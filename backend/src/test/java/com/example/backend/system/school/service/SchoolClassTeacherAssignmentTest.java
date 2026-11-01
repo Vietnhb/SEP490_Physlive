@@ -59,10 +59,20 @@ class SchoolClassTeacherAssignmentTest {
     }
 
     @Test
-    void rejectsTeacherAlreadyAssignedElsewhere() {
-        when(assignments.existsByTeacherIdAndSchoolClassIdNotAndIsActiveTrue(42, classId)).thenReturn(true);
-        assertEquals(HttpStatus.CONFLICT, assertThrows(ApiException.class, () -> service.assignTeacher(schoolId, classId, 42)).getStatus());
-        verify(assignments, never()).save(any());
+    void allowsSameTeacherToTeachMultipleClasses() {
+        UUID secondClassId = UUID.randomUUID();
+        SchoolClass secondClass = new SchoolClass();
+        secondClass.setId(secondClassId); secondClass.setSchool(teacher.getSchool()); secondClass.setIsActive(true);
+        when(classes.findById(secondClassId)).thenReturn(Optional.of(secondClass));
+
+        assertEquals(42, service.assignTeacher(schoolId, classId, 42).teacherId());
+        assertEquals(42, service.assignTeacher(schoolId, secondClassId, 42).teacherId());
+
+        var saved = org.mockito.ArgumentCaptor.forClass(ClassTeacherAssignment.class);
+        verify(assignments, times(2)).save(saved.capture());
+        assertEquals(java.util.List.of(classId, secondClassId), saved.getAllValues().stream()
+                .map(item -> item.getSchoolClass().getId()).toList());
+        assertTrue(saved.getAllValues().stream().allMatch(item -> item.getTeacher() == teacher && item.getIsActive()));
     }
 
     @Test

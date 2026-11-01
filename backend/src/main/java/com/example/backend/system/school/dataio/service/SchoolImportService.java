@@ -164,7 +164,7 @@ public class SchoolImportService {
         List<SchoolClass> schoolClasses = classes.findBySchoolIdAndIsActiveTrue(schoolId);
         List<User> schoolUsers = request.kind() == SchoolImport.Kind.USERS ? users.findBySchoolId(schoolId) : List.of();
         Map<String, Long> emailCounts = new HashMap<>(), identityCounts = new HashMap<>(), classCounts = new HashMap<>();
-        Map<String, Long> teacherCounts = new HashMap<>(), teacherClassCounts = new HashMap<>();
+        Map<String, Long> teacherClassCounts = new HashMap<>();
         List<SchoolImport.Row> normalized = request.rows().stream().map(row -> normalize(request.kind(), row)).toList();
         for (SchoolImport.Row row : normalized) {
             var data = row.data();
@@ -179,7 +179,6 @@ public class SchoolImportService {
             classCounts.merge(classKey(data.get("classCode"), data.get("schoolYear")), 1L, Long::sum);
             if (request.kind() == SchoolImport.Kind.TEACHER_ASSIGNMENTS
                     || request.kind() == SchoolImport.Kind.USERS && "STAFF".equals(data.get("role")) && !data.get("classCode").isBlank()) {
-                teacherCounts.merge(data.getOrDefault("teacherEmail", data.get("email")), 1L, Long::sum);
                 teacherClassCounts.merge(classKey(data.get("classCode"), data.get("schoolYear")), 1L, Long::sum);
             }
         }
@@ -233,9 +232,6 @@ public class SchoolImportService {
                 boolean teacherRow = request.kind() == SchoolImport.Kind.TEACHER_ASSIGNMENTS
                         || request.kind() == SchoolImport.Kind.USERS && "STAFF".equals(data.get("role"));
                 if (teacherRow) {
-                    String teacherEmail = data.getOrDefault("teacherEmail", data.get("email"));
-                    if (teacherCounts.getOrDefault(teacherEmail, 0L) > 1)
-                        errors.add("Mỗi giáo viên chỉ được phân công một lớp; giáo viên có nhiều dòng trong tệp.");
                     if (teacherClassCounts.getOrDefault(classKey(data.get("classCode"), data.get("schoolYear")), 0L) > 1)
                         errors.add("Mỗi lớp chỉ được có một giáo viên; lớp có nhiều dòng phân công trong tệp.");
                     if (target != null && !assignments.findByClassIdAndIsActiveTrue(target.getId()).isEmpty())
@@ -252,7 +248,6 @@ public class SchoolImportService {
                         if (!student && !accountAccess.canTeach(person)) errors.add("Tài khoản chưa có quyền giáo viên nên không thể phân công giảng dạy.");
                         if (student && enrollments.findActiveEnrollment(person.getId(), data.get("schoolYear")).isPresent()) errors.add("Học sinh đã được xếp lớp trong năm học này. Dùng chức năng chuyển lớp nếu cần.");
                         if (!student && assignments.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(target.getId(), person.getId())) errors.add("Giáo viên đã được phân công cho lớp này.");
-                        if (!student && assignments.existsByTeacherIdAndSchoolClassIdNotAndIsActiveTrue(person.getId(), target.getId())) errors.add("Giáo viên đã phụ trách lớp khác. Mỗi giáo viên chỉ được phân công một lớp.");
                     }
                     String key = student ? email + "|" + data.get("schoolYear") : email + "|" + data.get("classCode").toLowerCase(Locale.ROOT) + "|" + data.get("schoolYear");
                     if (emailCounts.get(key) > 1) errors.add(student ? "Học sinh có nhiều dòng trong cùng năm học." : "Phân công trùng trong tệp.");
