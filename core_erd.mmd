@@ -1,0 +1,248 @@
+erDiagram
+    %% ==========================================
+    %% 1. TÀI KHOẢN & TRƯỜNG HỌC (AUTH & SCHOOL)
+    %% ==========================================
+    roles {
+        int id PK
+        varchar name UK
+    }
+
+    users {
+        int id PK
+        varchar email UK
+        varchar password
+        varchar full_name
+        int role_id FK
+        uuid school_id FK
+        boolean active
+        varchar account_status
+        timestamptz last_login
+    }
+
+    schools {
+        uuid id PK
+        varchar code UK
+        varchar name
+        varchar plan_code FK
+        boolean active
+        date license_start
+        date license_end
+        bigint annual_price_vnd
+    }
+
+    license_plans {
+        varchar code PK
+        varchar name
+        int duration_months
+        int monthly_token_quota
+        bigint annual_price_vnd
+        boolean active
+    }
+
+    school_payments {
+        uuid id PK
+        uuid school_id FK
+        int manager_id FK
+        varchar plan_code FK
+        bigint amount_vnd
+        varchar purpose
+        timestamptz paid_at
+    }
+
+    %% ==========================================
+    %% 2. LỚP HỌC & PHÂN CÔNG (ACADEMICS)
+    %% ==========================================
+    school_classes {
+        uuid id PK
+        uuid school_id FK
+        varchar name
+        int grade_level
+        varchar school_year
+        boolean is_active
+    }
+
+    class_enrollments {
+        uuid id PK
+        uuid class_id FK
+        int student_id FK
+        varchar status
+        timestamptz enrolled_at
+    }
+
+    class_teacher_assignments {
+        uuid id PK
+        uuid class_id FK
+        int teacher_id FK
+        boolean is_active
+        timestamptz assigned_at
+    }
+
+    %% ==========================================
+    %% 3. CHƯƠNG TRÌNH HỌC (CURRICULUM)
+    %% ==========================================
+    topics {
+        uuid id PK
+        varchar name
+        varchar slug UK
+        int sort_order
+        boolean enabled
+    }
+
+    content_modules {
+        uuid id PK
+        uuid topic_id FK
+        varchar name
+        varchar slug
+        int sort_order
+        boolean active
+    }
+
+    grade_levels {
+        uuid id PK
+        uuid module_id FK
+        varchar name
+        int sort_order
+        boolean active
+    }
+
+    lessons {
+        uuid id PK
+        uuid level_id FK
+        varchar name
+        varchar slug
+        int sort_order
+        boolean active
+    }
+
+    %% ==========================================
+    %% 4. BÀI TOÁN, ĐẶC TẢ & MÔ PHỎNG (SIMULATION)
+    %% ==========================================
+    problem_submissions {
+        uuid id PK
+        int owner_id FK
+        uuid lesson_id FK
+        varchar source_mode
+        varchar status
+        text original_text
+    }
+
+    specifications {
+        uuid id PK
+        uuid submission_id FK
+        varchar schema_id
+        varchar schema_version
+        numeric confidence
+        jsonb objects
+        jsonb quantities
+        jsonb relations
+    }
+
+    simulations {
+        uuid id PK
+        uuid specification_id FK
+        int owner_id FK
+        varchar schema_id
+        varchar solver_version
+        varchar status
+    }
+
+    simulation_runs {
+        uuid id PK
+        uuid simulation_id FK
+        varchar run_type
+        boolean validation_passed
+        double duration_seconds
+        jsonb result
+    }
+
+    %% ==========================================
+    %% 5. THƯ VIỆN & CỘNG ĐỒNG (LIBRARY)
+    %% ==========================================
+    library_items {
+        uuid id PK
+        int owner_id FK
+        uuid specification_id FK
+        uuid simulation_id FK
+        uuid lesson_id FK
+        varchar title
+        varchar visibility
+        varchar moderation_status
+        boolean active
+    }
+
+    library_comments {
+        uuid id PK
+        uuid item_id FK
+        int author_id FK
+        text body
+        timestamptz created_at
+    }
+
+    %% ==========================================
+    %% 6. BÀI TẬP & ĐÁNH GIÁ (ASSIGNMENTS)
+    %% ==========================================
+    assignments {
+        uuid id PK
+        int teacher_id FK
+        uuid school_class_id FK
+        uuid specification_id FK
+        varchar title
+        text description
+        jsonb questions
+        numeric max_score
+        boolean auto_grade
+        varchar status
+        timestamptz due_at
+    }
+
+    assignment_submissions {
+        uuid id PK
+        uuid assignment_id FK
+        int student_id FK
+        int graded_by FK
+        jsonb predictions
+        numeric score
+        varchar grading_status
+        text feedback
+        timestamptz submitted_at
+    }
+
+    %% ==========================================
+    %% QUAN HỆ CỐT LÕI (CORE RELATIONSHIPS)
+    %% ==========================================
+    roles ||--o{ users : "assigns"
+    schools ||--o{ users : "employs_or_enrolls"
+    license_plans ||--o{ schools : "subscribes"
+    schools ||--o{ school_payments : "records"
+    users ||--o{ school_payments : "manager_pays"
+
+    schools ||--o{ school_classes : "contains"
+    school_classes ||--o{ class_enrollments : "enrolls"
+    users ||--o{ class_enrollments : "student"
+    school_classes ||--o{ class_teacher_assignments : "assigns"
+    users ||--o{ class_teacher_assignments : "teacher"
+
+    topics ||--o{ content_modules : "branches"
+    content_modules ||--o{ grade_levels : "categorizes"
+    grade_levels ||--o{ lessons : "structures"
+
+    users ||--o{ problem_submissions : "authors"
+    lessons ||--o{ problem_submissions : "assigned_under"
+    problem_submissions ||--o{ specifications : "produces"
+    specifications ||--o{ simulations : "modeled_into"
+    users ||--o{ simulations : "owns"
+    simulations ||--o{ simulation_runs : "executes"
+
+    users ||--o{ library_items : "publishes"
+    simulations ||--o{ library_items : "shares_model"
+    lessons ||--o{ library_items : "mapped_lesson"
+    specifications ||--o{ library_items : "specified_by"
+    library_items ||--o{ library_comments : "receives"
+    users ||--o{ library_comments : "comments"
+
+    users ||--o{ assignments : "teacher_assigns"
+    school_classes ||--o{ assignments : "assigned_to_class"
+    specifications ||--o{ assignments : "exercises_spec"
+    assignments ||--o{ assignment_submissions : "receives"
+    users ||--o{ assignment_submissions : "student_submits"
+    users ||--o{ assignment_submissions : "graded_by_teacher"

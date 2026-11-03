@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    actor Teacher
+    participant UI as Browser SPA (Canvas Lab)
+    participant SimCtrl as SimulationController
+    participant SimSvc as SimulationService
+    participant RK4 as AnalyticalSolver (RK4)
+    participant Canvas as Kinetic Canvas (Pixi.js)
+    participant Gate as PhysicsLawValidator
+    participant DB as PostgreSQL (Supabase)
+
+    Teacher ->> UI: Click Run and Verify Simulation
+    UI ->> SimCtrl: POST /api/simulations/{id}/verify
+    SimCtrl ->> SimSvc: executeVerification(simulationId)
+    
+    par Numerical Integration & Timeline Generation
+        SimSvc ->> RK4: solveTrajectories(schemaId, initialParams)
+        RK4 ->> RK4: Runge-Kutta 4th Order numerical integration
+        RK4 -->> SimSvc: solvedTimeline (position, velocity, mechanical energy E)
+    and Interactive Canvas Setup
+        SimSvc -->> UI: Send initial parameters and scene descriptor
+        UI ->> Canvas: Initialize Pixi.js canvas environment
+        Canvas ->> Canvas: Render visual geometry at 60 FPS
+        Canvas -->> UI: Canvas ready for playback
+    end
+
+    SimSvc ->> Gate: validateLawInvariants(solvedTimeline, lawCatalogue)
+    Gate ->> Gate: checkConservationLaws(Energy, Momentum, Newton II)
+
+    alt Domain Laws Satisfied (Status = VERIFIED)
+        Gate -->> SimSvc: ValidationReport (status = VERIFIED, lawsPassed = 11/11)
+        SimSvc ->> DB: UPDATE simulations SET status = 'VERIFIED'
+        SimSvc ->> DB: INSERT INTO simulation_runs (validation_passed = true, status = 'VERIFIED')
+        SimSvc -->> SimCtrl: VerificationResult (SUCCESS, VERIFIED)
+        SimCtrl -->> UI: HTTP 200 OK (Model certified, all laws verified)
+        UI -->> Teacher: Green verified badge and unlock Save/Assign controls
+    else Physical Invariant Violated (Status = FLAGGED)
+        Gate -->> SimSvc: ValidationReport (status = FLAGGED, violation = Energy Conservation Broken)
+        SimSvc ->> DB: UPDATE simulations SET status = 'FLAGGED'
+        SimSvc ->> DB: INSERT INTO law_gaps (kind = 'VIOLATION', status = 'FLAGGED')
+        SimSvc -->> SimCtrl: VerificationResult (FLAGGED, triggerSelfRepair = true)
+        SimCtrl -->> UI: HTTP 422 Unprocessable Entity (MSG-05: Law Violation)
+        UI -->> Teacher: Warning banner and auto-route to AI self-repair loop
+    end
+

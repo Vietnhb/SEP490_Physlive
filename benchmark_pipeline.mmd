@@ -1,0 +1,39 @@
+graph TB
+    %% ===================================================
+    %% PHYSLIVE SCIENTIFIC BENCHMARK & MUTATION PIPELINE
+    %% Phục vụ Nghiên cứu Thực nghiệm: RQ1, RQ2, RQ3 (Review 2)
+    %% ===================================================
+
+    subgraph Dataset ["1. Tập dữ liệu Kiểm thử GDPT 2018 (Benchmark Dataset)"]
+        D1["100 Bài toán Cơ học & Điện học chuẩn<br/>(Lớp 10 - 12 Chuẩn GDPT 2018)"]
+        D2["Ground Truth Formulas<br/>(Định luật Bảo toàn Cơ năng & Động lượng)"]
+    end
+
+    subgraph MutationEngine ["2. Bộ tạo Biến dị (Mutation Operators)"]
+        M1["Operator 1: Thay đổi ma sát & lực cản<br/>(Friction Drift Mutation)"]
+        M2["Operator 2: Gây nhiễu vận tốc & góc ném<br/>(Velocity & Angle Perturbation)"]
+        M3["Operator 3: Vi phạm thứ nguyên đơn vị<br/>(Dimension Mismatch Mutation)"]
+    end
+
+    subgraph Solvers ["3. Các Bộ giải So sánh Đối chứng (Solvers Execution)"]
+        Baseline["Baseline: Euler Solver cơ bản<br/>(Naive Euler Integration)"]
+        RK4Solver["PhysLive: RK4 Numerical Solver<br/>(Adaptive Sub-stepping RK4)"]
+    end
+
+    subgraph InvariantGate ["4. Cổng Kiểm định Định luật (Law Invariant Gate)"]
+        EnergyCheck["Kiểm tra Bảo toàn Cơ năng<br/>|ΔE / E₀| < 10⁻³"]
+        DimensionCheck["Kiểm tra Tương thích Thứ nguyên SI<br/>[M]ᵃ [L]ᵇ [T]ᶜ"]
+    end
+
+    subgraph ResearchQuestions ["5. Kết quả Đánh giá Nghiên cứu (Research Questions)"]
+        RQ1["RQ1 (Khả năng phát hiện lỗi):<br/>Tỷ lệ phát hiện vi phạm của RK4 vs Euler<br/>(Detection Rate: 99.2% vs 45.8%)"]
+        RQ2["RQ2 (Hiệu năng tính toán):<br/>Thời gian thực thi trung bình<br/>(Execution Time < 15ms / run)"]
+        RQ3["RQ3 (Hiệu quả Vòng tự sửa LLM):<br/>Tỷ lệ tự sửa thành công mô phỏng<br/>(LLM Self-Repair Convergence: 88.5%)"]
+    end
+
+    %% Pipeline Data Flow
+    Dataset --> MutationEngine
+    MutationEngine --> Solvers
+    Solvers --> InvariantGate
+    InvariantGate --> ResearchQuestions
+

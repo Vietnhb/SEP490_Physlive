@@ -1,0 +1,14 @@
+Lấy requirement + nắm bắt nghiệp vụ. (Từng thành viên)
+Hỏi về những edge case: ví dụ nếu thì như thế nào? giải thích dựa trên nghiệp vụ. (Từng thành viên)
+Trường hợp xấu nhất hệ thống thì sao? 
+Hỏi tiếp về những góp ý từ rv1 có bổ sung hay không? trong hệ thống có hay không?
+Architecture diagram.
+Packet diagram: cái này nhóm mình còn thiếu nè: giải thích về luồng lúc sự kiện được tạo ra đến khi cái sự kiện đó kết thúc.
+Activity diagram: chỗ này nhóm mình có bị question hay gì đó góp ý lắng nghe bảo vệ tiếp thu thôi đừng aggresive quá.
+API Doc: copy từ swagger xuống cũng được.
+State machine diagram.
+Kiểm tra UI nhấn vô cái nút này thì nó ra cái gì.
+Tiến độ của mobile. (Nếu có)
+Source Code: trong doc có đề cập file thì phải làm rõ: chỗ này có thể chuẩn bị source xong hỏi gì liên quan tới code mở file lên xem!
+Kiểm tra file config hỏi các thứ liên quan tới api!
+Kết thúc Team tự đánh giá tiến độ dự án %

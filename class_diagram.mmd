@@ -1,0 +1,264 @@
+classDiagram
+    %% ==========================================
+    %% 1. BASE ENTITY (LỚP CƠ SỞ KẾ THỪA)
+    %% ==========================================
+    class AuditedEntity {
+        <<Abstract>>
+        #id: UUID
+        #createdAt: Instant
+        #updatedAt: Instant
+        +getId(): UUID
+        +getCreatedAt(): Instant
+        +getUpdatedAt(): Instant
+        #onCreate(): void
+        #onUpdate(): void
+    }
+
+    %% ==========================================
+    %% 2. ACCOUNT & SECURITY DOMAIN (TÀI KHOẢN & PHÂN QUYỀN)
+    %% ==========================================
+    class User {
+        -id: Integer
+        -email: String
+        -password: String
+        -fullName: String
+        -active: Boolean
+        -mustChangePassword: boolean
+        -lastLogin: Instant
+        -dateOfBirth: LocalDate
+        -avatarUrl: String
+        ~deactivatedBy: Integer
+        +getId(): Integer
+        +getEmail(): String
+        +getFullName(): String
+        +hasPermission(code: PermissionCode): boolean
+        +grantPermission(permission: Permission, grantedBy: Integer): void
+        +permissionCodes(): List~String~
+    }
+
+    class Role {
+        -id: Integer
+        -name: RoleName
+        +getId(): Integer
+        +getName(): RoleName
+        +matches(value: String): boolean
+        +authority(): String
+    }
+
+    class Permission {
+        -id: Integer
+        -code: String
+        -label: String
+        +getId(): Integer
+        +getCode(): String
+        +getLabel(): String
+    }
+
+    %% ==========================================
+    %% 3. SCHOOL & BILLING DOMAIN (TRƯỜNG HỌC & LỚP HỌC)
+    %% ==========================================
+    class School {
+        -id: UUID
+        -name: String
+        -code: String
+        -licenseStart: LocalDate
+        -licenseEnd: LocalDate
+        -active: boolean
+        -monthlyTokenQuota: Integer
+        -usedTokens: Long
+        -planCode: String
+        -annualPriceVnd: Long
+        +getId(): UUID
+        +getName(): String
+        +isLicenseActive(): boolean
+        +hasAvailableQuota(): boolean
+    }
+
+    class LicensePlan {
+        -id: UUID
+        -code: String
+        -name: String
+        -durationMonths: Integer
+        -annualPriceVnd: Long
+        -monthlyTokenQuota: Integer
+        +getCode(): String
+        +getAnnualPriceVnd(): Long
+    }
+
+    class SchoolPayment {
+        -id: UUID
+        -amount: Long
+        -status: String
+        -transactionId: String
+        -paymentDate: Instant
+        +getId(): UUID
+        +isSuccessful(): boolean
+        +confirmTransaction(txnId: String): void
+    }
+
+    class SchoolClass {
+        -id: UUID
+        -name: String
+        -gradeLevel: Integer
+        +getId(): UUID
+        +getName(): String
+    }
+
+    class ClassEnrollment {
+        -id: UUID
+        -enrolledAt: Instant
+        +getId(): UUID
+        +getEnrolledAt(): Instant
+    }
+
+    class ClassTeacherAssignment {
+        -id: UUID
+        -assignedAt: Instant
+        +getId(): UUID
+        +getAssignedAt(): Instant
+    }
+
+    %% ==========================================
+    %% 4. SIMULATION DOMAIN (MÔ PHỎNG & ĐẶC TẢ)
+    %% ==========================================
+    class Specification {
+        -title: String
+        -description: String
+        -schemaId: String
+        -promptText: String
+        +getTitle(): String
+    }
+
+    class Simulation {
+        -schemaId: String
+        -solverVersion: String
+        -status: SimulationStatus
+        +getSchemaId(): String
+        +getStatus(): SimulationStatus
+        +validateModel(): boolean
+    }
+
+    class SimulationRun {
+        -id: UUID
+        -inputState: String
+        -outputMetrics: String
+        -executedAt: Instant
+        +getId(): UUID
+        +getOutputMetrics(): String
+    }
+
+    class SchemaEquationRuntime {
+        -defaultStep: double
+        -maxDuration: double
+        -maxSamples: int
+        -unitDimensions: Map
+        +integrate(plan: Node): Trajectory
+        +checkDimensions(ast: Node): boolean
+        +stepRK4(t: double, y: double[], dt: double): double[]
+    }
+
+    class PhysicsLawValidator {
+        -energyTolerance: double = 1e-3
+        +validateConservation(run: SimulationRun): ValidationReport
+        +checkMechanicalEnergy(eTimeline: double[]): boolean
+        +triggerSelfRepair(gap: String): boolean
+    }
+
+    class AiQuotaService {
+        -schools: SchoolRepository
+        -audits: TokenUsageAuditRepository
+        +requireAllowance(): void
+        +record(operation: String, tokens: long): void
+        +currentMonth(): LocalDate
+    }
+
+    %% ==========================================
+    %% 5. ASSIGNMENT DOMAIN (BÀI TẬP & BÀI LÀM)
+    %% ==========================================
+    class Assignment {
+        -title: String
+        -description: String
+        -questions: JsonNode
+        -gradingCriteria: JsonNode
+        -maxScore: BigDecimal
+        -autoGrade: boolean
+        -assignedAt: Instant
+        -dueAt: Instant
+        -status: AssignmentStatus
+        +getTitle(): String
+        +isOverdue(): boolean
+        +closeAssignment(): void
+    }
+
+    class AssignmentSubmission {
+        -predictions: JsonNode
+        -submittedAt: Instant
+        -completedAt: Instant
+        -score: BigDecimal
+        -gradingStatus: GradingStatus
+        -feedback: String
+        -gradedAt: Instant
+        +getScore(): BigDecimal
+        +isGraded(): boolean
+        +submitWork(answers: JsonNode): void
+        +gradeSubmission(score: BigDecimal, feedback: String): void
+    }
+
+    %% ==========================================
+    %% 6. LIBRARY DOMAIN (THƯ VIỆN & XUẤT BẢN)
+    %% ==========================================
+    class LibraryItem {
+        -status: String
+        -viewsCount: Integer
+        -likesCount: Integer
+        +getStatus(): String
+        +approvePublication(): void
+        +rejectPublication(reason: String): void
+    }
+
+    %% ==========================================
+    %% QUAN HỆ & BỘI SỐ (RELATIONSHIPS & MULTIPLICITY)
+    %% ==========================================
+
+    %% 1. Thừa kế (Inheritance: <|--)
+    AuditedEntity <|-- Specification
+    AuditedEntity <|-- Simulation
+    AuditedEntity <|-- Assignment
+    AuditedEntity <|-- AssignmentSubmission
+    AuditedEntity <|-- LibraryItem
+
+    %% 2. Hợp thành (Composition: *--)
+    %% Trường học mất -> Lớp học, Lịch sử thanh toán của trường mất
+    School "1" *-- "1..*" SchoolClass : contains
+    School "1" *-- "0..*" SchoolPayment : records
+    %% Lớp học mất -> Bản ghi phân lớp học sinh, phân công giáo viên mất
+    SchoolClass "1" *-- "0..*" ClassEnrollment : enlists
+    SchoolClass "1" *-- "0..*" ClassTeacherAssignment : designates
+    %% Đợt bài tập mất -> Toàn bộ bài làm của học sinh trong đợt đó mất
+    Assignment "1" *-- "0..*" AssignmentSubmission : receives
+    %% Mô phỏng mất -> Các lần chạy thử nghiệm của mô phỏng đó mất
+    Simulation "1" *-- "0..*" SimulationRun : executes
+
+    %% 3. Thu nạp (Aggregation: o--)
+    %% Trường học giải thể thì tài khoản con người (User) vẫn tồn tại độc lập
+    School "1" o-- "0..*" User : employs/enrolls
+
+    %% 4. Liên kết (Association: -->)
+    User "0..*" --> "1" Role : has role
+    Role "1" --> "0..*" Permission : defines
+    User "0..*" --> "0..1" School : belongs to
+    School "0..*" --> "0..1" LicensePlan : subscribes
+    SchoolPayment "0..*" --> "1" LicensePlan : pays for
+    ClassEnrollment "0..*" --> "1" User : student
+    ClassTeacherAssignment "0..*" --> "1" User : teacher
+    Simulation "0..*" --> "1" Specification : based on
+    Simulation "0..*" --> "1" User : authored by
+    Simulation "1" --> "1" SchemaEquationRuntime : solved by
+    Simulation "1" --> "1" PhysicsLawValidator : verified by
+    School "1" --> "1" AiQuotaService : metered by
+    Assignment "0..*" --> "1" Specification : uses
+    Assignment "0..*" --> "1" User : created by teacher
+    Assignment "0..*" --> "1" SchoolClass : assigned to class
+    AssignmentSubmission "0..*" --> "1" User : submitted by student
+    LibraryItem "0..*" --> "1" Simulation : publishes
+    LibraryItem "0..*" --> "1" User : shared by

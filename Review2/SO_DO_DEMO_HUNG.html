@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sơ Đồ Kịch Bản Live Demo Review 2 - Nguyễn Thế Hùng (PhysLive)</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #3b82f6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* Top Navigation Toolbar */
+    header {
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      z-index: 100;
+    }
+    .title-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .title-box h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      background: #1e3a8a;
+      color: #93c5fd;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid #3b82f6;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    button {
+      background: #1f2937;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    button:hover {
+      background: #374151;
+      color: #ffffff;
+      border-color: #4b5563;
+    }
+    button.primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+      color: #ffffff;
+    }
+    button.primary:hover {
+      background: #1d4ed8;
+    }
+    .zoom-level {
+      font-size: 12px;
+      font-weight: bold;
+      color: #60a5fa;
+      min-width: 45px;
+      text-align: center;
+    }
+    /* Main Layout */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    /* Diagram Viewport (Pan & Zoom) */
+    .viewport {
+      flex: 1;
+      height: 100%;
+      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+      overflow: hidden;
+      position: relative;
+      cursor: grab;
+    }
+    .viewport:active {
+      cursor: grabbing;
+    }
+    .pan-zoom-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: 0 0;
+      transition: transform 0.05s ease-out;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .svg-wrapper {
+      width: 950px;
+      max-width: 950px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      border-radius: 16px;
+    }
+    .svg-wrapper svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    /* Side Panel / Cheat-sheet */
+    .side-panel {
+      width: 380px;
+      background: #111827;
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .card.admin { border-left: 4px solid var(--primary); }
+    .card.manager { border-left: 4px solid var(--success); }
+    .card.exception { border-left: 4px solid var(--warning); }
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card ol {
+      margin-left: 16px;
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.6;
+    }
+    .card code {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+    }
+    .help-hint {
+      position: absolute;
+      bottom: 12px;
+      left: 16px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    @media print {
+      header, .side-panel, .help-hint, .controls { display: none !important; }
+      body, .workspace, .viewport { height: auto !important; overflow: visible !important; background: white !important; }
+      .pan-zoom-container { position: static !important; transform: none !important; }
+      .svg-wrapper { width: 100% !important; max-width: 100% !important; box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="title-box">
+      <h1>🎯 KỊCH BẢN LIVE DEMO REVIEW 2</h1>
+      <span class="badge">Nguyễn Thế Hùng (ADMIN &amp; MANAGER)</span>
+    </div>
+    <div class="controls">
+      <button onclick="zoomIn()">🔍 Phóng to (+)</button>
+      <button onclick="zoomOut()">🔎 Thu nhỏ (-)</button>
+      <span class="zoom-level" id="zoomText">100%</span>
+      <button onclick="resetZoom()">🔄 Mặc định</button>
+      <button onclick="fitWidth()">↔️ Vừa chiều rộng</button>
+      <button class="primary" onclick="toggleFullScreen()">⛶ Toàn màn hình</button>
+      <button onclick="window.print()">🖨️ In / PDF</button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+    <!-- Viewport for SVG -->
+    <div class="viewport" id="viewport">
+      <div class="pan-zoom-container" id="panZoomContainer">
+        <div class="svg-wrapper" id="svgWrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1320" width="100%" height="100%" style="background:#0f172a; font-family:'Segoe UI', Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="gradAdmin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="gradManager" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <linearGradient id="gradException" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowAdmin" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#60a5fa"/>
+    </marker>
+    <marker id="arrowManager" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399"/>
+    </marker>
+    <marker id="arrowException" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#fbbf24"/>
+    </marker>
+  </defs>
+
+  <!-- HEADER -->
+  <rect x="30" y="25" width="940" height="70" rx="14" fill="#1e293b" filter="url(#shadow)" stroke="#334155" stroke-width="1.5"/>
+  <text x="500" y="55" fill="#f8fafc" font-size="20" font-weight="bold" text-anchor="middle" letter-spacing="0.5">BẢN ĐỒ KỊCH BẢN LIVE DEMO REVIEW 2 (HÙNG - HUNGNT)</text>
+  <text x="500" y="78" fill="#94a3b8" font-size="13" text-anchor="middle">Hệ thống: PhysLive | Vai trò phụ trách: ADMIN (2 phút) + MANAGER (3 phút) + NGOẠI LỆ (1 phút)</text>
+
+  <!-- ==================== SECTION 1: ADMIN ==================== -->
+  <rect x="30" y="115" width="940" height="345" rx="16" fill="#1e293b" fill-opacity="0.6" stroke="#3b82f6" stroke-width="1.8" filter="url(#shadow)"/>
+  <!-- Section Title Badge -->
+  <rect x="50" y="130" width="370" height="34" rx="8" fill="url(#gradAdmin)"/>
+  <text x="65" y="153" fill="#ffffff" font-size="14" font-weight="bold">👑 PHẦN 1: DEMO VAI TRÒ ADMIN (2 PHÚT)</text>
+  <rect x="800" y="130" width="150" height="34" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+  <text x="875" y="152" fill="#93c5fd" font-size="12" font-weight="bold" text-anchor="middle">admin@gmail.com</text>
+
+  <!-- Admin Step 1 -->
+  <rect x="60" y="180" width="410" height="60" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="210" r="14" fill="#3b82f6"/>
+  <text x="85" y="215" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">1</text>
+  <text x="110" y="202" fill="#f8fafc" font-size="13" font-weight="bold">Đăng nhập tài khoản Admin</text>
+  <text x="110" y="222" fill="#94a3b8" font-size="11">Tài khoản: admin@gmail.com | Mật khẩu: 12345678</text>
+
+  <!-- Admin Step 2 -->
+  <rect x="530" y="180" width="410" height="60" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="555" cy="210" r="14" fill="#3b82f6"/>
+  <text x="555" y="215" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">2</text>
+  <text x="580" y="202" fill="#f8fafc" font-size="13" font-weight="bold">Mở Dashboard tổng quan sàn</text>
+  <text x="580" y="222" fill="#60a5fa" font-size="11">Đường dẫn: /admin | Component: AdminArea.tsx</text>
+
+  <!-- Connector Step 1 -> Step 2 -->
+  <line x1="470" y1="210" x2="522" y2="210" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowAdmin)"/>
+
+  <!-- Admin Step 3 -->
+  <rect x="60" y="270" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="305" r="14" fill="#3b82f6"/>
+  <text x="85" y="310" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">3</text>
+  <text x="110" y="295" fill="#f8fafc" font-size="13" font-weight="bold">Giám sát các chỉ số vận hành</text>
+  <text x="110" y="315" fill="#94a3b8" font-size="11">• Phân bổ 6 roles người dùng hệ thống</text>
+  <text x="110" y="332" fill="#94a3b8" font-size="11">• Thống kê Doanh thu &amp; Trạng thái thanh toán PayOS</text>
+
+  <!-- Connector Step 2 -> Step 3 (Down and Left) -->
+  <path d="M 735 240 L 735 255 L 265 255 L 265 262" fill="none" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowAdmin)"/>
+
+  <!-- Admin Step 4 -->
+  <rect x="530" y="270" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="555" cy="305" r="14" fill="#3b82f6"/>
+  <text x="555" y="310" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">4</text>
+  <text x="580" y="295" fill="#f8fafc" font-size="13" font-weight="bold">Quản trị tài khoản Manager</text>
+  <text x="580" y="315" fill="#94a3b8" font-size="11">• Admin nắm quyền cấp phép &amp; kiểm toán Manager</text>
+  <text x="580" y="332" fill="#94a3b8" font-size="11">• Thao tác: Tạo mới Manager, Khóa (active=false)</text>
+
+  <!-- Connector Step 3 -> Step 4 -->
+  <line x1="470" y1="307" x2="522" y2="307" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowAdmin)"/>
+
+  <!-- Admin Step 5 -->
+  <rect x="60" y="375" width="880" height="65" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="407" r="14" fill="#3b82f6"/>
+  <text x="85" y="412" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">5</text>
+  <text x="110" y="398" fill="#f8fafc" font-size="13" font-weight="bold">Danh mục người dùng toàn hệ thống (/admin/users)</text>
+  <text x="110" y="418" fill="#60a5fa" font-size="11">Component: UsersView.tsx | Tra cứu, lọc theo vai trò, quản lý trạng thái tài khoản của toàn bộ trường và giáo viên</text>
+
+  <!-- Connector Step 4 -> Step 5 -->
+  <path d="M 735 345 L 735 360 L 500 360 L 500 367" fill="none" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowAdmin)"/>
+
+  <!-- Connector Admin -> Manager -->
+  <line x1="500" y1="460" x2="500" y2="480" stroke="#64748b" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+  <!-- ==================== SECTION 2: MANAGER ==================== -->
+  <rect x="30" y="485" width="940" height="435" rx="16" fill="#1e293b" fill-opacity="0.6" stroke="#10b981" stroke-width="1.8" filter="url(#shadow)"/>
+  <!-- Section Title Badge -->
+  <rect x="50" y="500" width="390" height="34" rx="8" fill="url(#gradManager)"/>
+  <text x="65" y="523" fill="#ffffff" font-size="14" font-weight="bold">🏢 PHẦN 2: DEMO VAI TRÒ MANAGER (3 PHÚT)</text>
+  <rect x="780" y="500" width="170" height="34" rx="8" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+  <text x="865" y="522" fill="#6ee7b7" font-size="12" font-weight="bold" text-anchor="middle">manager@gmail.com</text>
+
+  <!-- Manager Step 1 -->
+  <rect x="60" y="550" width="410" height="60" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="580" r="14" fill="#10b981"/>
+  <text x="85" y="585" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">1</text>
+  <text x="110" y="572" fill="#f8fafc" font-size="13" font-weight="bold">Đăng nhập tài khoản Manager</text>
+  <text x="110" y="592" fill="#94a3b8" font-size="11">Tài khoản: manager@gmail.com | Mật khẩu: 123456789</text>
+
+  <!-- Manager Step 2 -->
+  <rect x="530" y="550" width="410" height="60" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="555" cy="580" r="14" fill="#10b981"/>
+  <text x="555" y="585" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">2</text>
+  <text x="580" y="572" fill="#f8fafc" font-size="13" font-weight="bold">Màn hình Tổng quan Vận hành</text>
+  <text x="580" y="592" fill="#34d399" font-size="11">Đường dẫn: /manager | Component: OverviewView.tsx</text>
+
+  <!-- Connector M1 -> M2 -->
+  <line x1="470" y1="580" x2="522" y2="580" stroke="#34d399" stroke-width="2" marker-end="url(#arrowManager)"/>
+
+  <!-- Manager Step 3 -->
+  <rect x="60" y="640" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="675" r="14" fill="#10b981"/>
+  <text x="85" y="680" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">3</text>
+  <text x="110" y="663" fill="#f8fafc" font-size="13" font-weight="bold">Quản lý Trường học (/manager/schools)</text>
+  <text x="110" y="683" fill="#94a3b8" font-size="11">Component: SchoolsView.tsx</text>
+  <text x="110" y="700" fill="#94a3b8" font-size="11">Xem danh sách trường, gói thuê bao, sĩ số học sinh</text>
+
+  <!-- Connector M2 -> M3 -->
+  <path d="M 735 610 L 735 625 L 265 625 L 265 632" fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrowManager)"/>
+
+  <!-- Manager Step 4 -->
+  <rect x="530" y="640" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="555" cy="675" r="14" fill="#10b981"/>
+  <text x="555" y="680" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">4</text>
+  <text x="580" y="663" fill="#f8fafc" font-size="13" font-weight="bold">Cấu hình Gói cước &amp; Hạn mức AI</text>
+  <text x="580" y="683" fill="#34d399" font-size="11">Component: SchoolSubscriptionDialog.tsx</text>
+  <text x="580" y="700" fill="#94a3b8" font-size="11">Thiết lập Student Quota &amp; Monthly AI Token Quota</text>
+
+  <!-- Connector M3 -> M4 -->
+  <line x1="470" y1="677" x2="522" y2="677" stroke="#34d399" stroke-width="2" marker-end="url(#arrowManager)"/>
+
+  <!-- Manager Step 5 -->
+  <rect x="60" y="745" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="780" r="14" fill="#10b981"/>
+  <text x="85" y="785" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">5</text>
+  <text x="110" y="768" fill="#f8fafc" font-size="13" font-weight="bold">Đối soát Giao dịch VietQR PayOS</text>
+  <text x="110" y="788" fill="#34d399" font-size="11">Đường dẫn: /manager/payments (AdminPayments.tsx)</text>
+  <text x="110" y="805" fill="#94a3b8" font-size="11">Theo dõi đơn PAID &amp; đơn REQUIRES_REVIEW có badge cảnh báo</text>
+
+  <!-- Connector M4 -> M5 -->
+  <path d="M 735 715 L 735 730 L 265 730 L 265 737" fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrowManager)"/>
+
+  <!-- Manager Step 6 -->
+  <rect x="530" y="745" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="555" cy="780" r="14" fill="#10b981"/>
+  <text x="555" y="785" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">6</text>
+  <text x="580" y="768" fill="#f8fafc" font-size="13" font-weight="bold">Giám sát Kiểm định Vật lý toàn sàn</text>
+  <text x="580" y="788" fill="#34d399" font-size="11">Đường dẫn: /manager/validation (ValidationView.tsx)</text>
+  <text x="580" y="805" fill="#94a3b8" font-size="11">Giám sát tỷ lệ VERIFIED vs FLAGGED (Không trực tiếp duyệt)</text>
+
+  <!-- Connector M5 -> M6 -->
+  <line x1="470" y1="782" x2="522" y2="782" stroke="#34d399" stroke-width="2" marker-end="url(#arrowManager)"/>
+
+  <!-- Manager Extra Step 7 (Curriculum) -->
+  <rect x="60" y="845" width="880" height="60" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="875" r="14" fill="#10b981"/>
+  <text x="85" y="880" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">7</text>
+  <text x="110" y="868" fill="#f8fafc" font-size="13" font-weight="bold">Quản lý Khung Chương trình GDPT 2018 (/manager/curriculum)</text>
+  <text x="110" y="888" fill="#34d399" font-size="11">Component: CurriculumView.tsx | Flyway V54: Cấu hình Khối lớp (10, 11, 12), Chủ đề, Bài học chuẩn Bộ GD&amp;ĐT</text>
+
+  <!-- Connector M6 -> Extra 7 -->
+  <path d="M 735 820 L 735 832 L 500 832 L 500 837" fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrowManager)"/>
+
+  <!-- Connector Manager -> Exception -->
+  <line x1="500" y1="920" x2="500" y2="940" stroke="#64748b" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+  <!-- ==================== SECTION 3: EXCEPTION ==================== -->
+  <rect x="30" y="945" width="940" height="345" rx="16" fill="#1e293b" fill-opacity="0.6" stroke="#f59e0b" stroke-width="1.8" filter="url(#shadow)"/>
+  <!-- Section Title Badge -->
+  <rect x="50" y="960" width="410" height="34" rx="8" fill="url(#gradException)"/>
+  <text x="65" y="983" fill="#ffffff" font-size="14" font-weight="bold">⚡ PHẦN 3: DEMO NGOẠI LỆ ĐỈNH CAO (1 PHÚT)</text>
+  <rect x="760" y="960" width="190" height="34" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+  <text x="855" y="982" fill="#fde68a" font-size="12" font-weight="bold" text-anchor="middle">SUSPENDED_READ_ONLY</text>
+
+  <!-- Exception Step 1 -->
+  <rect x="60" y="1010" width="410" height="65" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="85" cy="1042" r="14" fill="#f59e0b"/>
+  <text x="85" y="1047" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">1</text>
+  <text x="110" y="1033" fill="#f8fafc" font-size="13" font-weight="bold">Trường học nợ phí / Có tranh chấp</text>
+  <text x="110" y="1053" fill="#94a3b8" font-size="11">Phát hiện trường học quá hạn thanh toán VietQR</text>
+
+  <!-- Exception Step 2 -->
+  <rect x="530" y="1010" width="410" height="65" rx="10" fill="url(#cardBg)" stroke="#334155" stroke-width="1.2"/>
+  <circle cx="555" cy="1042" r="14" fill="#f59e0b"/>
+  <text x="555" y="1047" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">2</text>
+  <text x="580" y="1033" fill="#f8fafc" font-size="13" font-weight="bold">Manager chuyển sang SUSPENDED_READ_ONLY</text>
+  <text x="580" y="1053" fill="#fbbf24" font-size="11">Khóa quyền ghi nhưng bảo vệ quyền truy cập dữ liệu cũ</text>
+
+  <!-- Connector E1 -> E2 -->
+  <line x1="470" y1="1042" x2="522" y2="1042" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrowException)"/>
+
+  <!-- Exception Step 3 -->
+  <rect x="60" y="1100" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#ef4444" stroke-width="1.2"/>
+  <circle cx="85" cy="1137" r="14" fill="#ef4444"/>
+  <text x="85" y="1142" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">3</text>
+  <text x="110" y="1125" fill="#fca5a5" font-size="13" font-weight="bold">Thử POST / PUT / DELETE -&gt; 403 Forbidden</text>
+  <text x="110" y="1145" fill="#fecaca" font-size="11">Backend chặn ngay lập tức qua Interceptor:</text>
+  <text x="110" y="1160" fill="#fca5a5" font-size="11 font-weight='bold'">AccountCapabilityInterceptor.java</text>
+
+  <!-- Connector E2 -> E3 -->
+  <path d="M 735 1075 L 735 1088 L 265 1088 L 265 1092" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrowException)"/>
+
+  <!-- Exception Step 4 -->
+  <rect x="530" y="1100" width="410" height="75" rx="10" fill="url(#cardBg)" stroke="#10b981" stroke-width="1.2"/>
+  <circle cx="555" cy="1137" r="14" fill="#10b981"/>
+  <text x="555" y="1142" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">4</text>
+  <text x="580" y="1125" fill="#6ee7b7" font-size="13" font-weight="bold">GET dữ liệu cũ &amp; Gửi đơn Khiếu nại (Appeal)</text>
+  <text x="580" y="1145" fill="#a7f3d0" font-size="11">Giáo viên vẫn xem được bài giảng cũ để tránh gián đoạn dạy học</text>
+  <text x="580" y="1160" fill="#6ee7b7" font-size="11">Gửi khiếu nại tới AppealController.java (Flyway V50)</text>
+
+  <!-- Connector E3 -> E4 -->
+  <line x1="470" y1="1137" x2="522" y2="1137" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrowException)"/>
+
+  <!-- SUMMARY FOOTER -->
+  <rect x="60" y="1200" width="880" height="65" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.2"/>
+  <text x="500" y="1225" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">🎯 TỔNG KẾT: 6 PHÚT CHUẨN XÁC - TÍNH NĂNG RÕ RÀNG - MÃ NGUỒN CHUẨN DOANH NGHIỆP</text>
+  <text x="500" y="1245" fill="#94a3b8" font-size="11" text-anchor="middle">Hùng chỉ cần tự tin thao tác đúng trình tự trên, kết hợp chỉ đúng file code tương ứng sẽ hoàn toàn chinh phục Hội đồng!</text>
+</svg>
+        </div>
+      </div>
+      <div class="help-hint">
+        💡 <b>Mẹo thao tác:</b> Lăn chuột để <b>Phóng to / Thu nhỏ</b>. Nhấn giữ chuột trái và kéo để <b>Di chuyển</b> sơ đồ.
+      </div>
+    </div>
+
+    <!-- SIDE PANEL GUIDE -->
+    <div class="side-panel">
+      <h2 style="font-size: 14px; font-weight: bold; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+        📋 CẨM NANG BƯỚC DEMO (6 PHÚT)
+      </h2>
+
+      <!-- Admin Box -->
+      <div class="card admin">
+        <h3 style="color: #60a5fa;">
+          👑 PHẦN 1: ADMIN (2 PHÚT)
+          <span style="font-size: 10px; color: #94a3b8;">/admin</span>
+        </h3>
+        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 6px;">
+          Tài khoản: <code>admin@gmail.com</code> | MK: <code>12345678</code>
+        </p>
+        <ol>
+          <li>Đăng nhập vào màn hình <code>/admin</code>.</li>
+          <li>Chỉ vào Dashboard <code>AdminArea.tsx</code>: Thống kê 6 roles người dùng, Doanh thu &amp; Đơn PayOS.</li>
+          <li>Vào mục Quản lý Manager: Tạo Manager mới hoặc Khóa tạm thời <code>active=false</code>.</li>
+          <li>Mở danh mục người dùng <code>UsersView.tsx</code>: Tra cứu người dùng toàn sàn.</li>
+        </ol>
+      </div>
+
+      <!-- Manager Box -->
+      <div class="card manager">
+        <h3 style="color: #34d399;">
+          🏢 PHẦN 2: MANAGER (3 PHÚT)
+          <span style="font-size: 10px; color: #94a3b8;">/manager</span>
+        </h3>
+        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 6px;">
+          Tài khoản: <code>manager@gmail.com</code> | MK: <code>123456789</code>
+        </p>
+        <ol>
+          <li>Đăng nhập vào màn hình <code>/manager</code> (OverviewView.tsx).</li>
+          <li>Quản lý Trường học <code>SchoolsView.tsx</code>: Xem trường, gói cước và học sinh.</li>
+          <li>Cấu hình Gói <code>SchoolSubscriptionDialog.tsx</code>: Cài Student Quota &amp; AI Token Quota.</li>
+          <li>Đối soát VietQR PayOS <code>AdminPayments.tsx</code>: Xem đơn PAID và đơn cảnh báo REQUIRES_REVIEW.</li>
+          <li>Giám sát Kiểm định <code>ValidationView.tsx</code>: Xem % mô phỏng VERIFIED vs FLAGGED.</li>
+          <li>Khung CT GDPT 2018 <code>CurriculumView.tsx</code>: Cấu hình Khối 10, 11, 12 (Flyway V54).</li>
+        </ol>
+      </div>
+
+      <!-- Exception Box -->
+      <div class="card exception">
+        <h3 style="color: #fbbf24;">
+          ⚡ PHẦN 3: NGOẠI LỆ (1 PHÚT)
+          <span style="font-size: 10px; color: #f87171;">403 FORBIDDEN</span>
+        </h3>
+        <ol>
+          <li>Manager đổi trạng thái trường sang <code>SUSPENDED_READ_ONLY</code> (do nợ phí hoặc vi phạm).</li>
+          <li>Thử gửi thao tác ghi POST/PUT/DELETE -&gt; Bị chặn ngay HTTP 403 bởi <code>AccountCapabilityInterceptor.java</code>.</li>
+          <li>Đăng nhập GET xem bài giảng cũ bình thường để không gián đoạn dạy học.</li>
+          <li>Gửi khiếu nại tới <code>AppealController.java</code> (Flyway V50).</li>
+        </ol>
+      </div>
+
+      <div style="font-size: 11px; color: #94a3b8; line-height: 1.5; background: #0f172a; padding: 10px; border-radius: 8px;">
+        📌 <b>Lưu ý vàng bảo vệ:</b> Manager <i>không trực tiếp duyệt mô phỏng</i> (role Reviewer duyệt). Manager nắm quyền vận hành kinh doanh, hạn mức và đối soát tiền bạc.
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT PAN & ZOOM -->
+  <script>
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const viewport = document.getElementById('viewport');
+    const container = document.getElementById('panZoomContainer');
+    const zoomText = document.getElementById('zoomText');
+
+    function updateTransform() {
+      container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      zoomText.textContent = `${Math.round(scale * 100)}%`;
+    }
+
+    function zoomIn() {
+      scale = Math.min(scale * 1.25, 4.0);
+      updateTransform();
+    }
+
+    function zoomOut() {
+      scale = Math.max(scale / 1.25, 0.3);
+      updateTransform();
+    }
+
+    function resetZoom() {
+      scale = 1;
+      translateX = 0;
+      translateY = 0;
+      updateTransform();
+    }
+
+    function fitWidth() {
+      const vpWidth = viewport.clientWidth;
+      const svgWidth = 950;
+      scale = (vpWidth - 80) / svgWidth;
+      translateX = 0;
+      translateY = 0;
+      updateTransform();
+    }
+
+    // Mouse Wheel Zoom
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+      const newScale = Math.min(Math.max(scale * zoomFactor, 0.3), 4.0);
+
+      // Zoom towards mouse pointer
+      const rect = viewport.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      translateX = mouseX - (mouseX - translateX) * (newScale / scale);
+      translateY = mouseY - (mouseY - translateY) * (newScale / scale);
+      scale = newScale;
+
+      updateTransform();
+    }, { passive: false });
+
+    // Mouse Drag (Panning)
+    viewport.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // Only left click
+      isDragging = true;
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      translateX = e.clientX - startX;
+      translateY = e.clientY - startY;
+      updateTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Fullscreen toggle
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          alert(`Lỗi khi mở toàn màn hình: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // Auto fit on load if viewport is narrow
+    window.addEventListener('load', () => {
+      if (viewport.clientWidth < 1100) {
+        fitWidth();
+      }
+    });
+  </script>
+</body>
+</html>
