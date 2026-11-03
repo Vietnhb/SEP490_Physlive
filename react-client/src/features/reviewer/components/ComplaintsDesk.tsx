@@ -12,6 +12,7 @@ export function ComplaintsDesk() {
   const [items, setItems] = useState<SimulationComplaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState<Filter>("todo");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState("");
@@ -34,11 +35,13 @@ export function ComplaintsDesk() {
       setActionError({ id: item.id, message: "Hãy ghi kết quả xử lý trước khi đánh dấu đã giải quyết." });
       return;
     }
-    setBusyId(item.id); setActionError(null);
+    if (busyId) return;
+    setBusyId(item.id); setActionError(null); setNotice("");
     try {
       const updated = await resolveComplaint(item.id, status, response || undefined);
       setItems(current => current.map(value => value.id === updated.id ? updated : value));
       setDrafts(current => ({ ...current, [item.id]: "" }));
+      setNotice("Đã lưu kết quả kiểm tra. Manager và người gửi có thể xem phản hồi.");
     } catch (cause) {
       const message = axios.isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
       setActionError({ id: item.id, message: message || "Chưa lưu được. Vui lòng thử lại." });
@@ -49,7 +52,7 @@ export function ComplaintsDesk() {
     <div className="reviewer-toolbar">
       <div style={{ flex: 1, minWidth: 0 }}>
         <Heading as="h1" size="6">Khiếu nại mô phỏng</Heading>
-        <Text as="p" size="2" color="gray" mt="1">Giáo viên báo mô phỏng tính sai hoặc không đúng đề bài. Hãy kiểm tra, trả lời và đánh dấu khi đã giải quyết.</Text>
+        <Text as="p" size="2" color="gray" mt="1">Các báo lỗi mô phỏng được Manager chuyển đến. Kiểm tra, phản hồi và đánh dấu khi đã giải quyết.</Text>
       </div>
       <Button variant="soft" color="gray" onClick={() => void load()} disabled={loading}>Làm mới</Button>
     </div>
@@ -60,6 +63,7 @@ export function ComplaintsDesk() {
       </SegmentedControl.Root>
     </div>
     {error && <Card><Text color="red" role="alert">{error}</Text></Card>}
+    {notice && <Card><Text color="green" role="status">{notice}</Text></Card>}
     {loading && items.length === 0 && <CardLoadingSkeleton cards={3} label="Đang tải khiếu nại…" />}
     {!loading && !error && visible.length === 0 && <Card size="3"><Text color="gray">{filter === "todo" ? "Không có khiếu nại nào đang chờ. " : "Chưa có khiếu nại nào được giải quyết."}</Text></Card>}
     <div className="complaint-desk">
@@ -71,20 +75,16 @@ export function ComplaintsDesk() {
           <p className="complaint-item__body">{detail.trim()}</p>
           {context && <p className="complaint-context" style={{ whiteSpace: "pre-wrap", marginTop: 10 }}><strong>Đề bài và thông số giáo viên đang dùng</strong>{"\n"}{context.replace("— Thông số đang dùng —", "Thông số:").trim()}</p>}
           {item.adminResponse && <p className="complaint-item__answer"><b>Đã phản hồi{item.responderName ? ` (${item.responderName})` : ""}</b>{item.adminResponse}</p>}
-          <div className="complaint-desk__reply">
+          {item.status !== "RESOLVED" && <div className="complaint-desk__reply">
             <TextArea aria-label={`Phản hồi cho ${item.senderName}`} rows={3} maxLength={4000} value={drafts[item.id] ?? ""} disabled={busyId === item.id}
               onChange={event => setDrafts(current => ({ ...current, [item.id]: event.target.value }))}
               placeholder={item.adminResponse ? "Viết phản hồi mới (thay cho phản hồi trước)…" : "Kết quả kiểm tra và hướng xử lý cho giáo viên…"} />
             {actionError?.id === item.id && <Text size="2" color="red" role="alert">{actionError.message}</Text>}
             <div className="complaint-desk__actions">
-              {item.status === "RESOLVED"
-                ? <Button variant="soft" color="gray" disabled={busyId === item.id} onClick={() => void act(item, "READ")}>Mở lại để xử lý tiếp</Button>
-                : <>
-                  <Button variant="soft" disabled={busyId === item.id || !(drafts[item.id] ?? "").trim()} onClick={() => void act(item, "READ")}>Gửi phản hồi, tiếp tục xem xét</Button>
-                  <Button disabled={busyId === item.id} onClick={() => void act(item, "RESOLVED")}>Đánh dấu đã giải quyết</Button>
-                </>}
+              <Button variant="soft" disabled={!!busyId || !(drafts[item.id] ?? "").trim()} onClick={() => void act(item, "READ")}>Gửi phản hồi, tiếp tục xem xét</Button>
+              <Button disabled={!!busyId} onClick={() => void act(item, "RESOLVED")}>Đánh dấu đã giải quyết</Button>
             </div>
-          </div>
+          </div>}
         </Card>;
       })}
     </div>

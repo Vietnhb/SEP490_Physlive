@@ -56,7 +56,7 @@ function ProfileContent({ user }: Readonly<{ user: User }>) {
 
   return <div className="profile-page">
     <div className="profile-container">
-      <div className="profile-back"><Link to="/"><LearningIcon name="back" />Quay lại PhysLive</Link></div>
+      <div className="profile-back"><Link to="/"><LearningIcon name="back" />Quay lại PhysLive</Link> · <Link to="/support">Hỗ trợ & khiếu nại của tôi</Link></div>
       <div className="profile-grid">
         <aside className="profile-sidebar">
           <section className="profile-card profile-identity-card">

@@ -5,7 +5,7 @@ import { login } from "../api/authApi";
 import { setToken } from "../../../shared/lib/token";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import LearningIcon from "../../../shared/ui/LearningIcon";
-import { userHome } from "../../../shared/auth/permissions";
+import { isAccountSuspended, userHome } from "../../../shared/auth/permissions";
 import TrajectoryFigure from "../components/TrajectoryFigure";
 import DotField from "../../../shared/effects/DotField";
 import Aurora from "../../../shared/effects/Aurora";
@@ -33,7 +33,7 @@ export default function Login() {
       const response = await login(email, password);
       setToken(response.token);
       setUser(response.user);
-      navigate(response.user.mustChangePassword ? "/change-password" : userHome(response.user), { replace: true });
+      navigate(!isAccountSuspended(response.user) && response.user.mustChangePassword ? "/change-password" : userHome(response.user), { replace: true });
     }
     catch (err: unknown) {
       if (axios.isAxiosError<{ message?: string }>(err) && err.response) setError(err.response.data?.message ?? (err.response.status === 401 ? "Email hoặc mật khẩu không đúng." : "Không thể đăng nhập."));

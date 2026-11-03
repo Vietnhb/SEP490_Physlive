@@ -1,0 +1,14 @@
+.support-page { width: min(100%, 1280px); margin: 0 auto; padding: 28px; display: grid; gap: 20px; color: var(--ink, var(--gray-12)); }
+.support-page--manager { width: 100%; margin: 0; padding: 32px; min-width: 0; }
+.support-page h1 { margin: 0 0 8px; font-size: 26px; }
+.support-page p { color: var(--muted, var(--gray-11)); line-height: 1.6; }
+.support-panel { min-width: 0; padding: 22px; border: 1px solid var(--line, var(--gray-6)); border-radius: 14px; background: var(--surface, var(--color-panel-solid)); }
+.support-scroll { max-height: 440px; overflow: auto; scrollbar-width: thin; scrollbar-gutter: stable; border: 1px solid var(--gray-6); border-radius: 10px; }
+.support-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
+.support-table th { position: sticky; top: 0; z-index: 1; background: var(--gray-2); }
+.support-table th, .support-table td { padding: 14px; border-bottom: 1px solid var(--gray-6); }
+.support-table small { display: block; color: var(--gray-11); margin-top: 4px; }
+.support-field { display: grid; gap: 8px; margin: 16px 0; font-size: 14px; font-weight: 500; }
+.support-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.support-page .support-success { color: var(--green-11); }
+@media (max-width: 600px) { .support-page { padding: 16px; } .support-panel { padding: 16px; } }

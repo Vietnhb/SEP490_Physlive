@@ -57,7 +57,7 @@ export default function SimulationComplaintDialog({ simulationId, description, p
       const created = await submitSimulationComplaint(reason, content.slice(0, 10000), simulationId);
       setHistory(current => [created, ...(current ?? [])]);
       setDetail("");
-      setNotice("Đã gửi khiếu nại. Người kiểm duyệt sẽ phản hồi tại đây.");
+      setNotice("Đã gửi báo lỗi đến Manager. Kết quả xử lý sẽ hiển thị tại đây.");
     } catch (cause) {
       const message = axios.isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
       setError(message || "Chưa gửi được khiếu nại. Vui lòng thử lại.");
@@ -67,7 +67,7 @@ export default function SimulationComplaintDialog({ simulationId, description, p
   return createPortal(<div className="complaint-overlay" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="complaint-dialog" data-history-only={historyOnly || undefined} role="dialog" aria-modal="true" aria-labelledby="complaint-title">
       <header className="complaint-dialog__head">
-        <div><h2 id="complaint-title">{historyOnly ? "Khiếu nại đã gửi" : "Báo lỗi mô phỏng"}</h2><p>{historyOnly ? "Trạng thái và phản hồi của người kiểm duyệt. Để gửi khiếu nại mới, mở mô phỏng rồi bấm “Báo lỗi” phía trên khung mô phỏng." : "Báo cho người kiểm duyệt khi mô phỏng tính sai hoặc không đúng với đề bài. Phản hồi sẽ hiện trong mục Khiếu nại đã gửi."}</p></div>
+        <div><h2 id="complaint-title">{historyOnly ? "Khiếu nại đã gửi" : "Báo lỗi mô phỏng"}</h2><p>{historyOnly ? "Theo dõi trạng thái và phản hồi. Để gửi báo lỗi mới, mở mô phỏng rồi bấm “Báo lỗi” phía trên khung mô phỏng." : "Manager tiếp nhận, xử lý hoặc chuyển Reviewer kiểm tra chuyên môn. Phản hồi sẽ hiện trong mục Khiếu nại đã gửi."}</p></div>
         <button type="button" className="complaint-close" aria-label="Đóng" onClick={onClose}>×</button>
       </header>
       {!historyOnly && <form className="complaint-form" onSubmit={submit}>
@@ -95,7 +95,8 @@ export default function SimulationComplaintDialog({ simulationId, description, p
             <div className="complaint-item__top"><strong>{item.subject}</strong><span className="complaint-status" data-status={item.status}>{COMPLAINT_STATUS[item.status]}</span></div>
             <time dateTime={item.createdAt}>Gửi lúc {new Date(item.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</time>
             <p className="complaint-item__body">{item.content.split("\n— Đề bài —")[0].trim()}</p>
-            {item.adminResponse && <p className="complaint-item__answer"><b>Phản hồi của người kiểm duyệt{item.responderName ? ` (${item.responderName})` : ""}</b>{item.adminResponse}</p>}
+            {item.reviewerReferred && <p className="complaint-item__meta">Đã chuyển Reviewer kiểm tra.</p>}
+            {item.adminResponse && <p className="complaint-item__answer"><b>Phản hồi{item.responderName ? ` (${item.responderName})` : ""}</b>{item.adminResponse}</p>}
           </article>)}
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { Badge, Button, Callout, Dialog, Flex, IconButton, TextArea, TextField } from "@radix-ui/themes";
 import { Cross2Icon, ExclamationTriangleIcon, LockClosedIcon } from "@radix-ui/react-icons";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -27,10 +28,6 @@ export default function AccountSuspendedBanner() {
       await createAppeal({ reason: reason.trim(), content: content.trim() });
       setNotice("Đã gửi đơn khiếu nại thành công! Quản trị viên sẽ xem xét và phản hồi sớm.");
       setContent("");
-      setTimeout(() => {
-        setOpen(false);
-        setNotice("");
-      }, 2500);
     } catch (err) {
       setError(apiMessage(err, "Không thể gửi khiếu nại lúc này. Vui lòng thử lại."));
     } finally {
@@ -61,10 +58,10 @@ export default function AccountSuspendedBanner() {
       >
         <Flex align="center" gap="3" style={{ flex: 1, minWidth: "280px" }}>
           <Badge color="red" size="2" variant="solid">
-            <LockClosedIcon /> TẠM KHÓA (CHỈ XEM)
+            <LockClosedIcon /> TÀI KHOẢN TẠM KHÓA
           </Badge>
           <div>
-            <strong>Tài khoản đang trong chế độ chỉ xem:</strong>{" "}
+            <strong>Bạn chỉ có thể gửi và theo dõi khiếu nại tài khoản:</strong>{" "}
             {user.suspensionReason ? user.suspensionReason : "Chưa có lý do cụ thể."}{" "}
             <span style={{ opacity: 0.85 }}>({expirationText})</span>
           </div>
@@ -80,6 +77,7 @@ export default function AccountSuspendedBanner() {
         >
           <ExclamationTriangleIcon /> Gửi khiếu nại tài khoản
         </Button>
+        <Link to="/support">Xem lịch sử và phản hồi</Link>
       </div>
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -92,7 +90,7 @@ export default function AccountSuspendedBanner() {
           </Flex>
 
           <Dialog.Description size="2" mb="4">
-            Gửi giải trình hoặc yêu cầu hỗ trợ mở khóa tài khoản đến Quản trị viên hệ thống. Đơn khiếu nại sẽ được lưu vào bảng dữ liệu kiểm tra.
+            Gửi yêu cầu xem xét mở khóa. Admin xử lý tài khoản Manager; Manager xử lý các tài khoản thuộc phạm vi quản lý. Mỗi tài khoản chỉ có một đơn đang chờ.
           </Dialog.Description>
 
           {notice && (
@@ -124,6 +122,7 @@ export default function AccountSuspendedBanner() {
               <TextArea
                 required
                 rows={4}
+                maxLength={10000}
                 disabled={submitting}
                 placeholder="Mô tả hoàn cảnh, bằng chứng hoặc cam kết khắc phục vi phạm…"
                 value={content}

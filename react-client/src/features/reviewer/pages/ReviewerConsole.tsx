@@ -38,7 +38,7 @@ export default function ReviewerLayout() {
   }, [access.canReview]);
 
   // Complaints are open to every reviewer account, whichever permission it holds.
-  const canHandleComplaints = access.canEdit || access.canReview;
+  const canHandleComplaints = !access.isManager && (access.canEdit || access.canReview);
   const [openComplaints, setOpenComplaints] = useState(0);
   useEffect(() => {
     if (!canHandleComplaints) return;
@@ -101,6 +101,7 @@ export function ReviewerTopicsPage() {
 
 export function ReviewerComplaintsPage() {
   const { access } = useReviewer();
+  if (access.isManager) return <Navigate to="/manager/support?kind=COMPLAINT" replace />;
   return access.canEdit || access.canReview ? <ComplaintsDesk /> : <Navigate to="/reviewer" replace />;
 }
 

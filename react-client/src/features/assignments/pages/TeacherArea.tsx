@@ -23,11 +23,11 @@ type RailItem = { to: string; label: string; icon: ComponentProps<typeof Learnin
  */
 export default function TeacherAreaLayout() {
   const user = useSessionStore(state => state.user);
-  // Complaints a reviewer has answered but not closed: the teacher may want to read the reply.
+  // A reply can come from Manager or Reviewer; referral alone is not a reply.
   const [answered, setAnswered] = useState(0);
   useEffect(() => {
     let active = true;
-    mySupportItems().then(items => { if (active) setAnswered(complaintsOnly(items).filter(item => item.status === "READ").length); }).catch(() => undefined);
+    mySupportItems().then(items => { if (active) setAnswered(complaintsOnly(items).filter(item => item.status === "READ" && item.adminResponse?.trim()).length); }).catch(() => undefined);
     return () => { active = false; };
   }, []);
 
@@ -80,7 +80,7 @@ export function TeacherComplaintsPage() {
 
   return <div className="complaint-page">
     <header className="complaint-page__head">
-      <div><h1>Khiếu nại đã gửi</h1><p>Các lần bạn báo mô phỏng sai và phản hồi của người kiểm duyệt. Để gửi khiếu nại mới, mở mô phỏng rồi bấm “Báo lỗi” phía trên khung mô phỏng.</p></div>
+      <div><h1>Khiếu nại đã gửi</h1><p>Manager tiếp nhận báo lỗi và có thể chuyển Reviewer kiểm tra. Để báo lỗi mới, mở mô phỏng rồi bấm “Báo lỗi” phía trên khung mô phỏng.</p></div>
       <button type="button" className="complaint-page__refresh" onClick={() => void load()}>Làm mới</button>
     </header>
     <div className="complaint-page__filters" role="group" aria-label="Lọc theo trạng thái">
@@ -95,10 +95,11 @@ export function TeacherComplaintsPage() {
         return <article className="complaint-item" key={item.id}>
           <div className="complaint-item__top"><strong>{item.subject}</strong><span className="complaint-status" data-status={item.status}>{COMPLAINT_STATUS[item.status]}</span></div>
           <time dateTime={item.createdAt}>Gửi lúc {new Date(item.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</time>
+          {item.reviewerReferred && <p className="complaint-item__meta">Đã chuyển Reviewer kiểm tra.</p>}
           <p className="complaint-item__body">{detail.trim()}</p>
           {context && <p className="complaint-context" style={{ whiteSpace: "pre-wrap" }}><strong>Đề bài</strong>{"\n"}{context.split("— Thông số đang dùng —")[0].trim()}</p>}
           {item.adminResponse
-            ? <p className="complaint-item__answer"><b>Phản hồi của người kiểm duyệt{item.responderName ? ` (${item.responderName})` : ""}{item.respondedAt ? ` · ${new Date(item.respondedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}` : ""}</b>{item.adminResponse}</p>
+            ? <p className="complaint-item__answer"><b>Phản hồi{item.responderName ? ` (${item.responderName})` : ""}{item.respondedAt ? ` · ${new Date(item.respondedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}` : ""}</b>{item.adminResponse}</p>
             : <p className="complaint-item__meta">Chưa có phản hồi.</p>}
         </article>;
       })}</div>}

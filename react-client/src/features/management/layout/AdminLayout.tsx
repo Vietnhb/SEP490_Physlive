@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { DropdownMenu, IconButton } from "@radix-ui/themes";
 import { useNavigate } from "react-router-dom";
 import { paymentNotifications, type PaymentNotification } from "../../billing/api/billingApi";
+import { adminSupportItems } from "../../support/api/supportApi";
+import { getAdminAppeals } from "../../account/api/appealApi";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppSidebar";
 
@@ -10,6 +12,27 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [notificationError, setNotificationError] = useState(false);
+  const [pendingSupport, setPendingSupport] = useState(0);
+  useEffect(() => {
+    let active = true;
+    let revision = 0;
+    const load = () => {
+      const request = ++revision;
+      void Promise.all([adminSupportItems(), getAdminAppeals()]).then(([support, appeals]) => {
+        if (active && request === revision) setPendingSupport(support.filter(item => item.status !== "RESOLVED").length
+          + appeals.filter(item => item.status === "PENDING").length);
+      }).catch(() => { /* Keep the previous count if a refresh fails. */ });
+    };
+    load();
+    const timer = window.setInterval(load, 30000);
+    window.addEventListener("physlive:support-updated", load);
+    window.addEventListener("focus", load);
+    return () => {
+      active = false; window.clearInterval(timer);
+      window.removeEventListener("physlive:support-updated", load);
+      window.removeEventListener("focus", load);
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     const load = () => void paymentNotifications().then(items => { if (active) { setNotifications(items); setNotificationError(false); } }).catch(() => { if (active) setNotificationError(true); });
@@ -27,8 +50,7 @@ export default function AdminLayout() {
       { to: "/manager/payments", label: "Thanh toán", icon: "chart", badge: toReconcile },
     ] },
     { label: "Hỗ trợ", items: [
-      { to: "/manager/feedback", label: "Phản hồi", icon: "message" },
-      { to: "/manager/messages", label: "Tin nhắn", icon: "bell" },
+      { to: "/manager/support", label: "Yêu cầu hỗ trợ", icon: "message", badge: pendingSupport },
     ] },
     { label: "Nội dung", items: [
       { to: "/manager/curriculum", label: "Chương trình học", icon: "file" },

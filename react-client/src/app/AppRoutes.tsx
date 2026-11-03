@@ -2,14 +2,16 @@ import { lazy, Suspense, type ReactElement } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useSessionStore } from "../shared/auth/sessionStore";
 import { isStudentRole, ROLE_NAMES, LEARNING_MANAGER_ROLES, CONTENT_REVIEW_ROLES, APPLICATION_ROLES } from "../shared/auth/roles";
-import { canTeach, isDepartmentHead, userHome } from "../shared/auth/permissions";
+import { canTeach, isAccountSuspended, isDepartmentHead, userHome } from "../shared/auth/permissions";
 import RequireAccess from "./RequireAccess";
 import AccountSuspendedBanner from "../features/account/components/AccountSuspendedBanner";
 import { CardLoadingSkeleton } from "../shared/ui/LoadingSkeleton";
 
 const AdminDirectory = lazy(() => import("../features/account/pages/AdminDirectory"));
+const AccountAppeals = lazy(() => import("../features/account/pages/AccountAppeals"));
+const MySupport = lazy(() => import("../features/support/pages/MySupport"));
 const Admin = lazy(() => import("../features/management/pages/OverviewView").then(module => ({ default: module.OverviewView })));
-const AdminSupport = lazy(() => import("../features/support/pages/AdminSupport"));
+const SupportInbox = lazy(() => import("../features/support/pages/SupportInbox"));
 const AdminLayout = lazy(() => import("../features/management/layout/AdminLayout"));
 const UserAccounts = lazy(() => import("../features/account/components/UsersView").then(module => ({ default: module.UsersView })));
 const AdminSchools = lazy(() => import("../features/school/pages/SchoolsView").then(module => ({ default: module.SchoolsView })));
@@ -70,6 +72,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
     && user?.role === ROLE_NAMES.SCHOOL
     && user.billingRequired === true
     && pathname !== "/school/billing"
+    && pathname !== "/support"
     && pathname !== "/signup/payment-result";
   // A STAFF account that is only a department head has no teaching workspace.
   const teachingElement = (element: ReactElement) =>
@@ -83,7 +86,9 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
     roleElement([ROLE_NAMES.STAFF, ROLE_NAMES.STUDENT],
       isStudentRole(user?.role) ? <Navigate to="/student/assignments" replace /> : teachingElement(<Navigate to={`/assignments/workspace${search}`} replace />));
 
-  if (authReady && user?.mustChangePassword && pathname !== "/change-password") {
+  const suspended = isAccountSuspended(user);
+  if (authReady && suspended && pathname !== "/support") return <Navigate to="/support" replace />;
+  if (authReady && !suspended && user?.mustChangePassword && pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />;
   }
   if (authReady && !user?.mustChangePassword && pathname === "/change-password" && user) {
@@ -93,7 +98,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
     return <Navigate to={`${pathname.replace(/^\/admin/, '/manager')}${search}`} replace />;
   }
   if (authReady && user?.role === ROLE_NAMES.ADMIN
-      && pathname !== "/" && pathname !== "/admin" && !pathname.startsWith("/admin/") && pathname !== "/profile" && pathname !== "/change-password") {
+      && pathname !== "/" && pathname !== "/admin" && !pathname.startsWith("/admin/") && pathname !== "/profile" && pathname !== "/support" && pathname !== "/change-password") {
     return <Navigate to="/admin" replace />;
   }
   if (managerBillingOnly && !user?.mustChangePassword) return <Navigate to="/school/billing" replace />;
@@ -147,6 +152,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           <Route path="/admin" element={roleElement([ROLE_NAMES.ADMIN], <AdminArea />)}>
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminDirectory />} />
+            <Route path="appeals" element={<AccountAppeals />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
           <Route path="/student" element={roleElement([ROLE_NAMES.STUDENT], <StudentArea />)}>
@@ -158,8 +164,10 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           <Route path="/manager" element={roleElement([ROLE_NAMES.MANAGER], <AdminLayout />)}>
             <Route index element={<Admin />} />
             <Route path="users" element={<UserAccounts />} />
-            <Route path="feedback" element={<AdminSupport kind="FEEDBACK" />} />
-            <Route path="messages" element={<AdminSupport kind="MESSAGE" />} />
+            <Route path="support" element={<SupportInbox />} />
+            <Route path="feedback" element={<Navigate to="/manager/support?kind=FEEDBACK" replace />} />
+            <Route path="messages" element={<Navigate to="/manager/support?kind=MESSAGE" replace />} />
+            <Route path="appeals" element={<Navigate to="/manager/support?kind=ACCOUNT" replace />} />
             <Route path="schools" element={<AdminSchools />} />
             <Route path="plans" element={<AdminPlans />} />
             <Route path="payments" element={<AdminPayments />} />
@@ -176,6 +184,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           </Route>
           <Route path="/curriculum" element={<RequireAccess ready={authReady} roles={APPLICATION_ROLES}><Curriculum /></RequireAccess>} />
           <Route path="/profile" element={<RequireAccess ready={authReady}><ProfilePage /></RequireAccess>} />
+          <Route path="/support" element={<RequireAccess ready={authReady} roles={APPLICATION_ROLES}><MySupport /></RequireAccess>} />
           <Route path="/about" element={<SiteInfo kind="about" />} />
           <Route path="/terms" element={<SiteInfo kind="terms" />} />
           <Route path="/login" element={<Login />} />

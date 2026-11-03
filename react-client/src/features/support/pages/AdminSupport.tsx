@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { adminSupportItems, updateSupportItem, type SupportItem, type SupportKind, type SupportStatus } from "../api/supportApi";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 
@@ -8,6 +8,9 @@ export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) 
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<SupportItem | null>(null);
   const [response, setResponse] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const lock = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,19 +30,24 @@ export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) 
   }, [load]);
 
   const save = async (status: SupportStatus) => {
-    if (!selected) return;
+    if (!selected || lock.current) return;
+    lock.current = true; setBusy(true); setError(""); setNotice("");
     try {
       const updated = await updateSupportItem(selected.id, status, response);
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
       setSelected(updated);
       setResponse(updated.adminResponse ?? "");
+      setNotice("Đã cập nhật yêu cầu và gửi phản hồi cho người dùng.");
     } catch {
       setError("Không thể cập nhật yêu cầu.");
+    } finally {
+      lock.current = false; setBusy(false);
     }
   };
 
   return <div className="admin-content">
     <section className="admin-panel">
+      {notice && <p role="status">{notice}</p>}
       <div className="admin-panel-heading"><div><h2>{kind === "FEEDBACK" ? "Phản hồi" : "Tin nhắn"}</h2></div><button className="admin-secondary-button" type="button" onClick={() => void load()}>Làm mới</button></div>
       {error && <p className="admin-error-banner" role="alert">{error}</p>}
       {loading ? <TableLoadingSkeleton label="Đang tải yêu cầu hỗ trợ…" headers={["Người gửi", "Tiêu đề", "Trạng thái", "Ngày tạo", "Thao tác"]} /> : <div className="admin-table-scroll"><table className="admin-table">
@@ -51,12 +59,13 @@ export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) 
         </tr>)}</tbody>
       </table></div>}
     </section>
-    {selected && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelected(null); }}>
+    {selected && <div className="admin-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setSelected(null); }}>
       <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="support-title">
         <div className="admin-modal-header"><div><h2 id="support-title">{selected.subject}</h2><p>{selected.senderName} · {selected.senderEmail}</p></div><button type="button" className="admin-modal-close" onClick={() => setSelected(null)}>×</button></div>
         <p className="admin-support-content">{selected.content}</p>
+        {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
         <label>Phản hồi<textarea rows={4} value={response} onChange={(event) => setResponse(event.target.value)} placeholder="Nhập phản hồi cho người dùng…" /></label>
-        <div className="admin-form-actions"><button type="button" className="admin-secondary-button" onClick={() => void save("READ")}>Đánh dấu đã đọc</button><button type="button" className="admin-primary-button" onClick={() => void save("RESOLVED")}>Lưu & đóng</button></div>
+        <div className="admin-form-actions"><button type="button" disabled={busy} className="admin-secondary-button" onClick={() => void save("READ")}>Đánh dấu đã đọc</button><button type="button" disabled={busy || !response.trim()} className="admin-primary-button" onClick={() => void save("RESOLVED")}>{busy ? "Đang lưu…" : "Gửi phản hồi & hoàn tất"}</button></div>
       </section>
     </div>}
   </div>;

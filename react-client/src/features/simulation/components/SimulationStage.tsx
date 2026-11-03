@@ -20,7 +20,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
   const { simulation, liveTimeline, presentation, runValues, sandboxKey, validation, renderError, setRenderError, restartPreview, recomputing } = preview;
   // "Báo lỗi" and "Dựng lại" live in the authored player's toolbar.
   const stageActions = <>
-    {complaint && <button type="button" className="sim-action" title="Báo cho người kiểm duyệt khi mô phỏng sai" onClick={() => setComplaintOpen(true)}><Icon name="message" />Báo lỗi</button>}
+    {complaint && <button type="button" className="sim-action" title="Báo cho Manager khi mô phỏng sai" onClick={() => setComplaintOpen(true)}><Icon name="message" />Báo lỗi</button>}
     <button type="button" className="sim-action" title="Dựng lại cảnh và phát từ đầu" onClick={restartPreview}><Icon name="reset" />Dựng lại</button>
     <button type="button" className="sim-action" title="Phóng to mô phỏng (Esc để thoát)" aria-label="Phóng to mô phỏng toàn màn hình"
       onClick={event => {

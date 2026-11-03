@@ -96,6 +96,11 @@ export default function AccountMenu({ variant }: Readonly<{ variant: AccountMenu
               <LearningIcon name="chevronRight" />
             </Link>
 
+            <Link role="menuitem" className="account-menu__item" to="/support" onClick={close}>
+              <span className="account-menu__item-icon"><LearningIcon name="message" /></span>
+              <span>Hỗ trợ & khiếu nại của tôi</span>
+              <LearningIcon name="chevronRight" />
+            </Link>
             <div className="account-menu__divider" />
 
             <Link role="menuitem" className="account-menu__item" to="/profile#profile-security" onClick={close}>

@@ -10,7 +10,11 @@ import { roleHome } from './roles.ts';
 
 export type PermissionCode = 'TEACH' | 'DEPARTMENT_HEAD_PHYSICS' | 'CONTENT_EDIT' | 'CONTENT_REVIEW';
 
-type PermissionHolder = { role: string; permissions?: readonly string[] | null; billingRequired?: boolean };
+type PermissionHolder = { role: string; permissions?: readonly string[] | null; billingRequired?: boolean; active?: boolean | null; accountStatus?: string };
+
+export function isAccountSuspended(user: PermissionHolder | null | undefined): boolean {
+  return user?.active === false || user?.accountStatus === 'SUSPENDED_READ_ONLY';
+}
 
 export const PERMISSION_LABELS: Record<PermissionCode, string> = {
   TEACH: 'Giáo viên',
@@ -68,6 +72,7 @@ export function isDepartmentHead(user: PermissionHolder | null | undefined): boo
 /** Landing page of an account; a STAFF account without TEACH works in the department workspace. */
 export function userHome(user: PermissionHolder | null | undefined): string {
   if (!user) return '/';
+  if (isAccountSuspended(user)) return '/support';
   if (user.role === 'STAFF' && !canTeach(user)) return isDepartmentHead(user) ? '/department' : '/profile';
   return roleHome(user.role, user.billingRequired === true);
 }

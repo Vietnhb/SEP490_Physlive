@@ -5,6 +5,7 @@ import { useSessionBootstrap } from "./useSessionBootstrap";
 import { useSessionStore } from "../shared/auth/sessionStore";
 import { useRealtimeRevision } from "./hooks/useRealtimeRevision";
 import { isAdminRole } from "../shared/auth/roles";
+import { isAccountSuspended } from "../shared/auth/permissions";
 import { getMe } from "../features/account/api/userApi";
 
 export default function App() {
@@ -12,7 +13,7 @@ export default function App() {
   const user = useSessionStore(state => state.user);
   const setUser = useSessionStore(state => state.setUser);
   const hasUser = user !== null;
-  const realtimeRevision = useRealtimeRevision(authReady && hasUser && !user?.mustChangePassword && !isAdminRole(user?.role));
+  const realtimeRevision = useRealtimeRevision(authReady && hasUser && !user?.mustChangePassword && !isAccountSuspended(user) && !isAdminRole(user?.role));
   useEffect(() => {
     if (realtimeRevision === 0 || !hasUser) return;
     let active = true;
