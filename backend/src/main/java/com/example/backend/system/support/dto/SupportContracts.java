@@ -28,5 +28,6 @@ public final class SupportContracts {
 
     public record SupportView(UUID id, SupportKind kind, Integer senderId, String senderName, String senderEmail,
                               String subject, String content, SupportStatus status, String adminResponse,
-                              Instant createdAt, Instant respondedAt, UUID simulationId, String responderName) { }
+                              Instant createdAt, Instant respondedAt, UUID simulationId, String responderName,
+                              boolean reviewerReferred) { }
 }

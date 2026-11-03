@@ -39,7 +39,10 @@ public class SupportController {
     public List<SupportContracts.SupportView> mine() { return service.mine(); }
 
     @GetMapping("/admin")
-    public List<SupportContracts.SupportView> adminList(@RequestParam SupportKind kind) { return service.adminList(kind); }
+    public List<SupportContracts.SupportView> adminList(@RequestParam(required = false) SupportKind kind) { return service.adminList(kind); }
+
+    @PostMapping("/admin/{id}/refer-reviewer")
+    public SupportContracts.SupportView referReviewer(@PathVariable UUID id) { return service.referReviewer(id); }
 
     @PutMapping("/admin/{id}")
     public SupportContracts.SupportView update(@PathVariable UUID id,

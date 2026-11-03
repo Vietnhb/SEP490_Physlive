@@ -52,4 +52,7 @@ public class SupportItem extends AuditedEntity {
     /** Simulation a COMPLAINT is about; null for feedback, messages and unsaved simulations. */
     @Column(name = "simulation_id")
     private java.util.UUID simulationId;
+
+    @Column(name = "reviewer_referred", nullable = false)
+    private boolean reviewerReferred;
 }

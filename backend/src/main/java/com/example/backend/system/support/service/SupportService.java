@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupportService {
     private final SupportItemRepository repository;
     private final CurrentUserService currentUser;
+    private final com.example.backend.system.account.service.AccountAccessService accountAccess;
 
     @Transactional
     public SupportView create(SupportKind kind, CreateSupportRequest request) {
@@ -38,6 +39,8 @@ public class SupportService {
             throw ApiException.badRequest("Tiêu đề hoặc nội dung quá dài");
         }
         User sender = currentUser.requireCurrentUser();
+        if (kind == SupportKind.COMPLAINT && !accountAccess.canTeach(sender))
+            throw ApiException.forbidden("Chỉ giáo viên có quyền giảng dạy mới được báo lỗi mô phỏng.");
         SupportItem item = new SupportItem();
         item.setKind(kind);
         item.setSender(sender);
@@ -50,7 +53,7 @@ public class SupportService {
     @Transactional
     public SupportView createComplaint(SupportContracts.CreateComplaintRequest request) {
         User sender = currentUser.requireCurrentUser();
-        if (!hasRole(sender, RoleName.STAFF) && !hasRole(sender, RoleName.MANAGER))
+        if (!accountAccess.canTeach(sender))
             throw ApiException.forbidden("Chỉ giáo viên mới gửi được khiếu nại về mô phỏng.");
         SupportView created = create(SupportKind.COMPLAINT, new CreateSupportRequest(request.subject(), request.content()));
         if (request.simulationId() == null) return created;
@@ -61,16 +64,19 @@ public class SupportService {
     @Transactional(readOnly = true)
     public List<SupportView> complaintsForReview() {
         requireReviewer();
-        return repository.findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT).stream().map(this::view).toList();
+        return repository.findTop200ByKindAndReviewerReferredTrueOrderByCreatedAtDesc(SupportKind.COMPLAINT).stream().map(this::view).toList();
     }
     @Transactional
     public SupportView resolveComplaint(UUID id, UpdateSupportRequest request) {
         User reviewer = requireReviewer();
-        SupportItem item = repository.findById(id).filter(value -> value.getKind() == SupportKind.COMPLAINT)
+        SupportItem item = repository.findByIdForUpdate(id).filter(value -> value.getKind() == SupportKind.COMPLAINT)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy khiếu nại."));
+        if (!item.isReviewerReferred()) throw ApiException.forbidden("Khiếu nại chưa được Manager chuyển cho Reviewer.");
+        if (item.getStatus() == SupportStatus.RESOLVED) throw ApiException.conflict("Khiếu nại đã hoàn tất. Manager có thể mở lại khi cần.");
         if (item.getSender().getId().equals(reviewer.getId()))
             throw ApiException.conflict("Không thể tự giải quyết khiếu nại của chính mình.");
         String response = request == null || request.response() == null ? "" : request.response().trim();
+        if (response.length() > 10000) throw ApiException.badRequest("Phản hồi quá dài.");
         SupportStatus status = request == null || request.status() == null ? item.getStatus() : request.status();
         if (status == SupportStatus.RESOLVED && response.isBlank() && (item.getAdminResponse() == null || item.getAdminResponse().isBlank()))
             throw ApiException.badRequest("Cần ghi kết quả xử lý trước khi đánh dấu đã giải quyết.");
@@ -93,10 +99,7 @@ public class SupportService {
     @Transactional(readOnly = true)
     public List<SupportView> adminList(SupportKind kind) {
         requireManager();
-        if (kind == null) {
-            throw ApiException.badRequest("Vui lòng chọn loại yêu cầu hỗ trợ");
-        }
-        return repository.findTop200ByKindOrderByCreatedAtDesc(kind).stream()
+        return (kind == null ? repository.findAllByOrderByCreatedAtDesc() : repository.findTop200ByKindOrderByCreatedAtDesc(kind)).stream()
                 .map(this::view)
                 .toList();
     }
@@ -107,12 +110,17 @@ public class SupportService {
         if (request == null) {
             throw ApiException.badRequest("Vui lòng nhập nội dung cập nhật yêu cầu hỗ trợ");
         }
-        SupportItem item = repository.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy yêu cầu hỗ trợ"));
+        SupportItem item = repository.findByIdForUpdate(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy yêu cầu hỗ trợ"));
+        if (item.getKind() == SupportKind.COMPLAINT && item.getSender().getId().equals(admin.getId()))
+            throw ApiException.conflict("Không thể tự giải quyết khiếu nại của chính mình.");
         SupportStatus status = request.status() == null ? item.getStatus() : request.status();
         String response = request.response() == null ? null : request.response().trim();
         if (response != null && response.length() > 10000) {
             throw ApiException.badRequest("Phản hồi của quản trị viên quá dài");
         }
+        if (status == SupportStatus.RESOLVED && (response == null || response.isBlank())
+                && (item.getAdminResponse() == null || item.getAdminResponse().isBlank()))
+            throw ApiException.badRequest("Cần nhập phản hồi trước khi hoàn tất yêu cầu hỗ trợ.");
         if (response != null && !response.isBlank()) {
             item.setAdminResponse(response);
             item.setRespondedBy(admin);
@@ -130,12 +138,23 @@ public class SupportService {
         return new SupportView(item.getId(), item.getKind(), sender.getId(), sender.getFullName(), sender.getEmail(),
                 item.getSubject(), item.getContent(), item.getStatus(), item.getAdminResponse(), item.getCreatedAt(),
                 item.getRespondedAt(), item.getSimulationId(),
-                item.getRespondedBy() == null ? null : item.getRespondedBy().getFullName());
+                item.getRespondedBy() == null ? null : item.getRespondedBy().getFullName(), item.isReviewerReferred());
+    }
+
+    @Transactional
+    public SupportView referReviewer(UUID id) {
+        requireManager();
+        SupportItem item = repository.findByIdForUpdate(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy yêu cầu hỗ trợ."));
+        if (item.getKind() != SupportKind.COMPLAINT) throw ApiException.badRequest("Chỉ báo lỗi mô phỏng mới được chuyển Reviewer.");
+        if (item.getStatus() == SupportStatus.RESOLVED) throw ApiException.conflict("Yêu cầu đã hoàn tất. Hãy mở lại trước khi chuyển Reviewer.");
+        item.setReviewerReferred(true);
+        item.setStatus(SupportStatus.READ);
+        return view(repository.save(item));
     }
 
     private User requireReviewer() {
         User user = currentUser.requireCurrentUser();
-        if (!hasRole(user, RoleName.REVIEWER) && !hasRole(user, RoleName.MANAGER))
+        if (!hasRole(user, RoleName.REVIEWER))
             throw ApiException.forbidden("Chỉ người kiểm duyệt mới xử lý được khiếu nại mô phỏng.");
         return user;
     }
