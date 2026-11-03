@@ -189,7 +189,7 @@ export default function Home() {
         <section className={s.section} aria-labelledby="home-plans">
           <Reveal className={s.sectionHead}>
             <h2 id="home-plans">Gói dành cho nhà trường.</h2>
-            <p>Giáo viên và lớp học không giới hạn; token AI tính theo mức sử dụng thực tế.</p>
+            <p>Giáo viên, lớp học và AI theo mức sử dụng.</p>
           </Reveal>
           <HomePlanCatalog />
         </section>

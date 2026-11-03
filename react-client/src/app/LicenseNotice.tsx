@@ -23,7 +23,7 @@ export default function LicenseNotice() {
         <div role="status" className="license-notice">
           <p>
             {!effectiveLicense.canPerformWriteOperations
-              ? "Trường chưa có license hiệu lực. Bạn có thể xem dữ liệu; vui lòng liên hệ quản lý trường để gia hạn."
+              ? "Trường chưa có license hiệu lực. Bạn có thể xem dữ liệu, vui lòng liên hệ quản lý trường để gia hạn."
               : `License của trường còn ${effectiveLicense.daysUntilExpiry} ngày.`}
           </p>
           <button
