@@ -52,7 +52,7 @@ export function ComplaintsDesk() {
     <div className="reviewer-toolbar">
       <div style={{ flex: 1, minWidth: 0 }}>
         <Heading as="h1" size="6">Khiếu nại mô phỏng</Heading>
-        <Text as="p" size="2" color="gray" mt="1">Các báo lỗi mô phỏng được Manager chuyển đến. Kiểm tra, phản hồi và đánh dấu khi đã giải quyết.</Text>
+        <Text as="p" size="2" color="gray" mt="1">Các báo lỗi mô phỏng được Manager chuyển đến. Hãy kiểm tra, phản hồi và đánh dấu khi đã giải quyết.</Text>
       </div>
       <Button variant="soft" color="gray" onClick={() => void load()} disabled={loading}>Làm mới</Button>
     </div>

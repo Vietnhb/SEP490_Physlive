@@ -14,4 +14,4 @@ export function reviewerAccess(user: User | null | undefined): ReviewerAccess {
   };
 }
 
-export type ReviewerView = "overview" | "moderation" | "topics" | "gaps";
+export type ReviewerView = "overview" | "moderation" | "complaints" | "topics" | "gaps";

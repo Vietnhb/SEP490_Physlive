@@ -4,6 +4,7 @@ import { reviewerStatusLabel } from "../model/reviewerUtils";
 
 const PATHS = {
   queue: "M4 5h16v14H4z M8 9h8 M8 13h5",
+  message: "M4 5h16v11H8l-4 4V5z M8 9h8 M8 12h5",
   schema: "M4 4h7v6H4z M14 4h6v6h-6z M4 14h7v6H4z M14 14h6v6h-6z",
   solver: "M5 4h14v16H5z M8 8h8 M8 12h2 M14 12h2 M8 16h2 M14 16h2",
   module: "M4 5h7l2 2h7v13H4z M8 13l3 3 5-6",
