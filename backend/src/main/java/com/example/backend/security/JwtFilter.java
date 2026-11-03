@@ -56,18 +56,22 @@ public class JwtFilter extends OncePerRequestFilter {
                 var user = currentUser.get();
                 boolean isSuspended = user.isSuspendedReadOnly();
                 String path = request.getRequestURI().substring(request.getContextPath().length());
-                boolean isRead = List.of("GET", "HEAD", "OPTIONS").contains(request.getMethod());
-                boolean isAppeal = path.startsWith("/api/appeals") || path.startsWith("/api/account/appeals");
-                boolean isAuthMe = "/api/user/me".equals(path) || "/api/auth/logout".equals(path);
-
-                if (isSuspended && !isRead && !isAppeal && !isAuthMe) {
+                if (isSuspended && isSuspendedPortalPath(request.getMethod(), path)) {
+                    RoleName role = user.getRole() == null ? null : RoleName.from(user.getRole().getName()).orElse(null);
+                    if (role == null) { writeForbidden(response, "Tài khoản chưa được thiết lập vai trò"); return; }
+                    SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(email, null,
+                            List.of(new SimpleGrantedAuthority(role.authority()))));
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                if (isSuspended) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
                     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                     String reasonMsg = user.getSuspensionReason() != null ? " Lý do: " + user.getSuspensionReason() : "";
                     objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(
                             HttpServletResponse.SC_FORBIDDEN,
-                            "Tài khoản đang trong trạng thái tạm khóa (chỉ xem)." + reasonMsg + " Bạn có thể xem lý do hoặc gửi khiếu nại."));
+                            "Tài khoản đang bị tạm khóa." + reasonMsg + " Bạn chỉ có thể gửi và theo dõi khiếu nại tài khoản."));
                     return;
                 }
             }
@@ -133,6 +137,11 @@ public class JwtFilter extends OncePerRequestFilter {
                 || "/api/user/me/license".equals(path)
                 || "/api/school/billing".equals(path)
                 || path.startsWith("/api/school/billing/");
+    }
+
+    private static boolean isSuspendedPortalPath(String method, String path) {
+        return "GET".equals(method) && List.of("/api/user/me", "/api/appeals/my", "/api/support/mine").contains(path)
+                || "POST".equals(method) && List.of("/api/appeals", "/api/auth/logout").contains(path);
     }
 
     private static boolean isPasswordLifecyclePath(String method, String path) {

@@ -39,19 +39,19 @@ public class AuthService {
         User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> ApiException.unauthorized("Email hoặc mật khẩu không đúng"));
 
-        // Only an explicit active flag allows authentication. Legacy null rows
-        // are treated as locked instead of silently bypassing this check.
-        if (!Boolean.TRUE.equals(user.getActive())) {
-            throw ApiException.forbidden("Tài khoản đang bị khóa. Vui lòng liên hệ quản trị viên.");
-        }
-
-        // Check if school is deactivated
-        if (user.getSchool() != null && Boolean.FALSE.equals(user.getSchool().isActive())) {
-            throw ApiException.forbidden("Tài khoản trường đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.");
-        }
-
         if (!PasswordPolicy.matches(password, user.getPassword(), passwordEncoder)) {
             throw ApiException.unauthorized("Email hoặc mật khẩu không đúng");
+        }
+        // Explicitly suspended accounts may authenticate only to access the appeal portal.
+        // JwtFilter restricts their token on every request; unknown legacy active flags stay blocked.
+        if (user.getActive() == null) {
+            throw ApiException.forbidden("Tài khoản đang bị khóa. Vui lòng liên hệ quản trị viên.");
+        }
+        boolean suspended = user.isSuspendedReadOnly();
+
+        // Check if school is deactivated
+        if (!suspended && user.getSchool() != null && Boolean.FALSE.equals(user.getSchool().isActive())) {
+            throw ApiException.forbidden("Tài khoản trường đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.");
         }
 
         // Upgrade legacy credentials on successful authentication; never persist raw passwords again.
@@ -64,7 +64,7 @@ public class AuthService {
         String role = user.getRole() == null ? null : user.getRole().getName();
         RoleName roleName = RoleName.from(role)
                 .orElseThrow(() -> ApiException.forbidden("Tài khoản chưa được thiết lập vai trò"));
-        if (!user.isMustChangePassword() && (roleName == RoleName.STAFF || roleName == RoleName.STUDENT)
+        if (!suspended && !user.isMustChangePassword() && (roleName == RoleName.STAFF || roleName == RoleName.STUDENT)
                 && !licenseCheckService.isLicenseActive(user)) {
             throw ApiException.forbidden("Gói của trường chưa có hiệu lực. Vui lòng liên hệ quản lý trường.");
         }

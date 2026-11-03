@@ -13,6 +13,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") Integer id);
     Optional<User> findFirstByEmailIgnoreCase(String email);
     List<User> findBySchoolId(UUID schoolId);
 
