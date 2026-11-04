@@ -3,7 +3,7 @@ import { Button, Card, Heading, Text } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
 import { complaintsForReview } from "../../support/api/supportApi";
 import type { ReviewerAccess, ReviewerView } from "../model/reviewerAccess";
-import type { ModuleRelease, Version } from "../model/reviewerTypes";
+import type { Version } from "../model/reviewerTypes";
 import { timeAgo } from "../model/reviewerUtils";
 import { ReviewerIcon, ReviewerRefresh, type ReviewerIconName } from "./ReviewerKit";
 
@@ -11,10 +11,10 @@ type PendingItem = { createdAt?: string };
 type Counts = {
   moderation?: { pending: number; oldest?: string };
   complaints?: { open: number; oldest?: string };
-  drafts?: { schemas: number; modules: number };
+  drafts?: number;
   gaps?: { open: number; met: number };
 };
-type Task = { id: string; view: ReviewerView; section?: string; icon: ReviewerIconName; count: number; title: string; detail: string; action: string };
+type Task = { id: string; view: ReviewerView; icon: ReviewerIconName; count: number; title: string; detail: string; action: string };
 
 async function settle<T>(request: Promise<{ data: T }>) {
   try { return (await request).data; } catch { return undefined; }
@@ -30,9 +30,8 @@ function useOverview(access: ReviewerAccess) {
       access.canReview ? settle(api.get<PendingItem[]>("/reviewer/library", { params: { status: "PENDING" } })) : undefined,
       canHandleComplaints ? complaintsForReview().catch(() => undefined) : undefined,
       access.canEdit ? settle(api.get<Version[]>("/reviewer/schemas")) : undefined,
-      access.canEdit ? settle(api.get<ModuleRelease[]>("/reviewer/module-releases")) : undefined,
       access.canEdit ? settle(api.get<{ occurrences: number }[]>("/reviewer/law-gaps", { params: { status: "OPEN" } })) : undefined,
-  ]).then(([library, complaints, schemas, modules, gaps]) => {
+  ]).then(([library, complaints, schemas, gaps]) => {
     const next: Counts = {};
     if (access.canReview && library) {
       const oldest = library.map(item => item.createdAt).filter(Boolean).sort()[0];
@@ -44,10 +43,7 @@ function useOverview(access: ReviewerAccess) {
       next.complaints = { open: open.length, oldest };
     }
     if (access.canEdit) {
-      next.drafts = {
-        schemas: schemas?.filter(item => item.lifecycleStatus === "DRAFT").length ?? 0,
-        modules: modules?.filter(item => item.lifecycleStatus === "DRAFT").length ?? 0,
-      };
+      next.drafts = schemas?.filter(item => item.lifecycleStatus === "DRAFT").length ?? 0;
       if (gaps) next.gaps = { open: gaps.length, met: gaps.reduce((sum, item) => sum + item.occurrences, 0) };
     }
     const expected = (access.canReview ? 1 : 0) + (canHandleComplaints ? 1 : 0) + (access.canEdit ? 1 : 0);
@@ -58,15 +54,14 @@ function useOverview(access: ReviewerAccess) {
   return { counts, loading, failed, canHandleComplaints, refresh: () => { setLoading(true); setFailed(false); void load(); } };
 }
 
-export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: ReviewerAccess; name?: string; onOpen: (view: ReviewerView, extra?: Record<string, string>) => void }>) {
+export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: ReviewerAccess; name?: string; onOpen: (view: ReviewerView) => void }>) {
   const { counts, loading, failed, canHandleComplaints, refresh } = useOverview(access);
   const tasks: Task[] = [];
   if (counts.moderation) tasks.push({ id: "moderation", view: "moderation", icon: "library", count: counts.moderation.pending, title: "Mô phỏng chờ duyệt", detail: counts.moderation.pending ? `Giáo viên gửi lên thư viện công khai${counts.moderation.oldest ? ` · cũ nhất ${timeAgo(counts.moderation.oldest)}` : ""}.` : "Không có mô phỏng nào đang chờ.", action: "Bắt đầu duyệt" });
   if (counts.complaints) tasks.push({ id: "complaints", view: "complaints", icon: "message", count: counts.complaints.open, title: "Khiếu nại mô phỏng", detail: counts.complaints.open ? `Giáo viên báo mô phỏng tính sai hoặc lệch đề bài${counts.complaints.oldest ? ` · cũ nhất ${timeAgo(counts.complaints.oldest)}` : ""}.` : "Không có khiếu nại nào đang chờ xử lý.", action: "Xem khiếu nại" });
   if (counts.gaps) tasks.push({ id: "gaps", view: "gaps", icon: "benchmark", count: counts.gaps.open, title: "Định luật còn thiếu", detail: counts.gaps.open ? `${counts.gaps.open} loại đại lượng chưa có định luật kiểm, gặp ${counts.gaps.met} lần trong mô phỏng của giáo viên.` : "Mọi đại lượng giáo viên dùng đều đã có định luật kiểm.", action: "Xem danh sách" });
-  if (counts.drafts) {
-    const drafts = counts.drafts.schemas + counts.drafts.modules;
-    tasks.push({ id: "drafts", view: "topics", section: counts.drafts.schemas ? "schemas" : "modules", icon: "schema", count: drafts, title: "Bản nháp chờ phê duyệt", detail: drafts ? `${counts.drafts.schemas} chủ đề · ${counts.drafts.modules} gói phát hành.` : "Không có bản nháp tồn đọng.", action: "Xem bản nháp" });
+  if (counts.drafts !== undefined) {
+    tasks.push({ id: "drafts", view: "topics", icon: "schema", count: counts.drafts, title: "Bản nháp chờ phê duyệt", detail: counts.drafts ? `${counts.drafts} bản nháp chủ đề vật lý đang chờ kiểm tra và phê duyệt phát hành.` : "Không có bản nháp chủ đề nào tồn đọng.", action: "Xem chủ đề" });
   }
   const total = tasks.reduce((sum, task) => sum + task.count, 0);
   const firstName = name?.trim().split(/\s+/).at(-1);
@@ -87,7 +82,7 @@ export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: Re
         <div className="reviewer-task-top"><span className="reviewer-task-icon"><ReviewerIcon name={task.icon} size={22} /></span><span className="reviewer-task-count">{loading ? "—" : task.count}</span></div>
         <Heading as="h2" size="4" mt="3">{task.title}</Heading>
         <Text as="p" size="2" color="gray" mt="1" className="reviewer-task-detail">{loading ? "Đang tải…" : task.detail}</Text>
-        <Button mt="4" size="2" variant={task.count ? "solid" : "soft"} color={task.count ? undefined : "gray"} onClick={() => onOpen(task.view, task.section ? { section: task.section } : undefined)}>{task.action}<ReviewerIcon name="arrow" size={15} /></Button>
+        <Button mt="4" size="2" variant={task.count ? "solid" : "soft"} color={task.count ? undefined : "gray"} onClick={() => onOpen(task.view)}>{task.action}<ReviewerIcon name="arrow" size={15} /></Button>
       </Card>)}
     </div>
     <Card size="3" className="reviewer-guide">

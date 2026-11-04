@@ -17,8 +17,8 @@ import "../../support/styles/complaints.css";
 
 /** Older links used ?view= / ?tab=; send them to the matching route. */
 const LEGACY: Record<string, string> = { overview: "", moderation: "moderation", library: "moderation", topics: "topics", schemas: "topics", modules: "topics", benchmarks: "", gaps: "gaps" };
-const pathOf = (view: ReviewerView, extra?: Record<string, string>) =>
-  view === "overview" ? "/reviewer" : `/reviewer/${view}${view === "topics" && extra?.section ? `/${extra.section}` : ""}`;
+const pathOf = (view: ReviewerView) =>
+  view === "overview" ? "/reviewer" : `/reviewer/${view}`;
 
 type ReviewerContext = { access: ReviewerAccess };
 const useReviewer = () => useOutletContext<ReviewerContext>();
@@ -83,7 +83,7 @@ export function ReviewerHomePage() {
   const { access } = useReviewer();
   const navigate = useNavigate();
   const name = useSessionStore(state => state.user?.fullName);
-  return <ReviewerOverview access={access} name={name} onOpen={(view, extra) => navigate(pathOf(view, extra))} />;
+  return <ReviewerOverview access={access} name={name} onOpen={view => navigate(pathOf(view))} />;
 }
 
 export function ReviewerModerationPage() {
@@ -94,9 +94,9 @@ export function ReviewerModerationPage() {
 export function ReviewerTopicsPage() {
   const { access } = useReviewer();
   const { section } = useParams();
-  const navigate = useNavigate();
   if (!access.canEdit) return <Navigate to="/reviewer" replace />;
-  return <TopicsWorkspace section={section ?? null} onSection={next => navigate(`/reviewer/topics/${next}`)} />;
+  if (section) return <Navigate to="/reviewer/topics" replace />;
+  return <TopicsWorkspace />;
 }
 
 export function ReviewerComplaintsPage() {
