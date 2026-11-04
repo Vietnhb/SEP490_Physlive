@@ -5,6 +5,7 @@ export type AccountStatus = 'ACTIVE' | 'WARNED' | 'SUSPENDED_READ_ONLY';
 export type User = {
   id: number; email: string; fullName: string; role: string; active?: boolean; isActive?: boolean;
   accountStatus?: AccountStatus;
+  suspensionScope?: "SCHOOL" | "SYSTEM" | null;
   suspensionReason?: string | null;
   suspendedUntil?: string | null;
   institutionId?: string | null; schoolId?: string | null; schoolName?: string | null;

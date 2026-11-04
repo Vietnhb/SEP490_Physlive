@@ -14,7 +14,8 @@ export default function AppShell({ children }: PropsWithChildren) {
   const role = user?.role;
   const appearance = useEffectiveTheme();
   const passwordRequired = user?.mustChangePassword === true;
-  const hasRoleTheme = Boolean(role && role !== "STAFF");
+  // Support uses Radix dialogs/selects outside the staff workspace's own Theme.
+  const hasRoleTheme = Boolean(role && (role !== "STAFF" || pathname === "/support"));
   const academicPage = role && role !== "STAFF"
     && ["/admin", "/manager", "/school", "/reviewer", "/student", "/assignments", "/community", "/library", "/curriculum", "/profile"].some(
       prefix => pathname === prefix || pathname.startsWith(prefix + "/"),

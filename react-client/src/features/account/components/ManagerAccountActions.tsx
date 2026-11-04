@@ -14,6 +14,7 @@ export default function ManagerAccountActions({ user, onSaved }: Readonly<{ user
   const actorRole = useSessionStore(state => state.user?.role);
   const [mode, setMode] = useState<"form" | "status" | null>(null);
   const [resetUser, setResetUser] = useState<User | null>(null);
+  const [statusReason, setStatusReason] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +44,7 @@ export default function ManagerAccountActions({ user, onSaved }: Readonly<{ user
     if (!user || lock.current) return;
     lock.current = true; setBusy(true); setError("");
     try {
-      const saved = await setManagedUserActive(user.id, user.active === false);
+      const saved = await setManagedUserActive(user.id, user.active === false, undefined, statusReason.trim());
       setMode(null); onSaved(saved, saved.active === false ? "Đã tạm khóa tài khoản Manager." : "Đã mở khóa tài khoản Manager.");
     } catch (cause) { setError(apiMessage(cause, "Không thể thay đổi trạng thái tài khoản Manager.")); }
     finally { lock.current = false; setBusy(false); }
@@ -73,7 +74,8 @@ export default function ManagerAccountActions({ user, onSaved }: Readonly<{ user
       <AlertDialog.Title>{user?.active === false ? "Mở khóa tài khoản Manager?" : "Tạm khóa tài khoản Manager?"}</AlertDialog.Title>
       <AlertDialog.Description size="2">{user?.email} — {user?.active === false ? "Tài khoản sẽ được phép đăng nhập trở lại." : "Tài khoản sẽ không thể đăng nhập cho đến khi được mở khóa."}</AlertDialog.Description>
       {error && <Callout.Root color="red" role="alert" mt="4"><Callout.Text>{error}</Callout.Text></Callout.Root>}
-      <Flex gap="3" justify="end" mt="4"><AlertDialog.Cancel><Button variant="soft" color="gray" disabled={busy}>Hủy</Button></AlertDialog.Cancel><Button loading={busy} disabled={busy} color={user?.active === false ? "green" : "red"} onClick={() => void toggle()}>{user?.active === false ? "Mở khóa" : "Tạm khóa"}</Button></Flex>
+      {user?.active !== false && <FormField label="Lý do tạm khóa" htmlFor="manager-suspend-reason"><TextField.Root id="manager-suspend-reason" required maxLength={2000} value={statusReason} disabled={busy} onChange={e=>setStatusReason(e.target.value)} /></FormField>}
+      <Flex gap="3" justify="end" mt="4"><AlertDialog.Cancel><Button variant="soft" color="gray" disabled={busy}>Hủy</Button></AlertDialog.Cancel><Button loading={busy} disabled={busy || (user?.active !== false && !statusReason.trim())} color={user?.active === false ? "green" : "red"} onClick={() => void toggle()}>{user?.active === false ? "Mở khóa" : "Tạm khóa"}</Button></Flex>
     </AlertDialog.Content></AlertDialog.Root>
     <ResetManagedPasswordDialog user={resetUser} onClose={() => setResetUser(null)} onUpdated={updated => { onSaved(updated, `Đã đặt lại mật khẩu cho ${updated.email}.`); }} />
   </>;

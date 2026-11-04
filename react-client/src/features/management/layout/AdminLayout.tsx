@@ -19,8 +19,8 @@ export default function AdminLayout() {
     const load = () => {
       const request = ++revision;
       void Promise.all([adminSupportItems(), getAdminAppeals()]).then(([support, appeals]) => {
-        if (active && request === revision) setPendingSupport(support.filter(item => item.status !== "RESOLVED").length
-          + appeals.filter(item => item.status === "PENDING").length);
+        if (active && request === revision) setPendingSupport(support.filter(item => item.kind !== "COMPLAINT" && item.status !== "RESOLVED").length
+          + appeals.filter(item => item.status === "PENDING" && item.canResolve).length);
       }).catch(() => { /* Keep the previous count if a refresh fails. */ });
     };
     load();

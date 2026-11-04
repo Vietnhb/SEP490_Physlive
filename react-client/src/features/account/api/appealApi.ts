@@ -10,6 +10,9 @@ export type Appeal = {
   status: "PENDING" | "APPROVED" | "REJECTED";
   resolutionNote?: string | null;
   createdAt: string;
+  authority?: "SCHOOL" | "SYSTEM" | null;
+  canResolve?: boolean;
+  currentSuspension?: boolean;
   resolvedAt?: string | null;
 };
 

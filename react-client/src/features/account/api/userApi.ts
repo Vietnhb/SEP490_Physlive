@@ -47,8 +47,8 @@ export const updateManagedUser = (id: number, payload: ManagedUserDetails, schoo
 export const resetManagedUserPassword = (id: number, newPassword: string, schoolId?: string) =>
   axiosClient.post<User>(`${usersPath(schoolId)}/${id}/reset-password`, { newPassword }).then(r => r.data);
 
-export const setManagedUserActive = (id: number, active: boolean, schoolId?: string) =>
-  axiosClient.put<User>(schoolId ? `${usersPath(schoolId)}/${id}/${active ? "restore" : "suspend"}` : `/admin/users/${id}/${active ? "restore" : "suspend"}`).then(r => r.data);
+export const setManagedUserActive = (id: number, active: boolean, schoolId?: string, reason?: string) =>
+  axiosClient.put<User>(schoolId ? `${usersPath(schoolId)}/${id}/${active ? "restore" : "suspend"}` : `/admin/users/${id}/${active ? "restore" : "suspend"}`, active ? undefined : { reason }).then(r => r.data);
 
 export type PostStats = {
   periodTotalPosts: number;

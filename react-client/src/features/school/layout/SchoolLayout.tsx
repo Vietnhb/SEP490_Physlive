@@ -13,6 +13,7 @@ export default function SchoolLayout() {
         { to: "/school/users", label: "Tài khoản", icon: "users" },
         { to: "/school/classes", label: "Quản lý lớp học", icon: "book", childTitle: "Chi tiết lớp học" },
         { to: "/school/import", label: "Nhập dữ liệu", icon: "upload" },
+        { to: "/school/appeals", label: "Yêu cầu mở khóa", icon: "message" },
         { to: "/school/reports", label: "Báo cáo", icon: "chart" },
       ] },
       { label: "Gói dịch vụ", items: [{ to: "/school/billing", label: "Mua & gia hạn gói", icon: "activity" }] },

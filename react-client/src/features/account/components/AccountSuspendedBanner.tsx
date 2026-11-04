@@ -35,6 +35,7 @@ export default function AccountSuspendedBanner() {
     }
   };
 
+  const internalAdmin = ["MANAGER", "ADMIN"].includes(user.role);
   const expirationText = user.suspendedUntil
     ? `Thời hạn: đến ${new Date(user.suspendedUntil).toLocaleString("vi-VN")}`
     : "Thời hạn: Đến khi có quyết định xử lý từ Quản trị viên";
@@ -61,13 +62,13 @@ export default function AccountSuspendedBanner() {
             <LockClosedIcon /> TÀI KHOẢN TẠM KHÓA
           </Badge>
           <div>
-            <strong>Bạn chỉ có thể gửi và theo dõi khiếu nại tài khoản:</strong>{" "}
+            <strong>{internalAdmin ? "Tài khoản quản trị đang bị tạm khóa:" : "Bạn chỉ có thể gửi và theo dõi yêu cầu mở khóa:"}</strong>{" "}
             {user.suspensionReason ? user.suspensionReason : "Chưa có lý do cụ thể."}{" "}
             <span style={{ opacity: 0.85 }}>({expirationText})</span>
           </div>
         </Flex>
 
-        <Button
+        {!internalAdmin && <Button
           type="button"
           size="2"
           variant="solid"
@@ -76,7 +77,8 @@ export default function AccountSuspendedBanner() {
           style={{ cursor: "pointer" }}
         >
           <ExclamationTriangleIcon /> Gửi khiếu nại tài khoản
-        </Button>
+        </Button>}
+        {internalAdmin && <span>Vui lòng liên hệ quản trị viên hệ thống để mở lại tài khoản.</span>}
         <Link to="/support">Xem lịch sử và phản hồi</Link>
       </div>
 
@@ -90,7 +92,7 @@ export default function AccountSuspendedBanner() {
           </Flex>
 
           <Dialog.Description size="2" mb="4">
-            Gửi yêu cầu xem xét mở khóa. Admin xử lý tài khoản Manager; Manager xử lý các tài khoản thuộc phạm vi quản lý. Mỗi tài khoản chỉ có một đơn đang chờ.
+            Gửi yêu cầu xem xét mở khóa. School xử lý quyết định khóa của nhà trường; Manager xử lý quyết định khóa cấp hệ thống. Mỗi tài khoản chỉ có một đơn đang chờ.
           </Dialog.Description>
 
           {notice && (

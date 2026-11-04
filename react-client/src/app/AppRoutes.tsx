@@ -8,7 +8,6 @@ import AccountSuspendedBanner from "../features/account/components/AccountSuspen
 import { CardLoadingSkeleton } from "../shared/ui/LoadingSkeleton";
 
 const AdminDirectory = lazy(() => import("../features/account/pages/AdminDirectory"));
-const AccountAppeals = lazy(() => import("../features/account/pages/AccountAppeals"));
 const MySupport = lazy(() => import("../features/support/pages/MySupport"));
 const Admin = lazy(() => import("../features/management/pages/OverviewView").then(module => ({ default: module.OverviewView })));
 const SupportInbox = lazy(() => import("../features/support/pages/SupportInbox"));
@@ -145,6 +144,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route path="classes/:classId" element={<SchoolClassDetailPage />} />
             <Route path="class-management" element={<Navigate to="/school/classes" replace />} />
             <Route path="import" element={<SchoolImportPage />} />
+            <Route path="appeals" element={<SupportInbox schoolOnly />} />
             <Route path="reports" element={<SchoolReports />} />
             <Route path="billing" element={<SchoolBilling />} />
             <Route path="*" element={<Navigate to="/school" replace />} />
@@ -152,7 +152,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           <Route path="/admin" element={roleElement([ROLE_NAMES.ADMIN], <AdminArea />)}>
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminDirectory />} />
-            <Route path="appeals" element={<AccountAppeals />} />
+            <Route path="appeals" element={<Navigate to="/admin/users" replace />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
           <Route path="/student" element={roleElement([ROLE_NAMES.STUDENT], <StudentArea />)}>

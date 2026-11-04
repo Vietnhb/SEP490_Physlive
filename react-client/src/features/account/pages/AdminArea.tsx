@@ -16,7 +16,6 @@ import "../styles/admin-directory.css";
 const groups: SidebarGroup[] = [
   { items: [{ to: "/admin", label: "Tổng quan", icon: "grid", end: true }] },
   { label: "Quản trị", items: [{ to: "/admin/users", label: "Tài khoản người dùng", icon: "users" }] },
-  { label: "Hỗ trợ", items: [{ to: "/admin/appeals", label: "Khiếu nại tài khoản", icon: "message" }] },
 ];
 
 /** ADMIN area: sees every account, manages MANAGER accounts only. */

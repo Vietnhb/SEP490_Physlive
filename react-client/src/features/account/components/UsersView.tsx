@@ -37,6 +37,7 @@ function UserActionMenu({ item, open, disabled, onToggleMenu, onToggle, onEdit, 
   onResetPassword: () => void;
   onClose: () => void;
 }>) {
+  const actorRole = useSessionStore(state => state.user?.role);
   return <DropdownMenu.Root open={open} onOpenChange={nextOpen => { if (nextOpen) onToggleMenu(); else onClose(); }}>
     <DropdownMenu.Trigger>
       <IconButton type="button" variant="ghost" color="gray" disabled={disabled} aria-label={`Thao tác với ${item.email}`}><DotsHorizontalIcon width="20" height="20" /></IconButton>
@@ -46,7 +47,7 @@ function UserActionMenu({ item, open, disabled, onToggleMenu, onToggle, onEdit, 
       <DropdownMenu.Separator />
       <DropdownMenu.Item onSelect={() => { onEdit(); onClose(); }}>Sửa hồ sơ</DropdownMenu.Item>
       <DropdownMenu.Item onSelect={() => { onResetPassword(); onClose(); }}>Đặt lại mật khẩu</DropdownMenu.Item>
-      <DropdownMenu.Item color={item.active === false ? "cyan" : "red"} onSelect={() => { onToggle(); onClose(); }}>{item.active === false ? "Kích hoạt lại" : "Tạm khóa"}</DropdownMenu.Item>
+      <DropdownMenu.Item disabled={item.active === false && ((actorRole === "SCHOOL" && item.suspensionScope !== "SCHOOL") || (actorRole === "MANAGER" && item.suspensionScope === "SCHOOL"))} color={item.active === false ? "cyan" : "red"} onSelect={() => { onToggle(); onClose(); }}>{item.active === false ? "Kích hoạt lại" : "Tạm khóa"}</DropdownMenu.Item>
     </DropdownMenu.Content>
   </DropdownMenu.Root>;
 }
@@ -63,6 +64,8 @@ export function UsersView({ schoolId }: Readonly<{ schoolId?: string }> = {}) {
   const [availableSchools, setAvailableSchools] = useState<ManagedSchool[]>([]);
   const [items, setItems] = useState<User[]>([]); const [query, setQuery] = useState(""); const [form, setForm] = useState<UserForm>(blankUser); const [editing, setEditing] = useState<number | null>(null); const [showForm, setShowForm] = useState(false); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [openActions, setOpenActions] = useState<number | null>(null);
+  const [suspendUser, setSuspendUser] = useState<User | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
   const [resetUser, setResetUser] = useState<User | null>(null);
   const [notice, setNotice] = useState("");
   const [selectedRole, setSelectedRole] = useState<string>("ALL");
@@ -100,7 +103,7 @@ export function UsersView({ schoolId }: Readonly<{ schoolId?: string }> = {}) {
     finally { busyRef.current = false; setBusy(false); }
   };
   const edit = (item: User) => { setError(""); setNotice(""); setEditing(item.id); setForm({ email: item.email, password: "", fullName: item.fullName, role: item.role, institutionId: item.schoolId ?? item.institutionId ?? "", ...accountDetails(item) }); setShowForm(true); };
-  const toggle = async (item: User) => { if (busyRef.current) return; busyRef.current = true; setBusy(true); setError(""); setNotice(""); try { const updated = await setManagedUserActive(item.id, item.active === false, schoolId); setItems(current => current.map(user => user.id === updated.id ? updated : user)); } catch (e) { setError(apiMessage(e, "Không thể cập nhật trạng thái tài khoản.")); } finally { busyRef.current = false; setBusy(false); } };
+  const toggle = async (item: User, reason?: string) => { if (busyRef.current) return; busyRef.current = true; setBusy(true); setError(""); setNotice(""); try { const updated = await setManagedUserActive(item.id, item.active === false, schoolId, reason); setItems(current => current.map(user => user.id === updated.id ? updated : user)); setSuspendUser(null); setNotice(updated.active ? "Đã mở khóa tài khoản." : "Đã tạm khóa tài khoản và lưu lý do."); } catch (e) { setError(apiMessage(e, "Không thể cập nhật trạng thái tài khoản.")); } finally { busyRef.current = false; setBusy(false); } };
   return <div className="admin-content">
     {error && <ErrorNotice error={error} onRetry={() => void load()} />}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
@@ -154,8 +157,9 @@ export function UsersView({ schoolId }: Readonly<{ schoolId?: string }> = {}) {
       {!schoolScoped && <Table.Cell>{availableSchools.find(school => school.id === item.institutionId)?.name || "—"}</Table.Cell>}
       <Table.Cell><Text size="2" color="gray">{item.lastLogin ? new Date(item.lastLogin).toLocaleString("vi-VN") : "Chưa đăng nhập"}</Text></Table.Cell>
       <Table.Cell><div style={{ display: "grid", gap: 6, justifyItems: "start" }}><Badge color={item.active === false ? "amber" : "cyan"} size="2">{item.active === false ? "Tạm khóa" : "Hoạt động"}</Badge>{item.mustChangePassword && <Text size="1" color="gray">Cần đổi mật khẩu</Text>}</div></Table.Cell>
-      <Table.Cell>{canEditUser(actorRole, item.role) && <UserActionMenu item={item} open={openActions === item.id} disabled={busy} onToggleMenu={() => setOpenActions(openActions === item.id ? null : item.id)} onToggle={() => void toggle(item)} onEdit={() => edit(item)} onResetPassword={() => setResetUser(item)} onClose={() => setOpenActions(null)} />}</Table.Cell>
+      <Table.Cell>{canEditUser(actorRole, item.role) && <UserActionMenu item={item} open={openActions === item.id} disabled={busy} onToggleMenu={() => setOpenActions(openActions === item.id ? null : item.id)} onToggle={() => { if (item.active === false) void toggle(item); else { setSuspendReason(""); setError(""); setSuspendUser(item); } }} onEdit={() => edit(item)} onResetPassword={() => setResetUser(item)} onClose={() => setOpenActions(null)} />}</Table.Cell>
     </Table.Row>)}</Table.Body></Table.Root><div className="admin-table-pagination"><span aria-live="polite">{filtered.length === 0 ? "0 kết quả" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, filtered.length)} / ${filtered.length} tài khoản`}</span><div><label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); setOpenActions(null); }}><Select.Trigger aria-label="Số tài khoản trên mỗi trang" /><Select.Content>{USER_PAGE_SIZES.map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => { setPage(Math.max(1, currentPage - 1)); setOpenActions(null); }}>Trước</ThemeButton><span>Trang {currentPage}/{pageCount}</span><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => { setPage(Math.min(pageCount, currentPage + 1)); setOpenActions(null); }}>Sau</ThemeButton></div></div></>}</Panel>
+    <Dialog.Root open={!!suspendUser} onOpenChange={open => { if (!open && !busy) setSuspendUser(null); }}><Dialog.Content maxWidth="520px"><Dialog.Title>Tạm khóa tài khoản</Dialog.Title><Dialog.Description>{suspendUser?.email}. Người dùng chỉ được gửi và theo dõi yêu cầu mở khóa.</Dialog.Description><form onSubmit={event => { event.preventDefault(); if (suspendUser && suspendReason.trim()) void toggle(suspendUser, suspendReason.trim()); }}><FormField label="Lý do tạm khóa" htmlFor="user-suspend-reason"><TextField.Root id="user-suspend-reason" required maxLength={2000} value={suspendReason} onChange={event => setSuspendReason(event.target.value)} disabled={busy} /></FormField>{error && <p role="alert">{error}</p>}<div style={{display:"flex",justifyContent:"flex-end",gap:12,marginTop:20}}><ThemeButton type="button" variant="soft" disabled={busy} onClick={()=>setSuspendUser(null)}>Hủy</ThemeButton><ThemeButton type="submit" color="red" loading={busy} disabled={busy || !suspendReason.trim()}>Tạm khóa</ThemeButton></div></form></Dialog.Content></Dialog.Root>
     <ResetManagedPasswordDialog user={resetUser} schoolId={schoolId} onClose={() => setResetUser(null)} onUpdated={updated => { setItems(current => current.map(user => user.id === updated.id ? updated : user)); setNotice(`Đã đặt lại mật khẩu cho ${updated.email}.`); }} />
   </div>;
 }
