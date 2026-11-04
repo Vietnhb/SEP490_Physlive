@@ -202,6 +202,11 @@ public class SchoolClassService {
                 .orElseGet(ClassEnrollment::new);
         enrollment.setSchoolClass(schoolClass); enrollment.setStudent(student); enrollment.setSchoolYear(schoolClass.getSchoolYear());
         enrollment.setStatus(ClassEnrollment.EnrollmentStatus.ACTIVE); enrollment = enrollments.save(enrollment);
+        // Joining after removal and direct transfers must receive the same open work.
+        // Existing recipients/submissions are preserved, including historical grades.
+        assignments.findOpenForTransfer(classId, java.time.Instant.now()).forEach(assignment -> {
+            if (assignment.getAssignedStudentIds().add(studentId)) assignments.save(assignment);
+        });
         return new Enrollment(enrollment.getId(), student.getId(), student.getFullName(), enrollment.getSchoolYear(), enrollment.getStatus().name());
     }
 
@@ -216,12 +221,7 @@ public class SchoolClassService {
                 existing.setStatus(ClassEnrollment.EnrollmentStatus.TRANSFERRED); enrollments.save(existing);
             }
         });
-        Enrollment result = enrollStudentInternal(schoolId, targetClassId, student.getId());
-        // The original class's assignments and submissions are historical records and stay untouched.
-        assignments.findOpenForTransfer(targetClassId, java.time.Instant.now()).forEach(assignment -> {
-            if (assignment.getAssignedStudentIds().add(studentId)) assignments.save(assignment);
-        });
-        return result;
+        return enrollStudentInternal(schoolId, targetClassId, student.getId());
     }
 
     @Transactional

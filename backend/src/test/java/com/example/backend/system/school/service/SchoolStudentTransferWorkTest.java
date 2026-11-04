@@ -10,14 +10,17 @@ import com.example.backend.system.school.repository.*;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.*;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class SchoolStudentTransferWorkTest {
-    @Test void transferKeepsOldRecipientsAndAddsOnlyOpenTargetWorkWithoutDuplicates() {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void joiningOrTransferringKeepsHistoryAndAddsOpenWorkWithoutDuplicates(boolean transfer) {
         SchoolClassRepository classes = mock(SchoolClassRepository.class);
         ClassEnrollmentRepository enrollments = mock(ClassEnrollmentRepository.class);
         SchoolRepository schools = mock(SchoolRepository.class);
@@ -34,7 +37,8 @@ class SchoolStudentTransferWorkTest {
         User student = new User(); student.setId(3); student.setSchool(school); student.setActive(true);
         Role studentRole = new Role(); studentRole.setName("STUDENT"); student.setRole(studentRole);
         User actor = new User(); Role manager = new Role(); manager.setName("MANAGER"); actor.setRole(manager);
-        ClassEnrollment old = new ClassEnrollment(); old.setSchoolClass(previous); old.setStudent(student); old.setStatus(ClassEnrollment.EnrollmentStatus.ACTIVE);
+        ClassEnrollment old = new ClassEnrollment(); old.setSchoolClass(previous); old.setStudent(student);
+        old.setStatus(transfer ? ClassEnrollment.EnrollmentStatus.ACTIVE : ClassEnrollment.EnrollmentStatus.DROPPED);
         when(current.requireCurrentUser()).thenReturn(actor); when(roles.canManageSchool(actor, schoolId)).thenReturn(true);
         when(schools.findByIdForUpdate(schoolId)).thenReturn(Optional.of(school)); when(classes.findById(targetId)).thenReturn(Optional.of(target));
         when(users.findById(3)).thenReturn(Optional.of(student));
@@ -43,8 +47,9 @@ class SchoolStudentTransferWorkTest {
         Assignment oldWork = new Assignment(); oldWork.getAssignedStudentIds().add(3);
         Assignment targetWork = new Assignment(), alreadyAssigned = new Assignment(); alreadyAssigned.getAssignedStudentIds().add(3);
         when(assignments.findOpenForTransfer(eq(targetId), any(Instant.class))).thenReturn(List.of(targetWork, alreadyAssigned));
-        service.transferStudent(schoolId, targetId, 3);
-        assertEquals(ClassEnrollment.EnrollmentStatus.TRANSFERRED, old.getStatus());
+        if (transfer) service.transferStudent(schoolId, targetId, 3);
+        else service.enrollStudent(schoolId, targetId, 3);
+        assertEquals(transfer ? ClassEnrollment.EnrollmentStatus.TRANSFERRED : ClassEnrollment.EnrollmentStatus.DROPPED, old.getStatus());
         assertTrue(oldWork.getAssignedStudentIds().contains(3)); assertTrue(targetWork.getAssignedStudentIds().contains(3));
         assertEquals(1, alreadyAssigned.getAssignedStudentIds().size());
         verify(assignments).save(targetWork); verify(assignments, never()).save(alreadyAssigned);
