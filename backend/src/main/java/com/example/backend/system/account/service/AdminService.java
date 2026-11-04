@@ -52,6 +52,12 @@ public class AdminService {
     }
 
     @Transactional
+    public UserStatusResponse suspendForSchool(java.util.UUID schoolId, Integer userId, String reason) {
+        requireUserInSchool(schoolId, userId);
+        return setActive(userId, false, reason);
+    }
+
+    @Transactional
     public UserStatusResponse createUserForSchool(java.util.UUID schoolId, CreateManagedUserRequest request) {
         requireSchoolAccess(schoolId);
         return createUser(new CreateManagedUserRequest(request.email(), request.password(), request.fullName(),
@@ -115,15 +121,36 @@ public class AdminService {
 
     @Transactional
     public UserStatusResponse setActive(Integer id, boolean active) {
+        return setActive(id, active, "Tạm khóa bởi quản trị viên.");
+    }
+
+    @Transactional
+    public UserStatusResponse setActive(Integer id, boolean active, String reason) {
         if (!active && currentUserService.requireCurrentUser().getId().equals(id)) {
             throw ApiException.conflict("Bạn không thể khóa tài khoản của chính mình");
         }
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy người dùng"));
         requireManage(user.getRole().getName(), user.getSchool());
         if (active && Boolean.FALSE.equals(user.getActive())) requireStudentSeat(user.getRole().getName(), user.getSchool());
         if (active && RoleName.SCHOOL.matches(user.getRole().getName()))
             roleValidationService.validateSingleSchoolManager(user.getSchool().getId(), user.getId());
+        User actor = currentUserService.requireCurrentUser();
+        boolean schoolActor = actor.getRole() != null && RoleName.SCHOOL.matches(actor.getRole().getName());
+        if (schoolActor && user.isSuspendedReadOnly() && !"SCHOOL".equals(user.getSuspensionScope()))
+            throw ApiException.forbidden("Tài khoản bị khóa ở cấp hệ thống. School không có quyền thay đổi quyết định này.");
+        if (actor.getRole() != null && RoleName.MANAGER.matches(actor.getRole().getName())
+                && user.isSuspendedReadOnly() && "SCHOOL".equals(user.getSuspensionScope()))
+            throw ApiException.forbidden("Tài khoản do School tạm khóa. Manager chỉ được xem; nhà trường chịu trách nhiệm mở lại.");
+        if (!active && (reason == null || reason.isBlank())) throw ApiException.badRequest("Vui lòng nhập lý do tạm khóa.");
+        if (!active && reason.length() > 2000) throw ApiException.badRequest("Lý do quá dài.");
+        if (!active && user.isSuspendedReadOnly() && java.util.Objects.equals(user.getSuspensionScope(), schoolActor ? "SCHOOL" : "SYSTEM"))
+            throw ApiException.conflict("Tài khoản đã bị khóa ở cấp quản lý này.");
+        user.setAccountStatus(active ? "ACTIVE" : "SUSPENDED_READ_ONLY");
+        user.setSuspensionReason(active ? null : reason.trim());
+        user.setSuspendedUntil(null);
+        user.setSuspensionScope(active ? null : schoolActor ? "SCHOOL" : "SYSTEM");
+        user.setSuspensionId(active ? null : java.util.UUID.randomUUID());
         user.setActive(active);
         user.setDeactivatedAt(active ? null : java.time.Instant.now());
         user.setDeactivatedBy(active ? null : currentUserService.requireCurrentUser().getId());
@@ -150,7 +177,7 @@ public class AdminService {
                 user.getSchool() == null ? null : user.getSchool().getId(),
                 user.getSchool() == null ? null : user.getSchool().getName(), user.isMustChangePassword(),
                 user.permissionCodes(),
-                status, user.getSuspensionReason(), user.getSuspendedUntil());
+                status, user.getSuspensionReason(), user.getSuspendedUntil(), user.getSuspensionScope());
     }
 
     @Transactional
@@ -187,6 +214,8 @@ public class AdminService {
                 throw ApiException.forbidden("Quản trị viên chỉ có thể quản lý tài khoản quản lý");
             return;
         }
+        if (RoleName.MANAGER.matches(targetRole))
+            throw ApiException.forbidden("Chỉ Admin được quản lý tài khoản Manager.");
         if (RoleName.ADMIN.matches(targetRole))
             throw ApiException.forbidden("Không thể quản lý tài khoản quản trị viên tại đây");
         if (actor.getRole() != null && RoleName.MANAGER.matches(actor.getRole().getName())) return;

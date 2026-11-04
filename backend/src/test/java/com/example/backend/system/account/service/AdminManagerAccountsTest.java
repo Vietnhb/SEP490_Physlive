@@ -34,6 +34,7 @@ class AdminManagerAccountsTest {
         manager.setId(2); manager.setRole(role("MANAGER")); manager.setEmail("manager@example.test"); manager.setFullName("Manager"); manager.setActive(true);
         when(current.requireCurrentUser()).thenReturn(admin);
         when(users.findById(2)).thenReturn(Optional.of(manager));
+        when(users.findByIdForUpdate(2)).thenReturn(Optional.of(manager));
         when(roles.findByName("MANAGER")).thenReturn(Optional.of(manager.getRole()));
         when(passwords.encode(anyString())).thenReturn("encoded-password");
         when(users.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

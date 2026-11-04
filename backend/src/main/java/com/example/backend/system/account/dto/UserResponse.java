@@ -25,6 +25,7 @@ public class UserResponse {
     private String accountStatus;
     private String suspensionReason;
     private Instant suspendedUntil;
+    private String suspensionScope;
 
     public static UserResponse from(User user, boolean billingRequired) {
         String status = user.getAccountStatus() != null ? user.getAccountStatus()
@@ -35,6 +36,6 @@ public class UserResponse {
                 user.getSchool() == null ? null : user.getSchool().getId(), billingRequired,
                 user.isMustChangePassword(), user.getSchool() == null ? null : user.getSchool().getName(),
                 Boolean.TRUE.equals(user.getActive()), user.permissionCodes(),
-                status, user.getSuspensionReason(), user.getSuspendedUntil());
+                status, user.getSuspensionReason(), user.getSuspendedUntil(), user.getSuspensionScope());
     }
 }

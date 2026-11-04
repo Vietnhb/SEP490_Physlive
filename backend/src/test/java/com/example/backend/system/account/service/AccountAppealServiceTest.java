@@ -1,101 +1,33 @@
 package com.example.backend.system.account.service;
-
 import com.example.backend.exception.ApiException;
 import com.example.backend.system.account.dto.AppealContracts.*;
 import com.example.backend.system.account.model.entity.*;
 import com.example.backend.system.account.repository.*;
+import com.example.backend.system.school.model.entity.School;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-
 class AccountAppealServiceTest {
-    private final AccountAppealRepository appeals = mock(AccountAppealRepository.class);
-    private final UserRepository users = mock(UserRepository.class);
-    private final CurrentUserService current = mock(CurrentUserService.class);
-    private final AdminService admin = mock(AdminService.class);
-    private final AccountAppealService service = new AccountAppealService(appeals, users, current, admin);
-
-    private User user(int id, String name) {
-        User user = new User(); user.setId(id); user.setEmail(id + "@test.com");
-        Role role = new Role(); role.setName(name); user.setRole(role); user.setActive(false);
-        return user;
-    }
-    private AccountAppeal pending(User target) {
-        AccountAppeal appeal = new AccountAppeal(); appeal.setId(UUID.randomUUID()); appeal.setUser(target);
-        when(appeals.findByIdForUpdate(appeal.getId())).thenReturn(Optional.of(appeal));
-        when(users.findByIdForUpdate(target.getId())).thenReturn(Optional.of(target));
-        when(appeals.save(any())).thenAnswer(call -> call.getArgument(0));
-        return appeal;
-    }
-    private CreateAppealRequest request() { return new CreateAppealRequest("Mở khóa", "Vui lòng xem xét"); }
-
-    @Test void onlySuspendedUsersCanSubmitAndPendingCannotBeDuplicated() {
-        User target = user(2, "STUDENT");
-        var auth = new UsernamePasswordAuthenticationToken(target.getEmail(), "");
-        when(users.findByEmail(target.getEmail())).thenReturn(Optional.of(target));
-        when(users.findByIdForUpdate(2)).thenReturn(Optional.of(target));
-        when(appeals.save(any())).thenAnswer(call -> call.getArgument(0));
-        target.setActive(true);
-        assertThrows(ApiException.class, () -> service.createAppeal(auth, request()));
-        target.setActive(false);
-        assertEquals("PENDING", service.createAppeal(auth, request()).status());
-        when(appeals.existsByUserIdAndStatus(2, "PENDING")).thenReturn(true);
-        assertThrows(ApiException.class, () -> service.createAppeal(auth, request()));
-        verify(appeals, times(1)).save(any());
-    }
-    @Test void listIsScopedToHandlerRole() {
-        var managerAppeal = pending(user(2, "MANAGER"));
-        var studentAppeal = pending(user(3, "STUDENT"));
-        var adminAppeal = pending(user(4, "ADMIN"));
-        when(appeals.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(managerAppeal, studentAppeal, adminAppeal));
-        when(current.requireCurrentUser()).thenReturn(user(1, "ADMIN"));
-        assertEquals(List.of(managerAppeal.getId()), service.allAppeals().stream().map(AppealResponse::id).toList());
-        when(current.requireCurrentUser()).thenReturn(user(1, "MANAGER"));
-        assertEquals(List.of(studentAppeal.getId()), service.allAppeals().stream().map(AppealResponse::id).toList());
-        when(current.requireCurrentUser()).thenReturn(user(1, "STAFF"));
-        assertThrows(ApiException.class, service::allAppeals);
-    }
-    @Test void managerCannotHandleManagerOrAdminEvenByDirectId() {
-        when(current.requireCurrentUser()).thenReturn(user(1, "MANAGER"));
-        for (String role : List.of("MANAGER", "ADMIN")) {
-            var appeal = pending(user(2, role));
-            assertThrows(ApiException.class, () -> service.resolveAppeal(appeal.getId(), new ResolveAppealRequest("APPROVED", "Đồng ý")));
-        }
-        verifyNoInteractions(admin);
-    }
-    @Test void approvalReusesQuotaChecksAndClearsSuspension() {
-        when(current.requireCurrentUser()).thenReturn(user(1, "MANAGER"));
-        User target = user(2, "STUDENT"); target.setAccountStatus("SUSPENDED_READ_ONLY"); target.setSuspensionReason("Lý do");
-        var appeal = pending(target);
-        assertEquals("APPROVED", service.resolveAppeal(appeal.getId(), new ResolveAppealRequest("APPROVED", "Đồng ý")).status());
-        verify(admin).setActive(2, true);
-        assertTrue(target.getActive()); assertEquals("ACTIVE", target.getAccountStatus()); assertNull(target.getSuspensionReason());
-        assertThrows(ApiException.class, () -> service.resolveAppeal(appeal.getId(), new ResolveAppealRequest("REJECTED", "Khác")));
-    }
-    @Test void quotaFailureDoesNotResolveAppeal() {
-        when(current.requireCurrentUser()).thenReturn(user(1, "MANAGER"));
-        var appeal = pending(user(2, "STUDENT"));
-        doThrow(ApiException.conflict("Hết quota")).when(admin).setActive(2, true);
-        assertThrows(ApiException.class, () -> service.resolveAppeal(appeal.getId(), new ResolveAppealRequest("APPROVED", "Đồng ý")));
-        assertEquals("PENDING", appeal.getStatus()); verify(appeals, never()).save(any());
-    }
-    @Test void adminApprovesManagerAndRejectionRequiresNoteWithoutUnlocking() {
-        when(current.requireCurrentUser()).thenReturn(user(1, "ADMIN"));
-        var appeal = pending(user(2, "MANAGER"));
-        assertThrows(ApiException.class, () -> service.resolveAppeal(appeal.getId(), new ResolveAppealRequest("REJECTED", " ")));
-        assertEquals("REJECTED", service.resolveAppeal(appeal.getId(), new ResolveAppealRequest("REJECTED", "Chưa đủ căn cứ")).status());
-        assertFalse(appeal.getUser().getActive()); verifyNoInteractions(admin);
-        var other = pending(user(3, "MANAGER"));
-        assertEquals("APPROVED", service.resolveAppeal(other.getId(), new ResolveAppealRequest("APPROVED", "Đồng ý")).status());
-    }
-    @Test void mineReturnsOnlyCurrentUsersHistory() {
-        User target = user(2, "STUDENT"); var appeal = pending(target);
-        when(users.findByEmail(target.getEmail())).thenReturn(Optional.of(target));
-        when(appeals.findByUserIdOrderByCreatedAtDesc(2)).thenReturn(List.of(appeal));
-        assertEquals(appeal.getId(), service.myAppeals(new UsernamePasswordAuthenticationToken(target.getEmail(), "")).getFirst().id());
-        verify(appeals, never()).findAllByOrderByCreatedAtDesc();
-    }
+ final AccountAppealRepository appeals=mock(AccountAppealRepository.class);
+ final UserRepository users=mock(UserRepository.class);
+ final CurrentUserService current=mock(CurrentUserService.class);
+ final AdminService admin=mock(AdminService.class);
+ final AccountAppealService service=new AccountAppealService(appeals,users,current,admin);
+ final UUID schoolId=UUID.randomUUID();
+ User user(int id,String role){User u=new User();u.setId(id);u.setEmail(id+"@test.com");Role rr=new Role();rr.setName(role);u.setRole(rr);School s=new School();s.setId(schoolId);u.setSchool(s);u.setActive(true);return u;}
+ AccountAppeal pending(String scope){User u=user(2,"STUDENT");u.setActive(false);u.setSuspensionId(UUID.randomUUID());u.setSuspensionScope(scope);AccountAppeal a=new AccountAppeal();a.setId(UUID.randomUUID());a.setUser(u);a.setSuspensionId(u.getSuspensionId());a.setSuspensionScope(scope);a.setSchoolId(schoolId);when(appeals.findByIdForUpdate(a.getId())).thenReturn(Optional.of(a));when(users.findByIdForUpdate(2)).thenReturn(Optional.of(u));when(appeals.save(any())).thenAnswer(c->c.getArgument(0));return a;}
+ ResolveAppealRequest approve(){return new ResolveAppealRequest("APPROVED","Đã kiểm tra thông tin.");}
+ @Test void schoolDecidesOnlyItsSchoolSuspensions(){var a=pending("SCHOOL");when(current.requireCurrentUser()).thenReturn(user(1,"SCHOOL"));assertEquals("APPROVED",service.resolveAppeal(a.getId(),approve()).status());verify(admin).setActive(2,true);}
+ @Test void schoolCannotResolveSystemSuspensions(){var a=pending("SYSTEM");when(current.requireCurrentUser()).thenReturn(user(1,"SCHOOL"));assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),approve()));verifyNoInteractions(admin);}
+ @Test void differentSchoolCannotSeeOrResolve(){var a=pending("SCHOOL");User actor=user(1,"SCHOOL");actor.getSchool().setId(UUID.randomUUID());when(current.requireCurrentUser()).thenReturn(actor);when(appeals.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(a));assertTrue(service.allAppeals().isEmpty());assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),approve()));}
+ @Test void managerSeesSchoolAppealButCannotDecide(){var a=pending("SCHOOL");when(current.requireCurrentUser()).thenReturn(user(1,"MANAGER"));when(appeals.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(a));assertFalse(service.allAppeals().getFirst().canResolve());assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),approve()));verifyNoInteractions(admin);}
+ @Test void managerCanResolveSystemLock(){var a=pending("SYSTEM");when(current.requireCurrentUser()).thenReturn(user(1,"MANAGER"));when(appeals.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(a));assertTrue(service.allAppeals().getFirst().canResolve());assertEquals("APPROVED",service.resolveAppeal(a.getId(),approve()).status());verify(admin).setActive(2,true);}
+ @Test void staleAppealCannotUnlockNewSuspension(){var a=pending("SYSTEM");a.getUser().setSuspensionId(UUID.randomUUID());when(current.requireCurrentUser()).thenReturn(user(1,"MANAGER"));assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),approve()));verifyNoInteractions(admin);}
+ @Test void rejectedAndCompletedRequireReasonAndCannotBeReprocessed(){var a=pending("SYSTEM");when(current.requireCurrentUser()).thenReturn(user(1,"MANAGER"));assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),new ResolveAppealRequest("REJECTED"," ")));assertEquals("REJECTED",service.resolveAppeal(a.getId(),new ResolveAppealRequest("REJECTED","Giữ nguyên quyết định.")).status());assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),approve()));verifyNoInteractions(admin);}
+ @Test void managerCannotFileAppeal(){User u=user(2,"MANAGER");u.setActive(false);when(users.findByEmail(u.getEmail())).thenReturn(Optional.of(u));when(users.findByIdForUpdate(2)).thenReturn(Optional.of(u));assertThrows(ApiException.class,()->service.createAppeal(new UsernamePasswordAuthenticationToken(u.getEmail(),""),new CreateAppealRequest("Mở khóa","Kiểm tra")));}
+ @Test void snapshotsDecisionAndBlocksDuplicateForSameSuspension(){var a=pending("SCHOOL");User u=a.getUser();when(users.findByEmail(u.getEmail())).thenReturn(Optional.of(u));var auth=new UsernamePasswordAuthenticationToken(u.getEmail(),"");var req=new CreateAppealRequest("Mở khóa","Kiểm tra");assertEquals("SCHOOL",service.createAppeal(auth,req).authority());when(appeals.existsByUserIdAndSuspensionIdAndStatus(2,u.getSuspensionId(),"PENDING")).thenReturn(true);assertThrows(ApiException.class,()->service.createAppeal(auth,req));u.setSuspensionId(UUID.randomUUID());assertDoesNotThrow(()->service.createAppeal(auth,req));}
+ @Test void adminNoLongerHandlesAppeals(){var a=pending("SYSTEM");when(current.requireCurrentUser()).thenReturn(user(1,"ADMIN"));assertThrows(ApiException.class,service::allAppeals);assertThrows(ApiException.class,()->service.resolveAppeal(a.getId(),approve()));}
 }

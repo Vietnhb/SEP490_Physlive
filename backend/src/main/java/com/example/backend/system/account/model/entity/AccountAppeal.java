@@ -40,6 +40,17 @@ public class AccountAppeal {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "suspension_id")
+    private UUID suspensionId;
+    @Column(name = "suspension_scope", length = 12)
+    private String suspensionScope;
+    @Column(name = "school_id")
+    private UUID schoolId;
+    @Column(name = "suspended_by")
+    private Integer suspendedBy;
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
+
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 }

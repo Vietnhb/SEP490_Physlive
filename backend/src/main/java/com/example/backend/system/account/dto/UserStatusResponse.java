@@ -8,7 +8,7 @@ public record UserStatusResponse(Integer id, String email, String fullName, Stri
         String institutionId, Instant lastLogin, LocalDate dateOfBirth, String avatarUrl,
         UUID schoolId, String schoolName, boolean mustChangePassword,
         java.util.List<String> permissions,
-        String accountStatus, String suspensionReason, Instant suspendedUntil) {
+        String accountStatus, String suspensionReason, Instant suspendedUntil, String suspensionScope) {
 
     public UserStatusResponse(Integer id, String email, String fullName, String role, boolean active,
             String institutionId, Instant lastLogin, LocalDate dateOfBirth, String avatarUrl,
@@ -16,6 +16,6 @@ public record UserStatusResponse(Integer id, String email, String fullName, Stri
             java.util.List<String> permissions) {
         this(id, email, fullName, role, active, institutionId, lastLogin, dateOfBirth, avatarUrl,
                 schoolId, schoolName, mustChangePassword, permissions,
-                active ? "ACTIVE" : "SUSPENDED_READ_ONLY", null, null);
+                active ? "ACTIVE" : "SUSPENDED_READ_ONLY", null, null, null);
     }
 }

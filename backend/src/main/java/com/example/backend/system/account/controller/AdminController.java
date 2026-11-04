@@ -44,8 +44,8 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}/suspend")
-    public UserStatusResponse suspend(@PathVariable Integer id) {
-        return adminService.setActive(id, false);
+    public UserStatusResponse suspend(@PathVariable Integer id, @Valid @RequestBody com.example.backend.system.account.dto.SuspendAccountRequest request) {
+        return adminService.setActive(id, false, request.reason());
     }
 
     @PutMapping("/users/{id}/restore")

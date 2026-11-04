@@ -47,8 +47,8 @@ public class SchoolManagementController {
     }
 
     @PutMapping("/{userId}/suspend")
-    public UserStatusResponse suspend(@PathVariable UUID schoolId, @PathVariable Integer userId) {
-        return adminService.setActiveForSchool(schoolId, userId, false);
+    public UserStatusResponse suspend(@PathVariable UUID schoolId, @PathVariable Integer userId, @Valid @RequestBody com.example.backend.system.account.dto.SuspendAccountRequest request) {
+        return adminService.suspendForSchool(schoolId, userId, request.reason());
     }
 
     @PutMapping("/{userId}/restore")

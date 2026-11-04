@@ -11,6 +11,7 @@ public interface AccountAppealRepository extends JpaRepository<AccountAppeal, UU
     List<AccountAppeal> findByUserIdOrderByCreatedAtDesc(Integer userId);
     List<AccountAppeal> findAllByOrderByCreatedAtDesc();
     long countByStatus(String status);
+    boolean existsByUserIdAndSuspensionIdAndStatus(Integer userId, UUID suspensionId, String status);
     boolean existsByUserIdAndStatus(Integer userId, String status);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)

@@ -53,6 +53,12 @@ public class User {
     @Column(name = "suspended_until")
     private Instant suspendedUntil;
 
+    @Column(name = "suspension_scope", length = 12)
+    private String suspensionScope;
+
+    @Column(name = "suspension_id")
+    private java.util.UUID suspensionId;
+
     public boolean isSuspendedReadOnly() {
         return "SUSPENDED_READ_ONLY".equalsIgnoreCase(accountStatus) || Boolean.FALSE.equals(active);
     }
