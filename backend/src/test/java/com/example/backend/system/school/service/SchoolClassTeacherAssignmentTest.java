@@ -30,7 +30,7 @@ class SchoolClassTeacherAssignmentTest {
     private final RoleValidationService roles = mock(RoleValidationService.class);
     private final AccountAccessService access = mock(AccountAccessService.class);
     private final SchoolClassService service = new SchoolClassService(classes, mock(ClassEnrollmentRepository.class),
-            assignments, schools, users, currentUser, roles, mock(LicenseCheckService.class), access, mock(EntityManager.class));
+            assignments, schools, users, currentUser, roles, mock(LicenseCheckService.class), access, mock(EntityManager.class), mock(com.example.backend.system.assignment.repository.AssignmentRepository.class));
     private final UUID schoolId = UUID.randomUUID(), classId = UUID.randomUUID();
     private final User teacher = new User();
 

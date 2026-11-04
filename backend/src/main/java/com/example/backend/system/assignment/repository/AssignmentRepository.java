@@ -13,6 +13,13 @@ public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     List<Assignment> findByTeacherIdOrderByCreatedAtDesc(Integer teacherId);
     List<Assignment> findByAssignedStudentIdsContaining(Integer studentId);
 
+    @EntityGraph(attributePaths = {"teacher", "assignedStudentIds"})
+    List<Assignment> findBySchoolClassIdOrderByAssignedAtDesc(UUID classId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Assignment a where a.schoolClass.id = :classId and a.status = 'ACTIVE' and (a.dueAt is null or a.dueAt > :now)")
+    List<Assignment> findOpenForTransfer(UUID classId, java.time.Instant now);
+
     @EntityGraph(attributePaths = {"teacher", "schoolClass"})
     @Query("select a from Assignment a left join a.schoolClass c where c.school.id = :schoolId "
             + "or (c is null and a.teacher.school.id = :schoolId)")

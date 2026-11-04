@@ -44,6 +44,7 @@ public class SchoolClassService {
     private final LicenseCheckService licenseCheck;
     private final AccountAccessService accountAccess;
     private final jakarta.persistence.EntityManager entityManager;
+    private final com.example.backend.system.assignment.repository.AssignmentRepository assignments;
 
     @Transactional(readOnly = true)
     public List<StudentClassSummary> mineForStudent() {
@@ -206,14 +207,21 @@ public class SchoolClassService {
 
     @Transactional
     public Enrollment transferStudent(UUID schoolId, UUID targetClassId, Integer studentId) {
-        requireWriteAccess(schoolId); SchoolClass target = activeClassInSchool(schoolId, targetClassId);
+        requireWriteAccess(schoolId);
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+        SchoolClass target = activeClassInSchool(schoolId, targetClassId);
         User student = userInSchool(schoolId, studentId, RoleName.STUDENT.name());
         enrollments.findActiveEnrollment(studentId, target.getSchoolYear()).ifPresent(existing -> {
             if (!existing.getSchoolClass().getId().equals(targetClassId)) {
                 existing.setStatus(ClassEnrollment.EnrollmentStatus.TRANSFERRED); enrollments.save(existing);
             }
         });
-        return enrollStudentInternal(schoolId, targetClassId, student.getId());
+        Enrollment result = enrollStudentInternal(schoolId, targetClassId, student.getId());
+        // The original class's assignments and submissions are historical records and stay untouched.
+        assignments.findOpenForTransfer(targetClassId, java.time.Instant.now()).forEach(assignment -> {
+            if (assignment.getAssignedStudentIds().add(studentId)) assignments.save(assignment);
+        });
+        return result;
     }
 
     @Transactional

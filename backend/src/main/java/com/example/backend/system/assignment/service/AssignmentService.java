@@ -213,7 +213,17 @@ public class AssignmentService {
     @Transactional(readOnly = true)
     public List<AssignmentResponse> forTeacher() {
         User teacher = currentUserService.requireCurrentUser();
-        return assignmentRepository.findByTeacherIdOrderByCreatedAtDesc(teacher.getId()).stream().map(this::toResponse).toList();
+        if (!isTeachingStaff(teacher) && (teacher.getRole() == null || !RoleName.MANAGER.matches(teacher.getRole().getName())))
+            throw ApiException.forbidden("Tài khoản không có quyền giảng dạy.");
+        java.util.Map<UUID, Assignment> visible = new java.util.LinkedHashMap<>();
+        assignmentRepository.findByTeacherIdOrderByCreatedAtDesc(teacher.getId()).forEach(item -> visible.put(item.getId(), item));
+        classTeacherAssignments.findActiveByTeacherId(teacher.getId()).forEach(link -> {
+            SchoolClass classroom = link.getSchoolClass();
+            if (teacher.getSchool() != null && teacher.getSchool().getId().equals(classroom.getSchool().getId()))
+                assignmentRepository.findBySchoolClassIdOrderByAssignedAtDesc(classroom.getId()).forEach(item -> visible.put(item.getId(), item));
+        });
+        return visible.values().stream().sorted(java.util.Comparator.comparing(Assignment::getAssignedAt).reversed())
+                .map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -394,9 +404,8 @@ public class AssignmentService {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
-        if (!RoleName.MANAGER.matches(teacher.getRole() == null ? null : teacher.getRole().getName())
-                && !assignment.getTeacher().getId().equals(teacher.getId()))
-            throw ApiException.forbidden("Chỉ giáo viên giao bài mới được chấm bài nộp");
+        if (!canManageAssignment(teacher, assignment))
+            throw ApiException.forbidden("Bạn không có quyền chấm bài này. Sau bàn giao, giáo viên đang phụ trách lớp sẽ tiếp nhận.");
         AssignmentSubmission submission = submissionRepository.findById(submissionId)
                 .filter(item -> item.getAssignment().getId().equals(assignmentId))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy bài nộp"));
@@ -415,9 +424,8 @@ public class AssignmentService {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
-        if (!RoleName.MANAGER.matches(teacher.getRole() == null ? null : teacher.getRole().getName())
-                && !assignment.getTeacher().getId().equals(teacher.getId()))
-            throw ApiException.forbidden("Chỉ giáo viên giao bài mới được mở lại bài nộp");
+        if (!canManageAssignment(teacher, assignment))
+            throw ApiException.forbidden("Bạn không có quyền trả bài làm lại. Sau bàn giao, giáo viên đang phụ trách lớp sẽ tiếp nhận.");
         AssignmentSubmission submission = submissionRepository.findById(submissionId)
                 .filter(item -> item.getAssignment().getId().equals(assignmentId))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy bài nộp"));
@@ -438,9 +446,8 @@ public class AssignmentService {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
-        if (!RoleName.MANAGER.matches(teacher.getRole() == null ? null : teacher.getRole().getName())
-                && !assignment.getTeacher().getId().equals(teacher.getId()))
-            throw ApiException.forbidden("Chỉ giáo viên giao bài mới được đóng hoặc mở lại bài tập này.");
+        if (!canManageAssignment(teacher, assignment))
+            throw ApiException.forbidden("Bạn không có quyền đóng hoặc mở bài này. Sau bàn giao, giáo viên đang phụ trách lớp sẽ tiếp nhận.");
         assignment.setStatus(status);
         return toResponse(assignmentRepository.save(assignment));
     }
@@ -450,8 +457,7 @@ public class AssignmentService {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
-        if (!assignment.getTeacher().getId().equals(teacher.getId())
-                && !RoleName.MANAGER.matches(teacher.getRole() == null ? null : teacher.getRole().getName())) {
+        if (!canReadAssignment(teacher, assignment)) {
             throw ApiException.forbidden("Chỉ giáo viên mới được xem bài nộp");
         }
         return submissionRepository.findByAssignmentIdOrderBySubmittedAtDesc(assignmentId).stream().map(this::toSubmission).toList();
@@ -462,8 +468,7 @@ public class AssignmentService {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
-        boolean admin = teacher.getRole() != null && RoleName.MANAGER.matches(teacher.getRole().getName());
-        if (!admin && !assignment.getTeacher().getId().equals(teacher.getId()))
+        if (!canReadAssignment(teacher, assignment))
             throw ApiException.forbidden("Chỉ giáo viên giao bài mới được xem báo cáo");
         List<AssignmentSubmission> rows = submissionRepository.findByAssignmentIdOrderBySubmittedAtDesc(assignmentId);
         List<AssignmentSubmission> completed = rows.stream().filter(row -> row.getCompletedAt() != null).toList();
@@ -496,7 +501,27 @@ public class AssignmentService {
                         ? null : item.getGradingCriteria(), item.getMaxScore(), item.isAutoGrade(),
                 ownSubmission == null ? null : ownSubmission.getScore(), ownSubmission == null ? null : ownSubmission.getFeedback(),
                 ownSubmission == null ? null : ownSubmission.getGradingStatus(), ownSubmission != null && ownSubmission.isRetryAllowed(),
-                ownSubmission == null ? null : ownSubmission.getPredictions());
+                ownSubmission == null ? null : ownSubmission.getPredictions(), canManageAssignment(current, item),
+                item.getTeacher().getId(), item.getTeacher().getFullName());
+    }
+
+    private boolean canReadAssignment(User actor, Assignment assignment) {
+        return canManageAssignment(actor, assignment) || (isTeachingStaff(actor) && assignment.getTeacher().getId().equals(actor.getId()));
+    }
+
+    private boolean canManageAssignment(User actor, Assignment assignment) {
+        if (actor.getRole() != null && RoleName.MANAGER.matches(actor.getRole().getName())) return true;
+        if (!isTeachingStaff(actor)) return false;
+        SchoolClass classroom = assignment.getSchoolClass();
+        if (classroom == null) return assignment.getTeacher().getId().equals(actor.getId());
+        return Boolean.TRUE.equals(classroom.getIsActive()) && actor.getSchool() != null
+                && actor.getSchool().getId().equals(classroom.getSchool().getId())
+                && classTeacherAssignments.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(classroom.getId(), actor.getId());
+    }
+
+    private static boolean isTeachingStaff(User actor) {
+        return Boolean.TRUE.equals(actor.getActive()) && actor.getRole() != null && RoleName.STAFF.matches(actor.getRole().getName())
+                && actor.hasPermission(com.example.backend.system.account.model.enums.PermissionCode.TEACH);
     }
 
     private AssignmentSubmissionResponse toSubmission(AssignmentSubmission item) {

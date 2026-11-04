@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Badge, Button, Card, Popover, Select, Table, TextField } from "@radix-ui/themes";
+import { AlertDialog, Badge, Button, Card, Popover, Select, Table, TextField } from "@radix-ui/themes";
 import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, DownloadIcon, MagnifyingGlassIcon, Pencil1Icon } from "@radix-ui/react-icons";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { adminUsers } from "../../account/api/userApi";
@@ -20,6 +20,7 @@ import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { usePageBreadcrumb } from "../../../shared/layout/PageBreadcrumbContext";
 import { ClassDetailLoading } from "../components/SchoolLoading";
+import SchoolClassGrades from "../components/SchoolClassGrades";
 import s from "../components/SchoolClasses.module.css";
 
 type Option = { value: string; label: string };
@@ -47,6 +48,7 @@ export default function SchoolClassDetailPage() {
   const { classId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const editMode = searchParams.get("mode") === "edit";
+  const gradeMode = searchParams.get("view") === "grades";
   const schoolId = useSessionStore(state => state.user?.schoolId);
   const setPageBreadcrumb = usePageBreadcrumb();
   const [detail, setDetail] = useState<SchoolClassDetail | null>(null);
@@ -62,6 +64,7 @@ export default function SchoolClassDetailPage() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [transferTarget, setTransferTarget] = useState<{ studentId: number; studentName: string; classId: string; className: string } | null>(null);
 
   const load = useCallback(async (showSkeleton = true) => {
     if (!schoolId || !classId) return;
@@ -90,9 +93,9 @@ export default function SchoolClassDetailPage() {
   }, [load]);
 
   useEffect(() => {
-    if (detail?.name) setPageBreadcrumb(detail.name);
+    if (detail?.name) setPageBreadcrumb(gradeMode ? `${detail.name} · Bảng điểm` : detail.name);
     return () => setPageBreadcrumb(undefined);
-  }, [detail?.name, setPageBreadcrumb]);
+  }, [detail?.name, gradeMode, setPageBreadcrumb]);
 
   useEffect(() => {
     if (!feedback) return;
@@ -147,16 +150,17 @@ export default function SchoolClassDetailPage() {
   if (!schoolId || !classId) return null;
 
   return <div className="admin-content">
-    <div className={s.pageToolbar}><Button variant="ghost" color="gray" onClick={() => navigate("/school/classes")}><ArrowLeftIcon />Quay lại quản lý lớp học</Button>{editMode && <Button variant="soft" color="gray" onClick={() => changeMode(false)}>Xem chi tiết</Button>}</div>
-    {!editMode && <header className="admin-content-header">
+    <div className={s.pageToolbar}><Button variant="ghost" color="gray" onClick={() => navigate("/school/classes")}><ArrowLeftIcon />Quay lại quản lý lớp học</Button><div><Button variant={gradeMode ? "soft" : "solid"} onClick={() => setSearchParams({})}>Thông tin lớp</Button> <Button variant={gradeMode ? "solid" : "soft"} onClick={() => setSearchParams({ view: "grades" })}>Bảng điểm</Button>{editMode && <Button variant="soft" color="gray" onClick={() => changeMode(false)}>Xem chi tiết</Button>}</div></div>
+    {!editMode && !gradeMode && <header className="admin-content-header">
       <div><h1 className="admin-content-title">Chi tiết lớp học</h1><p className="admin-content-description">Thông tin lớp, giáo viên và học sinh.</p></div>
       <Button onClick={() => changeMode(true)}><Pencil1Icon />Chỉnh sửa</Button>
     </header>}
     {error && <div className="admin-error-banner" role="alert">{error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
     {feedback && <div className={`${s.feedbackToast} ${feedback.type === "success" ? s.feedbackSuccess : s.feedbackError}`} role={feedback.type === "error" ? "alert" : "status"} aria-live="polite">{feedback.message}</div>}
-    {loading && <ClassDetailLoading />}
+    {loading && !gradeMode && <ClassDetailLoading />}
 
-    {!loading && detail && <Card asChild size="3"><section className="admin-panel">
+    {gradeMode && <SchoolClassGrades key={classId} schoolId={schoolId} classId={classId} />}
+    {!gradeMode && !loading && detail && <Card asChild size="3"><section className="admin-panel">
       {!editMode && <div className="admin-panel-heading"><div><h2>{detail.name}</h2><p className="admin-panel-description">Khối {detail.gradeLevel} · {detail.schoolYear} · {detail.subject || "Chưa cập nhật môn học"}</p></div><Badge color="green" variant="soft">Hoạt động</Badge></div>}
 
       {editMode && form ? <form className={`admin-form-grid ${s.editForm}`} onSubmit={saveClass} aria-labelledby="detail-class-heading">
@@ -183,10 +187,11 @@ export default function SchoolClassDetailPage() {
         <div className={s.sectionHeading}><h3 id="detail-students-heading">Học sinh</h3><div className={s.sectionActions}><span>{detail.students.length} người</span><Button type="button" size="2" variant="soft" loading={exporting} disabled={busy || exporting || detail.students.length === 0} title={detail.students.length ? "Xuất toàn bộ học sinh của lớp, gồm cả các trang khác" : "Lớp chưa có học sinh để xuất"} onClick={() => void exportStudents()}><DownloadIcon />Xuất danh sách học sinh</Button></div></div>
         {editMode && <div className="admin-member-add"><AccountPicker value={studentId} disabled={busy} label="Chọn học sinh" placeholder="Chọn học sinh" emptyLabel="Không tìm thấy học sinh phù hợp." options={students.filter(user => !detail.students.some(item => item.id === user.id)).map(user => ({ value: String(user.id), label: `${user.fullName} · ${user.email}` }))} onValueChange={setStudentId} /><Button variant="soft" color="cyan" disabled={!studentId || busy} onClick={() => void runAction(async () => { await enrollClassStudent(schoolId, detail.id, Number(studentId)); setStudentId(""); }, "Đã thêm học sinh vào lớp.")}>Thêm vào lớp</Button></div>}
         {detail.students.length === 0 ? <p className={s.empty}>Lớp chưa có học sinh.</p> : <>
-          <div className={s.studentTableScroll} role="region" aria-labelledby="detail-students-heading" tabIndex={0}><Table.Root size="2" variant="surface"><Table.Header><Table.Row><Table.ColumnHeaderCell>STT</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Họ và tên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Email</Table.ColumnHeaderCell>{editMode && <Table.ColumnHeaderCell className={s.actionColumn}>Thao tác</Table.ColumnHeaderCell>}</Table.Row></Table.Header><Table.Body>{visibleStudents.map((item, index) => <Table.Row key={item.id}><Table.Cell>{pageStart + index + 1}</Table.Cell><Table.RowHeaderCell>{item.fullName}</Table.RowHeaderCell><Table.Cell>{item.email}</Table.Cell>{editMode && <Table.Cell><div className={s.studentActions}><Select.Root disabled={busy} onValueChange={targetId => { if (targetId) void runAction(() => transferClassStudent(schoolId, targetId, item.id), "Đã chuyển học sinh sang lớp mới."); }}><Select.Trigger className={s.transferSelect} placeholder="Chuyển lớp…" aria-label={`Chuyển lớp cho ${item.fullName}`} /><Select.Content>{classes.filter(candidate => candidate.id !== detail.id && candidate.schoolYear === detail.schoolYear).map(candidate => <Select.Item key={candidate.id} value={candidate.id}>{candidate.name}</Select.Item>)}</Select.Content></Select.Root><Button size="1" variant="soft" color="red" disabled={busy} onClick={() => void runAction(() => removeClassStudent(schoolId, detail.id, item.id), "Đã gỡ học sinh khỏi lớp.")}>Gỡ</Button></div></Table.Cell>}</Table.Row>)}</Table.Body></Table.Root></div>
+          <div className={s.studentTableScroll} role="region" aria-labelledby="detail-students-heading" tabIndex={0}><Table.Root size="2" variant="surface"><Table.Header><Table.Row><Table.ColumnHeaderCell>STT</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Họ và tên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Email</Table.ColumnHeaderCell>{editMode && <Table.ColumnHeaderCell className={s.actionColumn}>Thao tác</Table.ColumnHeaderCell>}</Table.Row></Table.Header><Table.Body>{visibleStudents.map((item, index) => <Table.Row key={item.id}><Table.Cell>{pageStart + index + 1}</Table.Cell><Table.RowHeaderCell>{item.fullName}</Table.RowHeaderCell><Table.Cell>{item.email}</Table.Cell>{editMode && <Table.Cell><div className={s.studentActions}><Select.Root disabled={busy} onValueChange={targetId => { const target = classes.find(candidate => candidate.id === targetId); if (target) setTransferTarget({ studentId: item.id, studentName: item.fullName, classId: target.id, className: target.name }); }}><Select.Trigger className={s.transferSelect} placeholder="Chuyển lớp…" aria-label={`Chuyển lớp cho ${item.fullName}`} /><Select.Content>{classes.filter(candidate => candidate.id !== detail.id && candidate.schoolYear === detail.schoolYear).map(candidate => <Select.Item key={candidate.id} value={candidate.id}>{candidate.name}</Select.Item>)}</Select.Content></Select.Root><Button size="1" variant="soft" color="red" disabled={busy} onClick={() => void runAction(() => removeClassStudent(schoolId, detail.id, item.id), "Đã gỡ học sinh khỏi lớp.")}>Gỡ</Button></div></Table.Cell>}</Table.Row>)}</Table.Body></Table.Root></div>
           <div className={s.studentFooter}><Select.Root size="1" value={String(studentPageSize)} onValueChange={value => { setStudentPageSize(Number(value)); setStudentPage(1); }}><Select.Trigger aria-label="Số học sinh trên mỗi trang" /><Select.Content>{[10, 20, 30].map(size => <Select.Item key={size} value={String(size)}>{size} dòng</Select.Item>)}</Select.Content></Select.Root><div className={`${s.pagination} ${s.compactPagination}`}><span>Hiển thị {pageStart + 1}–{Math.min(pageStart + studentPageSize, detail.students.length)} / {detail.students.length}</span><div><Button size="1" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setStudentPage(Math.max(1, currentPage - 1))}>Trước</Button><span>Trang {currentPage}/{pageCount}</span><Button size="1" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setStudentPage(Math.min(pageCount, currentPage + 1))}>Sau</Button></div></div></div>
         </>}
       </section>
     </section></Card>}
+    <AlertDialog.Root open={!!transferTarget} onOpenChange={open => { if (!open && !busy) setTransferTarget(null); }}><AlertDialog.Content maxWidth="520px"><AlertDialog.Title>Xác nhận chuyển lớp</AlertDialog.Title><AlertDialog.Description>Chuyển {transferTarget?.studentName} sang lớp {transferTarget?.className}? Điểm và bài nộp ở lớp cũ được giữ nguyên. Học sinh vẫn hoàn thành bài cũ và được bổ sung các bài của lớp mới còn mở, chưa quá hạn.</AlertDialog.Description><div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}><AlertDialog.Cancel><Button color="gray" variant="soft" disabled={busy}>Hủy</Button></AlertDialog.Cancel><Button loading={busy} disabled={busy} onClick={() => { if (transferTarget) void runAction(async () => { await transferClassStudent(schoolId, transferTarget.classId, transferTarget.studentId); setTransferTarget(null); }, "Đã chuyển lớp. Điểm cũ được giữ nguyên và bài tập lớp mới đã được cập nhật."); }}>Xác nhận chuyển</Button></div></AlertDialog.Content></AlertDialog.Root>
   </div>;
 }

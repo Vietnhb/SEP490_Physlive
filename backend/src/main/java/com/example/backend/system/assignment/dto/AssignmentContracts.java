@@ -87,7 +87,10 @@ public final class AssignmentContracts {
             String feedback,
             GradingStatus gradingStatus,
             boolean retryAllowed,
-            JsonNode predictions) {
+            JsonNode predictions,
+            boolean canManage,
+            Integer assignedById,
+            String assignedByName) {
     }
 
     public record AssignmentSubmissionResponse(UUID id, UUID assignmentId, Integer studentId,

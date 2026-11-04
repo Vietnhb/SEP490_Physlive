@@ -21,6 +21,19 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class SchoolClassController {
     private final SchoolClassService service;
+    private final com.example.backend.system.school.service.SchoolClassGradeService grades;
+
+    @GetMapping("/{classId}/grades")
+    public com.example.backend.system.school.dto.ClassGradebook grades(@PathVariable UUID schoolId, @PathVariable UUID classId) {
+        return grades.get(schoolId, classId);
+    }
+
+    @GetMapping(value = "/{classId}/grades.csv", produces = "text/csv")
+    public ResponseEntity<byte[]> exportGrades(@PathVariable UUID schoolId, @PathVariable UUID classId) {
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=class-grades-" + classId + ".csv")
+                .body(grades.csv(schoolId, classId));
+    }
 
     @GetMapping
     public List<SchoolClassContracts.ClassSummary> list(@PathVariable UUID schoolId,

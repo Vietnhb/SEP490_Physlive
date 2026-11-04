@@ -94,9 +94,10 @@ export function TeacherAssignmentHistory({
                 {activity && <li><LearningIcon name="bulb" />{activity}</li>}
                 {simulationTitle && <li className="studio-clamp-1" title={simulationTitle}><LearningIcon name="atom" />{simulationTitle}</li>}
               </ul>
+              {item.assignedByName && <Text as="p" size="1" color="gray">Người giao: {item.assignedByName}{item.canManage === false ? " · Lịch sử chỉ xem sau bàn giao" : ""}</Text>}
               <div className="studio-assignment__actions">
-                <Button size="2" onClick={() => onOpenSubmissions(item)}>Xem & chấm bài</Button>
-                <Button size="2" variant="soft" color="gray" onClick={() => onToggleOpen(item)} title={item.status === "ACTIVE" ? "Ngừng nhận bài nộp" : "Cho học sinh nộp tiếp"}>{item.status === "ACTIVE" ? "Đóng bài" : "Mở lại"}</Button>
+                <Button size="2" onClick={() => onOpenSubmissions(item)}>{item.canManage === false ? "Xem bài nộp" : "Xem & chấm bài"}</Button>
+                {item.canManage !== false && <Button size="2" variant="soft" color="gray" onClick={() => onToggleOpen(item)} title={item.status === "ACTIVE" ? "Ngừng nhận bài nộp" : "Cho học sinh nộp tiếp"}>{item.status === "ACTIVE" ? "Đóng bài" : "Mở lại"}</Button>}
                 <Button size="2" variant="ghost" color="gray" aria-expanded={expanded === item.id} onClick={() => setExpanded(expanded === item.id ? null : item.id)}>Học sinh</Button>
               </div>
               {expanded === item.id && <Text as="p" size="1" color="gray" className="studio-assignment__students">

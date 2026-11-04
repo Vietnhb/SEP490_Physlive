@@ -28,7 +28,7 @@ class SchoolClassRestoreTest {
     private final RoleValidationService roles = mock(RoleValidationService.class);
     private final LicenseCheckService license = mock(LicenseCheckService.class);
     private final SchoolClassService service = new SchoolClassService(classes, enrollments, assignments, schools,
-            mock(UserRepository.class), currentUser, roles, license, mock(AccountAccessService.class), mock(EntityManager.class));
+            mock(UserRepository.class), currentUser, roles, license, mock(AccountAccessService.class), mock(EntityManager.class), mock(com.example.backend.system.assignment.repository.AssignmentRepository.class));
     private final UUID schoolId = UUID.randomUUID(), classId = UUID.randomUUID();
     private final SchoolClass classroom = new SchoolClass();
     private final User actor = new User();
