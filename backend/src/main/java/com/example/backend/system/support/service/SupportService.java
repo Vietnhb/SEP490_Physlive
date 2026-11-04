@@ -64,15 +64,14 @@ public class SupportService {
     @Transactional(readOnly = true)
     public List<SupportView> complaintsForReview() {
         requireReviewer();
-        return repository.findTop200ByKindAndReviewerReferredTrueOrderByCreatedAtDesc(SupportKind.COMPLAINT).stream().map(this::view).toList();
+        return repository.findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT).stream().map(this::view).toList();
     }
     @Transactional
     public SupportView resolveComplaint(UUID id, UpdateSupportRequest request) {
         User reviewer = requireReviewer();
         SupportItem item = repository.findByIdForUpdate(id).filter(value -> value.getKind() == SupportKind.COMPLAINT)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy khiếu nại."));
-        if (!item.isReviewerReferred()) throw ApiException.forbidden("Khiếu nại chưa được Manager chuyển cho Reviewer.");
-        if (item.getStatus() == SupportStatus.RESOLVED) throw ApiException.conflict("Khiếu nại đã hoàn tất. Manager có thể mở lại khi cần.");
+        if (item.getStatus() == SupportStatus.RESOLVED) throw ApiException.conflict("Khiếu nại đã hoàn tất. Vui lòng tạo báo lỗi mới nếu vấn đề vẫn tồn tại.");
         if (item.getSender().getId().equals(reviewer.getId()))
             throw ApiException.conflict("Không thể tự giải quyết khiếu nại của chính mình.");
         String response = request == null || request.response() == null ? "" : request.response().trim();
@@ -111,8 +110,8 @@ public class SupportService {
             throw ApiException.badRequest("Vui lòng nhập nội dung cập nhật yêu cầu hỗ trợ");
         }
         SupportItem item = repository.findByIdForUpdate(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy yêu cầu hỗ trợ"));
-        if (item.getKind() == SupportKind.COMPLAINT && item.getSender().getId().equals(admin.getId()))
-            throw ApiException.conflict("Không thể tự giải quyết khiếu nại của chính mình.");
+        if (item.getKind() == SupportKind.COMPLAINT)
+            throw ApiException.forbidden("Manager chỉ được xem báo lỗi mô phỏng. Reviewer chịu trách nhiệm xử lý.");
         SupportStatus status = request.status() == null ? item.getStatus() : request.status();
         String response = request.response() == null ? null : request.response().trim();
         if (response != null && response.length() > 10000) {
@@ -141,15 +140,8 @@ public class SupportService {
                 item.getRespondedBy() == null ? null : item.getRespondedBy().getFullName(), item.isReviewerReferred());
     }
 
-    @Transactional
     public SupportView referReviewer(UUID id) {
-        requireManager();
-        SupportItem item = repository.findByIdForUpdate(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy yêu cầu hỗ trợ."));
-        if (item.getKind() != SupportKind.COMPLAINT) throw ApiException.badRequest("Chỉ báo lỗi mô phỏng mới được chuyển Reviewer.");
-        if (item.getStatus() == SupportStatus.RESOLVED) throw ApiException.conflict("Yêu cầu đã hoàn tất. Hãy mở lại trước khi chuyển Reviewer.");
-        item.setReviewerReferred(true);
-        item.setStatus(SupportStatus.READ);
-        return view(repository.save(item));
+        throw ApiException.forbidden("Báo lỗi mô phỏng được gửi trực tiếp cho Reviewer.");
     }
 
     private User requireReviewer() {

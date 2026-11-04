@@ -32,7 +32,7 @@ class SupportPermissionsTest {
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         assertEquals(SupportKind.COMPLAINT, service.createComplaint(new CreateComplaintRequest("Sai", "Nội dung", null)).kind());
     }
-    @Test void managerReceivesComplaintsAndCanResolveWithoutReferral() {
+    @Test void managerSeesComplaintsButCannotResolve() {
         actor("MANAGER");
         assertThrows(ApiException.class, service::complaintsForReview);
         when(repository.findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT)).thenReturn(List.of());
@@ -42,14 +42,13 @@ class SupportPermissionsTest {
         when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(item));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
         assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Xong")));
-        assertEquals(SupportStatus.RESOLVED, service.update(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Xong")).status());
+        assertThrows(ApiException.class, () -> service.update(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Xong")));
         assertFalse(item.isReviewerReferred());
     }
     @Test void reviewerCanReadComplaintsButCannotUseManagerSupportDesk() {
-        actor("REVIEWER"); when(repository.findTop200ByKindAndReviewerReferredTrueOrderByCreatedAtDesc(SupportKind.COMPLAINT)).thenReturn(List.of());
+        actor("REVIEWER"); when(repository.findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT)).thenReturn(List.of());
         assertTrue(service.complaintsForReview().isEmpty());
-        verify(repository).findTop200ByKindAndReviewerReferredTrueOrderByCreatedAtDesc(SupportKind.COMPLAINT);
-        verify(repository, never()).findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT);
+        verify(repository).findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT);
         assertThrows(ApiException.class, () -> service.adminList(SupportKind.MESSAGE));
     }
     @Test void reviewerRespondsAndCannotResolveOwnComplaint() {
@@ -59,8 +58,6 @@ class SupportPermissionsTest {
         item.setKind(SupportKind.COMPLAINT); item.setSender(sender); item.setStatus(SupportStatus.OPEN);
         when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(item));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
-        assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Đã kiểm tra")));
-        item.setReviewerReferred(true);
         assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, " ")));
         assertEquals(SupportStatus.RESOLVED, service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Đã kiểm tra và cập nhật")).status());
         assertEquals(reviewer, item.getRespondedBy());
@@ -79,8 +76,8 @@ class SupportPermissionsTest {
         item.setKind(SupportKind.COMPLAINT); item.setStatus(SupportStatus.RESOLVED);
         assertThrows(ApiException.class, () -> service.referReviewer(id));
         item.setStatus(SupportStatus.OPEN);
-        assertTrue(service.referReviewer(id).reviewerReferred());
-        assertEquals(SupportStatus.READ, item.getStatus());
+        assertThrows(ApiException.class, () -> service.referReviewer(id));
+        assertEquals(SupportStatus.OPEN, item.getStatus());
         actor("REVIEWER");
         assertThrows(ApiException.class, () -> service.referReviewer(id));
     }
