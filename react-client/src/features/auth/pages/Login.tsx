@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { login } from "../api/authApi";
@@ -25,20 +25,43 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [error, setError] = useState("");
+  const requestRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    const request = requestRef.current;
+    requestRef.current = null;
+    request?.abort();
+  }, []);
+  useEffect(() => {
+    if (!loading) return;
+    const timer = window.setTimeout(() => setSlow(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, [loading]);
 
   const handleLogin = async (event: FormEvent) => {
-    event.preventDefault(); setError(""); setLoading(true);
+    event.preventDefault();
+    if (requestRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setError(""); setSlow(false); setLoading(true);
     try {
-      const response = await login(email, password);
+      const response = await login(email.trim(), password, controller.signal);
+      if (controller.signal.aborted || requestRef.current !== controller) return;
       setToken(response.token);
       setUser(response.user);
       navigate(!isAccountSuspended(response.user) && response.user.mustChangePassword ? "/change-password" : userHome(response.user), { replace: true });
     }
     catch (err: unknown) {
-      if (axios.isAxiosError<{ message?: string }>(err) && err.response) setError(err.response.data?.message ?? (err.response.status === 401 ? "Email hoặc mật khẩu không đúng." : "Không thể đăng nhập."));
+      if (requestRef.current !== controller) return;
+      if (axios.isCancel(err)) setError("Đã hủy đăng nhập. Bạn có thể thử lại.");
+      else if (axios.isAxiosError(err) && (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT")) setError("Máy chủ chưa phản hồi sau 15 giây. Vui lòng thử đăng nhập lại.");
+      else if (axios.isAxiosError<{ message?: string }>(err) && err.response) setError(err.response.data?.message ?? (err.response.status === 401 ? "Email hoặc mật khẩu không đúng." : "Không thể đăng nhập."));
       else setError("Không thể kết nối tới máy chủ.");
-    } finally { setLoading(false); }
+    } finally {
+      if (requestRef.current === controller) { requestRef.current = null; setLoading(false); setSlow(false); }
+    }
   };
 
   return <main className="account-auth-page">
@@ -59,7 +82,7 @@ export default function Login() {
           <span>Email</span>
           <span className="account-field">
             <svg className="account-field__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7.5 8 6 8-6" /></svg>
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@truong.edu.vn" autoComplete="email" autoFocus required />
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@truong.edu.vn" autoComplete="email" autoFocus required disabled={loading} />
           </span>
         </label>
         <label>
@@ -67,7 +90,7 @@ export default function Login() {
           <span className="account-field account-password">
             <svg className="account-field__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></svg>
             <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)}
-              onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} autoComplete="current-password" required />
+              onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} autoComplete="current-password" required disabled={loading} />
             <button type="button" className="account-password-toggle" onClick={() => setShowPassword((value) => !value)} aria-pressed={showPassword}
               aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" />{showPassword && <path d="m4 4 16 16" />}</svg>
@@ -76,9 +99,10 @@ export default function Login() {
           {capsLock && <span className="account-caps" role="status">Caps Lock đang bật</span>}
         </label>
         {error && <div className="account-error" role="alert"><LearningIcon name="close" /><span>{error}</span></div>}
-        <button type="submit" className="account-submit" disabled={loading}>
-          {loading ? <span className="account-spinner" aria-label="Đang đăng nhập" /> : <>Đăng nhập<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></>}
+        <button type="submit" className="account-submit" disabled={loading} aria-busy={loading}>
+          {loading ? <><span className="account-spinner" aria-hidden="true" />Đang đăng nhập…</> : <>Đăng nhập<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></>}
         </button>
+        {loading && <div className="account-login-progress"><span role="status">{slow ? "Máy chủ đang phản hồi chậm. Bạn có thể chờ thêm hoặc hủy để thử lại." : "Đang kiểm tra tài khoản…"}</span><button type="button" onClick={() => requestRef.current?.abort()}>Hủy đăng nhập</button></div>}
       </form>
       <p className="account-hint">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5.5M12 7.8v.2" /></svg>

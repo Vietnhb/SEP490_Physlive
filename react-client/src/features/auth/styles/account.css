@@ -30,6 +30,9 @@
 .account-links a { color: var(--accent); font-weight: 600; text-decoration: none; }
 .account-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .account-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgb(255 255 255 / 45%); border-top-color: #fff; border-radius: 50%; animation: account-spin .7s linear infinite; }
+.account-login-progress { display: grid; justify-items: start; gap: 8px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.account-form .account-login-progress button { min-height: 0; padding: 2px 0; border: 0; border-radius: 0; background: transparent; color: var(--accent-11); font-size: 13px; font-weight: 500; box-shadow: none; transform: none; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.account-form .account-login-progress button:hover { background: transparent; color: var(--accent-12); box-shadow: none; transform: none; }
 @keyframes account-spin { to { transform: rotate(360deg); } }
 .account-auth-aside { display: flex; flex-direction: column; justify-content: center; width: min(100%, 640px); min-width: 0; min-height: 0; margin: 0 auto; padding: calc(var(--header-h) + 16px) 40px 32px; color: var(--stage-ink); }
 .account-auth-aside h2 { margin: 0 0 clamp(12px, 2.4vh, 28px); font-size: clamp(28px, 2.8vw, 40px); font-weight: 700; line-height: 1.22; letter-spacing: -.03em; }

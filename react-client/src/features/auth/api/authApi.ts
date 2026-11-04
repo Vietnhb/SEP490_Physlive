@@ -7,8 +7,12 @@ export const logout = () => axiosClient.post<void>("/auth/logout");
 
 export const login = async (
     email: string,
-    password: string
+    password: string,
+    signal?: AbortSignal
 ): Promise<LoginResponse> => {
-    const res = await axios.post<LoginResponse>(`${API_URL}/auth/login`, { email, password })
+    const res = await axios.post<LoginResponse>(`${API_URL}/auth/login`, { email, password }, {
+        timeout: 15000,
+        signal,
+    });
     return res.data;
 }
