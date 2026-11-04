@@ -1,0 +1,29 @@
+stateDiagram-v2
+    [*] --> DRAFT_ASSIGNMENT : Teacher Selects Simulation & Prepares Rubric
+    
+    DRAFT_ASSIGNMENT --> PUBLISHED : Publish to Class (Randomized PRNG Seeds)
+    DRAFT_ASSIGNMENT --> ARCHIVED : Cancel / Delete Draft
+    ARCHIVED --> [*]
+    
+    PUBLISHED --> OVERDUE_MISSED : [Deadline Expired] Unsubmitted
+    OVERDUE_MISSED --> [*] : Mark Incomplete
+    
+    PUBLISHED --> STEP_PREDICT : Student Starts Task (Canvas Run Locked)
+    
+    STEP_PREDICT --> STEP_OBSERVE : [Prediction Submitted] Unlock 2D Canvas (60 FPS)
+    
+    STEP_OBSERVE --> STEP_EXPLAIN : Observe Graphs & Formulate Explanation
+    STEP_EXPLAIN --> STEP_OBSERVE : [Need More Data] Re-run Simulation with New Variables
+    
+    STEP_EXPLAIN --> SUBMITTED : Submit Final POE Scientific Report
+    
+    SUBMITTED --> PENDING_TEACHER_REVIEW : [Subjective Essay] AI Generates Rubric Suggestion
+    SUBMITTED --> AUTO_GRADED : [Objective Kinematics] System Auto-Scoring
+    
+    PENDING_TEACHER_REVIEW --> GRADED_PUBLISHED : Teacher Confirms Score & Feedback
+    AUTO_GRADED --> GRADED_PUBLISHED : Score Merged
+    
+    GRADED_PUBLISHED --> REGRADE_APPEAL : Student Queries Rubric / Feedback
+    REGRADE_APPEAL --> GRADED_PUBLISHED : Teacher Reviews Appeal & Adjusts
+    
+    GRADED_PUBLISHED --> [*] : Student Reviews Report & Record Closed

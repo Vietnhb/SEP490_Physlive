@@ -1,0 +1,18 @@
+stateDiagram-v2
+    [*] --> TICKET_OPENED : User Submits Support / Bug Ticket
+    
+    TICKET_OPENED --> ADMIN_TRIAGE : [Target: Manager Account] Direct to Admin
+    ADMIN_TRIAGE --> TICKET_RESOLVED : Admin Audits & Resolves Account Appeal
+    
+    TICKET_OPENED --> MANAGER_TRIAGE : [General / Simulation Bug] Sent to Manager Desk
+    
+    MANAGER_TRIAGE --> TICKET_RESOLVED : [Billing / Account Issue] Manager Resolves Directly
+    MANAGER_TRIAGE --> REFERRED_TO_REVIEWER : [Simulation Physics Bug] Manager Clicks "Chuyển Reviewer"
+    
+    REFERRED_TO_REVIEWER --> REVIEWER_INVESTIGATING : Reviewer Accesses Desk & Inspects RK4 Model
+    
+    REVIEWER_INVESTIGATING --> TICKET_RESOLVED : Reviewer Verifies Physics Law & Adds Resolution Notes
+    
+    TICKET_RESOLVED --> TICKET_CLOSED : Manager Reviews Conclusion, Sends Feedback & Closes
+    
+    TICKET_CLOSED --> [*] : User Receives Notification & Ticket Archived

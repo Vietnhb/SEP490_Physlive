@@ -1,0 +1,21 @@
+stateDiagram-v2
+    [*] --> REGISTERED : School Signs Up on B2B Portal
+    
+    REGISTERED --> PENDING_PAYMENT : Select B2B Plan & Redirect to VNPAY
+    
+    PENDING_PAYMENT --> REGISTERED : [Cancelled / Timeout] Return to Cart
+    PENDING_PAYMENT --> ACTIVE : [VNPAY IPN HMAC-SHA512 Verified] Allocate Monthly AI Quota
+    
+    ACTIVE --> QUOTA_EXHAUSTED : [Atomic Balance <= 0] Lock AI Ingestion
+    QUOTA_EXHAUSTED --> ACTIVE : Monthly Reset / Manager Quota Top-up
+    
+    ACTIVE --> NEAR_EXPIRY : [Auto Alert] 15 Days Before Contract End
+    NEAR_EXPIRY --> ACTIVE : Annual Renewal Payment Success
+    
+    NEAR_EXPIRY --> SUSPENDED_READ_ONLY : [Grace Period Expired] Lock POST/PUT APIs
+    
+    SUSPENDED_READ_ONLY --> UNDER_REVIEW : School Files Billing Complaint Ticket
+    UNDER_REVIEW --> ACTIVE : Manager Resolves & Restores Quota
+    
+    SUSPENDED_READ_ONLY --> ACTIVE : Overdue Invoice Paid via VNPAY
+    SUSPENDED_READ_ONLY --> [*] : Contract Terminated / School Offboarded

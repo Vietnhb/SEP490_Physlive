@@ -1,0 +1,17 @@
+stateDiagram-v2
+    [*] --> DRAFT : Teacher Inputs Text / OCR Image
+    
+    DRAFT --> NEEDS_CLARIFICATION : Ambiguity Detected (Missing k, m, etc.)
+    NEEDS_CLARIFICATION --> DRAFT : Teacher Selects Assumption Chips
+    
+    DRAFT --> PARSED_SPEC : AI Extracts Quantities & Builds AST
+    
+    PARSED_SPEC --> RK4_SOLVING : Trigger Adaptive RK4 Solver
+    
+    RK4_SOLVING --> VERIFIED : [|ΔE/E₀| < 10⁻³] Law Invariant Verified
+    RK4_SOLVING --> FLAGGED : [|ΔE/E₀| ≥ 10⁻³] Energy Invariant Violated
+    
+    FLAGGED --> PARSED_SPEC : AI Self-Correction Loop (Auto-fix formula)
+    
+    VERIFIED --> SAVED_TO_LIBRARY : Render 2D Canvas (60 FPS)
+    SAVED_TO_LIBRARY --> [*] : Ready for Classroom Teaching

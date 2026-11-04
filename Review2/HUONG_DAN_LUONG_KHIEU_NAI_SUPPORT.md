@@ -147,3 +147,4 @@ npm install      # (Chỉ cần chạy 1 lần đầu tiên trên laptop)
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 *(Giao diện web mở tại `http://127.0.0.1:5173`, tự động proxy API sang `8080`).*
+
