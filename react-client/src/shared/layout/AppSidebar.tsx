@@ -37,6 +37,10 @@ type Props = {
   /** Classes for the content column, so each area keeps its own page styles. */
   contentClassName?: string;
   shellClassName?: string;
+  /** Where to render the user account menu. Defaults to "sidebar". Use "topbar" to place a workspace-style avatar menu in the topbar actions. */
+  accountPlacement?: "sidebar" | "topbar";
+  /** Whether to show the theme button in topbar actions. Defaults to false when accountPlacement is 'topbar', true otherwise. */
+  showThemeToggle?: boolean;
   children?: ReactNode;
 };
 
@@ -51,7 +55,7 @@ function isActive(pathname: string, item: SidebarItem) {
  * sections, count badges and a user menu, plus a slim top bar. Each role passes
  * its own groups; every item is a real route.
  */
-export default function AppSidebarLayout({ id, subtitle, home, groups, actions, contentClassName = "", shellClassName = "", children }: Readonly<Props>) {
+export default function AppSidebarLayout({ id, subtitle, home, groups, actions, contentClassName = "", shellClassName = "", accountPlacement = "sidebar", showThemeToggle = accountPlacement !== "topbar", children }: Readonly<Props>) {
   const { pathname } = useLocation();
   const reduced = useReducedMotion();
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -109,9 +113,11 @@ export default function AppSidebarLayout({ id, subtitle, home, groups, actions, 
           ))}
         </nav>
 
-        <div className="app-sidebar__foot">
-          <AccountMenu variant="sidebar" />
-        </div>
+        {accountPlacement === "sidebar" && (
+          <div className="app-sidebar__foot">
+            <AccountMenu variant="sidebar" />
+          </div>
+        )}
 
       </aside>
 
@@ -121,7 +127,11 @@ export default function AppSidebarLayout({ id, subtitle, home, groups, actions, 
           <button type="button" className="app-topbar__toggle app-topbar__toggle--mobile" onClick={() => setDrawerPath(drawerOpen ? null : pathname)} aria-label="Mở menu" aria-expanded={drawerOpen}><LearningIcon name="menu" /></button>
           <span className="app-topbar__divider" aria-hidden="true" />
           <p className="app-topbar__title"><span>{subtitle}</span>{current && <><span aria-hidden="true">/</span><strong>{current.title ?? current.label}</strong>{current.childTitle && pathname.startsWith(`${current.to}/`) && <><span aria-hidden="true">/</span><strong>{pageBreadcrumb?.path === pathname ? pageBreadcrumb.title : current.childTitle}</strong></>}</>}</p>
-          <div className="app-topbar__actions">{actions}<ThemeToggle /></div>
+          <div className="app-topbar__actions">
+            {actions}
+            {showThemeToggle && <ThemeToggle />}
+            {accountPlacement === "topbar" && <AccountMenu variant="workspace" />}
+          </div>
         </header>
         <div className={`app-content ${contentClassName}`}>{children ?? <Outlet />}</div>
       </div>

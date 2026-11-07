@@ -69,7 +69,7 @@ export default function ReviewerLayout() {
   ] });
   if (access.isManager) groups.push({ label: "Vận hành", items: [{ to: "/manager", label: "Về trang vận hành", icon: "back" }] });
 
-  return <AppSidebarLayout id="reviewer" subtitle="Kiểm duyệt" home="/reviewer" groups={groups} contentClassName="reviewer-academic reviewer-page">
+  return <AppSidebarLayout id="reviewer" subtitle="Kiểm duyệt" home="/reviewer" groups={groups} contentClassName="reviewer-academic reviewer-page" accountPlacement="topbar">
     {!access.canEdit && !access.canReview
       ? <div className="reviewer-blocked"><Card size="4"><span className="reviewer-empty-icon"><ReviewerIcon name="lock" size={28} /></span>
           <Heading as="h1" size="5" mt="3">Tài khoản chưa được cấp quyền</Heading>
