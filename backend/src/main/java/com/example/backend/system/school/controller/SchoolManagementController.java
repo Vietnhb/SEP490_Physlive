@@ -23,6 +23,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class SchoolManagementController {
     private final AdminService adminService;
 
+    @GetMapping("/page")
+    public AdminService.UserPage page(@PathVariable UUID schoolId,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "") String query,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "ALL") String role) {
+        return adminService.usersPage(schoolId, page, size, query, role, "ALL", "");
+    }
+
     @GetMapping
     public List<UserStatusResponse> list(@PathVariable UUID schoolId) {
         return adminService.usersForSchool(schoolId);

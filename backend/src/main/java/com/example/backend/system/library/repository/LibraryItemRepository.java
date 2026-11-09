@@ -18,6 +18,47 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LibraryItemRepository extends JpaRepository<LibraryItem, UUID> {
+    interface DashboardPosts {
+        long getCumTotal();
+        long getCumPub();
+        long getCumPriv();
+        long getCumDeleted();
+        long getWeekTotal();
+        long getWeekPub();
+        long getWeekPriv();
+        long getWeekDeleted();
+        long getMonthTotal();
+        long getMonthPub();
+        long getMonthPriv();
+        long getMonthDeleted();
+        long getPostsW4();
+        long getPostsW3();
+        long getPostsW2();
+        long getPostsW1();
+    }
+    @Query("""
+        select coalesce(sum(case when (true) and (true) then 1L else 0L end), 0L) as cumTotal,
+            coalesce(sum(case when (true) and (i.active = true and i.visibility = 'PUBLIC') then 1L else 0L end), 0L) as cumPub,
+            coalesce(sum(case when (true) and (i.active = true and i.visibility <> 'PUBLIC') then 1L else 0L end), 0L) as cumPriv,
+            coalesce(sum(case when (true) and (i.active = false) then 1L else 0L end), 0L) as cumDeleted,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :weekStart) and (true) then 1L else 0L end), 0L) as weekTotal,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :weekStart) and (i.active = true and i.visibility = 'PUBLIC') then 1L else 0L end), 0L) as weekPub,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :weekStart) and (i.active = true and i.visibility <> 'PUBLIC') then 1L else 0L end), 0L) as weekPriv,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :weekStart) and (i.active = false) then 1L else 0L end), 0L) as weekDeleted,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :monthStart) and (true) then 1L else 0L end), 0L) as monthTotal,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :monthStart) and (i.active = true and i.visibility = 'PUBLIC') then 1L else 0L end), 0L) as monthPub,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :monthStart) and (i.active = true and i.visibility <> 'PUBLIC') then 1L else 0L end), 0L) as monthPriv,
+            coalesce(sum(case when (coalesce(i.createdAt, :now) >= :monthStart) and (i.active = false) then 1L else 0L end), 0L) as monthDeleted,
+            coalesce(sum(case when coalesce(i.createdAt, :now) >= :w4 then 1L else 0L end), 0L) as postsW4,
+            coalesce(sum(case when coalesce(i.createdAt, :now) >= :w3 and coalesce(i.createdAt, :now) < :w4 then 1L else 0L end), 0L) as postsW3,
+            coalesce(sum(case when coalesce(i.createdAt, :now) >= :w2 and coalesce(i.createdAt, :now) < :w3 then 1L else 0L end), 0L) as postsW2,
+            coalesce(sum(case when coalesce(i.createdAt, :now) >= :monthAgo and coalesce(i.createdAt, :now) < :w2 then 1L else 0L end), 0L) as postsW1
+        from LibraryItem i
+        """)
+    DashboardPosts dashboardPosts(@Param("now") java.time.Instant now, @Param("weekStart") java.time.Instant weekStart,
+            @Param("monthStart") java.time.Instant monthStart, @Param("w4") java.time.Instant w4,
+            @Param("w3") java.time.Instant w3, @Param("w2") java.time.Instant w2, @Param("monthAgo") java.time.Instant monthAgo);
+
     @Query(value = "select count(*) from library_likes where item_id = :itemId", nativeQuery = true)
     long countLikes(@Param("itemId") UUID itemId);
 

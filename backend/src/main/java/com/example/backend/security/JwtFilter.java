@@ -126,6 +126,7 @@ public class JwtFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(email, null,
                                 List.of(new SimpleGrantedAuthority(authority)));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                request.setAttribute("physlive.authenticated-user", user);
             }
         }
         filterChain.doFilter(request, response);

@@ -6,7 +6,7 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -38,7 +38,7 @@ public class RealtimeEvents {
         broadcast(SseEmitter.event().id(Long.toString(change.revision())).name("change").data(change));
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onChange(RealtimeEvent.Change change) {
         publish(change.path(), change.clientId());
     }

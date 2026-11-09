@@ -380,6 +380,17 @@ public class SchoolPaymentService {
         return adminPaymentRows(payments.findAllForAdminPeriod(from, to));
     }
 
+    @Transactional(readOnly = true)
+    public com.example.backend.common.dto.PageResponse<AdminPaymentRow> adminPaymentPage(Instant from, Instant to, int page, int size, String status, String search) {
+        if (search != null && search.length() > 200) throw ApiException.badRequest("Search is too long.");
+        String needle = "%" + (search == null ? "" : search.trim().toLowerCase(Locale.ROOT).replace("!","!!").replace("%","!%").replace("_","!_")) + "%";
+        var request = com.example.backend.common.dto.PageResponse.request(page, size, org.springframework.data.domain.Sort.unsorted());
+        var result = payments.findAdminPage(from, to, status, needle, request);
+        if (page > 0 && result.isEmpty() && result.getTotalElements() > 0)
+            result = payments.findAdminPage(from, to, status, needle, request.withPage(result.getTotalPages() - 1));
+        return new com.example.backend.common.dto.PageResponse<>(adminPaymentRows(result.getContent()), result.getTotalElements(), result.getTotalPages(), result.getNumber(), size);
+    }
+
     private List<AdminPaymentRow> adminPaymentRows(List<SchoolPayment> source) {
         return source.stream()
                 .map(payment -> new AdminPaymentRow(payment.getId(),

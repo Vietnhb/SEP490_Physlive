@@ -34,6 +34,19 @@ public class AdminOperationsService {
     private final com.example.backend.system.account.repository.UserRepository users;
     private final com.example.backend.system.school.service.AiQuotaService aiQuota;
 
+    public record OverviewCounts(java.util.Map<String, Long> accounts, long schools, long activeSchools, ValidationMetrics validation) { }
+
+    @Transactional(readOnly = true)
+    public OverviewCounts overviewCounts() {
+        java.util.Map<String, Long> counts = new java.util.HashMap<>();
+        for (var row : users.accountCounts(null)) {
+            counts.merge(row.getRole() == null ? "UNKNOWN" : row.getRole(), row.getTotal(), Long::sum);
+            counts.merge("total", row.getTotal(), Long::sum);
+            if (Boolean.FALSE.equals(row.getActive())) counts.merge("suspended", row.getTotal(), Long::sum);
+        }
+        return new OverviewCounts(counts, schoolRepository.count(), schoolRepository.countByActiveTrue(), validationMetrics());
+    }
+
     @Transactional(readOnly = true)
     public List<LicensePlanResponse> plans() {
         return planRepository.findAll(Sort.by("annualPriceVnd")).stream().map(LicensePlanResponse::from).toList();
@@ -128,6 +141,22 @@ public class AdminOperationsService {
         long total = simulationRunRepository.count();
         long failed = simulationRunRepository.countByValidationPassedFalse();
         return new ValidationMetrics(total, failed, total == 0 ? 0 : (double) failed / total);
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.backend.common.dto.PageResponse<SchoolContracts.Response> schoolsPage(int page, int size) {
+        return com.example.backend.common.dto.PageResponse.from(schoolRepository.findAll(
+                com.example.backend.common.dto.PageResponse.request(page, size, Sort.by("name").and(Sort.by("id"))))
+                .map(SchoolContracts.Response::from));
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.backend.common.dto.PageResponse<ValidationRow> validationPage(int page, int size) {
+        var rows = simulationRunRepository.readValidationPage(com.example.backend.common.dto.PageResponse.request(page, size,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"))));
+        return com.example.backend.common.dto.PageResponse.from(rows.map(row -> new ValidationRow(row.getId(), row.getSubmissionId(),
+                row.getTopic(), row.getSchemaId(), row.getSchemaVersion(), row.getSolverVersion(), row.getPassed(),
+                row.getStatus(), row.getErrorMessage(), row.getCreatedAt())));
     }
 
     @Transactional(readOnly = true)

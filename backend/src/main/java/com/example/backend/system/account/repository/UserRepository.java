@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, Integer> {
+public interface UserRepository extends JpaRepository<User, Integer>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<User> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")
     Optional<User> findByIdForUpdate(@Param("id") Integer id);
@@ -21,6 +21,13 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     @Query("select count(u) from User u where u.school.id = :schoolId and u.role.name = 'STUDENT' and (u.active = true or u.active is null)")
     long countActiveStudents(@Param("schoolId") UUID schoolId);
+
+    @Query("select count(u) from User u where u.school.id = :schoolId and u.role.name = :roleName and (u.active = true or u.active is null)")
+    long countReportAccounts(@Param("schoolId") UUID schoolId, @Param("roleName") String roleName);
+
+    interface RoleCount { String getRole(); Boolean getActive(); long getTotal(); }
+    @Query("select r.name as role, u.active as active, count(u) as total from User u left join u.role r where (:schoolId is null or u.school.id = :schoolId) group by r.name, u.active")
+    List<RoleCount> accountCounts(@Param("schoolId") UUID schoolId);
 
     Optional<User> findByEmail(String email);
 

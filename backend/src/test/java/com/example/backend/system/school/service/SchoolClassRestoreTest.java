@@ -90,6 +90,33 @@ class SchoolClassRestoreTest {
     }
 
     @Test
+    void managerCanReadArchivedClassWithoutChangingMemberships() {
+        actor.getRole().setName("MANAGER");
+        User teacher = new User(); teacher.setId(7); teacher.setFullName("Teacher Demo"); teacher.setEmail("teacher@test");
+        var link = new com.example.backend.system.school.model.entity.ClassTeacherAssignment(); link.setTeacher(teacher);
+        when(assignments.findByClassIdAndIsActiveTrue(classId)).thenReturn(List.of(link));
+        User student = new User(); student.setId(8); student.setFullName("Student Demo"); student.setEmail("student@test");
+        var enrollment = new com.example.backend.system.school.model.entity.ClassEnrollment(); enrollment.setStudent(student);
+        when(enrollments.countActiveByClass(classId)).thenReturn(1L);
+        var detail = service.overview(schoolId, classId);
+        assertFalse(detail.active());
+        assertEquals("Teacher Demo", detail.teachers().getFirst().fullName());
+        assertEquals(1, detail.studentCount());
+        verify(classes, never()).save(any()); verify(assignments, never()).save(any()); verify(enrollments, never()).save(any());
+    }
+
+    @Test
+    void readOnlyArchivedClassStillRejectsUpdatesAndWrongSchool() {
+        actor.getRole().setName("MANAGER");
+        var request = new com.example.backend.system.school.dto.SchoolClassContracts.SchoolClassRequest("New name", 10, "2026-2027", "Physics");
+        assertThrows(ApiException.class, () -> service.update(schoolId, classId, request));
+        UUID otherSchool = UUID.randomUUID();
+        when(roles.canManageSchool(actor, otherSchool)).thenReturn(true);
+        assertThrows(ApiException.class, () -> service.overview(otherSchool, classId));
+        verify(classes, never()).save(any());
+    }
+
+    @Test
     void defaultListStaysActiveOnlyWhileManagementCanRequestInactiveClasses() {
         when(classes.findBySchoolIdAndIsActiveTrue(schoolId)).thenReturn(List.of());
         when(classes.findBySchoolIdOrderByNameAsc(schoolId)).thenReturn(List.of(classroom));

@@ -32,6 +32,8 @@ public final class SchoolClassContracts {
     public record Person(Integer id, String fullName, String email) { }
     public record ClassSummary(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
                                boolean active, long teacherCount, long studentCount) { }
+    public record ClassOverview(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
+                                boolean active, List<Person> teachers, long studentCount) { }
     public record ClassDetail(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
                               boolean active, List<Person> teachers, List<Person> students) { }
     public record TeacherAssignment(UUID id, Integer teacherId, String teacherName, boolean active) { }

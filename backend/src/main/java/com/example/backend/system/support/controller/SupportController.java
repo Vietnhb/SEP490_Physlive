@@ -16,6 +16,19 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class SupportController {
     private final SupportService service;
+    private final com.example.backend.system.support.service.SupportInboxService inbox;
+
+    @GetMapping("/inbox")
+    public com.example.backend.system.support.service.SupportInboxService.InboxPage inbox(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "ALL") String kind, @RequestParam(defaultValue = "ALL") String handler,
+            @RequestParam(defaultValue = "ALL") String status, @RequestParam(defaultValue = "") String query) {
+        return inbox.page(page, size, kind, handler, status, query);
+    }
+
+    @GetMapping("/inbox/pending-count")
+    public java.util.Map<String, Long> pendingCount() { return java.util.Map.of("count", inbox.pendingCount()); }
+
 
     @PostMapping("/feedback")
     public SupportContracts.SupportView feedback(@Valid @RequestBody CreateSupportRequest request) { return service.create(SupportKind.FEEDBACK, request); }

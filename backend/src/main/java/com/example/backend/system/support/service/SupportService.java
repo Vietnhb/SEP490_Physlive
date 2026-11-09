@@ -132,6 +132,13 @@ public class SupportService {
         return view(repository.save(item));
     }
 
+    @Transactional(readOnly = true)
+    public List<SupportView> viewsByIds(java.util.Collection<UUID> ids) {
+        requireManager();
+        if (ids.isEmpty()) return List.of();
+        return repository.findAllById(ids).stream().map(this::view).toList();
+    }
+
     private SupportView view(SupportItem item) {
         User sender = item.getSender();
         return new SupportView(item.getId(), item.getKind(), sender.getId(), sender.getFullName(), sender.getEmail(),

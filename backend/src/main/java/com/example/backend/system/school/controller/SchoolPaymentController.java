@@ -50,6 +50,17 @@ public class SchoolPaymentController {
         return payments.notifications();
     }
 
+    @GetMapping("/api/admin/payments/page")
+    public com.example.backend.common.dto.PageResponse<SchoolPaymentContracts.AdminPaymentRow> paymentPage(
+            @RequestParam(defaultValue = "YEAR") String period, @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month, @RequestParam(required = false) Integer quarter,
+            @RequestParam(required = false) String timezone, @RequestParam(required = false) String date,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "ALL") String status, @RequestParam(defaultValue = "") String query) {
+        var range = paymentAnalytics.resolvePeriod(period, year, month, quarter, timezone, date);
+        return payments.adminPaymentPage(range.from(), range.to(), page, size, status, query);
+    }
+
     @GetMapping("/api/admin/payments")
     public List<SchoolPaymentContracts.AdminPaymentRow> adminPayments(
             @RequestParam(required = false) String period,

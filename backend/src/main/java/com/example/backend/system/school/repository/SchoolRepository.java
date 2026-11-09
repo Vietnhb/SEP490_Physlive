@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface SchoolRepository extends JpaRepository<School, UUID> {
+    long countByActiveTrue();
+
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM School s WHERE s.id = :id")

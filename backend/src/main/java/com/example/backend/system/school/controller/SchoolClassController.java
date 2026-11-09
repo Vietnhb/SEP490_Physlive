@@ -38,6 +38,18 @@ public class SchoolClassController {
     @GetMapping
     public List<SchoolClassContracts.ClassSummary> list(@PathVariable UUID schoolId,
             @RequestParam(defaultValue = "false") boolean includeInactive) { return service.list(schoolId, includeInactive); }
+    @GetMapping("/page")
+    public SchoolClassService.ClassPage page(@PathVariable UUID schoolId,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Integer grade, @RequestParam(defaultValue = "ALL") String year,
+            @RequestParam(defaultValue = "ACTIVE") String status, @RequestParam(defaultValue = "") String query) {
+        return service.page(schoolId, page, size, grade, year, status, query);
+    }
+
+    @GetMapping("/{classId}/overview")
+    public SchoolClassContracts.ClassOverview overview(@PathVariable UUID schoolId, @PathVariable UUID classId) {
+        return service.overview(schoolId, classId);
+    }
     @GetMapping("/{classId}")
     public SchoolClassContracts.ClassDetail get(@PathVariable UUID schoolId, @PathVariable UUID classId) { return service.get(schoolId, classId); }
     @GetMapping(value = "/{classId}/students.csv", produces = "text/csv")

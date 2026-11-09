@@ -98,6 +98,14 @@ public class AccountAppealService {
         return actor;
     }
 
+    @Transactional(readOnly = true)
+    public List<AppealResponse> viewsByIds(java.util.Collection<UUID> ids) {
+        User actor = requireHandler();
+        if (ids.isEmpty()) return List.of();
+        return appealRepository.findAllById(ids).stream().filter(appeal -> canView(actor, appeal))
+                .map(appeal -> response(appeal, actor)).toList();
+    }
+
     private boolean canView(User actor, AccountAppeal appeal) {
         if (Set.of("ADMIN", "MANAGER").contains(role(appeal.getUser()))) return false;
         if ("MANAGER".equals(role(actor))) return true;

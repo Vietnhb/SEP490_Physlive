@@ -32,6 +32,56 @@ public class AdminService {
     private final com.example.backend.system.school.repository.SchoolRepository schoolRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
+    public record UserPage(java.util.List<UserStatusResponse> items, long totalElements, int totalPages, int page, int size,
+                           java.util.Map<String, Long> counts) { }
+
+    @Transactional(readOnly = true)
+    public UserPage usersPage(java.util.UUID schoolId, int page, int size, String query, String role, String tier, String status) {
+        if (schoolId != null) requireSchoolAccess(schoolId);
+        if (query != null && query.length() > 200) throw ApiException.badRequest("Search is too long.");
+        org.springframework.data.jpa.domain.Specification<User> scope = (root, cq, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (schoolId != null) {
+                predicates.add(cb.equal(root.get("school").get("id"), schoolId));
+                predicates.add(root.get("role").get("name").in(java.util.List.of("STAFF", "STUDENT")));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        org.springframework.data.jpa.domain.Specification<User> filters = (root, cq, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (role != null && !role.isBlank() && !role.equals("ALL")) predicates.add(cb.equal(root.get("role").get("name"), role));
+            var tierRoles = switch (tier == null ? "ALL" : tier) {
+                case "SYSTEM" -> java.util.List.of("ADMIN", "MANAGER");
+                case "SCHOOL" -> java.util.List.of("SCHOOL", "STAFF");
+                case "INDIVIDUAL" -> java.util.List.of("STUDENT", "REVIEWER");
+                default -> java.util.List.<String>of();
+            };
+            if (!tierRoles.isEmpty()) predicates.add(root.get("role").get("name").in(tierRoles));
+            if ("SUSPENDED_READ_ONLY".equals(status) || "SUSPENDED".equals(status)) predicates.add(cb.or(cb.isFalse(root.get("active")), cb.equal(root.get("accountStatus"), "SUSPENDED_READ_ONLY")));
+            else if ("WARNED".equals(status)) predicates.add(cb.equal(root.get("accountStatus"), "WARNED"));
+            else if ("ACTIVE".equals(status)) predicates.add(cb.and(cb.or(cb.isTrue(root.get("active")), cb.isNull(root.get("active"))), cb.or(cb.isNull(root.get("accountStatus")), cb.equal(root.get("accountStatus"), "ACTIVE"))));
+            if (query != null && !query.isBlank()) {
+                String needle = "%" + query.trim().toLowerCase(java.util.Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+                var school = root.join("school", jakarta.persistence.criteria.JoinType.LEFT);
+                predicates.add(cb.or(cb.like(root.get("id").as(String.class), needle, '!'), cb.like(cb.lower(root.get("email")), needle, '!'), cb.like(cb.lower(root.get("fullName")), needle, '!'),
+                        cb.like(cb.lower(school.get("name")), needle, '!'), cb.like(cb.lower(school.get("code")), needle, '!')));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        var request = com.example.backend.common.dto.PageResponse.request(page, size, org.springframework.data.domain.Sort.by("fullName").and(org.springframework.data.domain.Sort.by("id")));
+        var result = userRepository.findAll(scope.and(filters), request);
+        if (page > 0 && result.isEmpty() && result.getTotalElements() > 0)
+            result = userRepository.findAll(scope.and(filters), request.withPage(Math.max(0, result.getTotalPages() - 1)));
+        java.util.Map<String, Long> counts = new java.util.HashMap<>();
+        for (var count : userRepository.accountCounts(schoolId)) {
+            if (schoolId != null && !java.util.Set.of("STAFF", "STUDENT").contains(count.getRole())) continue;
+            counts.merge(count.getRole() == null ? "UNKNOWN" : count.getRole(), count.getTotal(), Long::sum);
+            counts.merge("total", count.getTotal(), Long::sum);
+            if (Boolean.FALSE.equals(count.getActive())) counts.merge("suspended", count.getTotal(), Long::sum);
+        }
+        return new UserPage(result.stream().map(this::toUser).toList(), result.getTotalElements(), result.getTotalPages(), result.getNumber(), size, counts);
+    }
+
     @Transactional(readOnly = true)
     public List<UserStatusResponse> users() {
         return userRepository.findAll().stream().map(this::toUser).toList();

@@ -59,7 +59,7 @@ public class SchoolClassService {
                     SchoolClass schoolClass = item.getSchoolClass();
                     List<StudentClassTeacher> teachers = teacherAssignments.findByClassIdAndIsActiveTrue(schoolClass.getId()).stream()
                             .map(assignment -> new StudentClassTeacher(assignment.getTeacher().getId(), assignment.getTeacher().getFullName())).toList();
-                    long classmates = Math.max(0, enrollments.findActiveStudentsByClassId(schoolClass.getId()).size() - 1L);
+                    long classmates = Math.max(0, enrollments.countActiveByClass(schoolClass.getId()) - 1L);
                     return new StudentClassSummary(schoolClass.getId(), schoolClass.getName(), schoolClass.getGradeLevel(),
                             schoolClass.getSchoolYear(), schoolClass.getSubject(), schoolClass.getSchool().getId(),
                             schoolClass.getSchool().getName(), teachers, classmates);
@@ -75,13 +75,69 @@ public class SchoolClassService {
     @Transactional(readOnly = true)
     public List<ClassSummary> list(UUID schoolId, boolean includeInactive) {
         requireSchoolAccess(schoolId);
-        return (includeInactive ? classes.findBySchoolIdOrderByNameAsc(schoolId)
-                : classes.findBySchoolIdAndIsActiveTrue(schoolId)).stream().map(this::summary).toList();
+        List<SchoolClass> rows = includeInactive ? classes.findBySchoolIdOrderByNameAsc(schoolId)
+                : classes.findBySchoolIdAndIsActiveTrue(schoolId);
+        return summaries(rows);
+    }
+
+    public record ClassPage(List<ClassSummary> items, long totalElements, int totalPages, int page, int size, List<String> years, long totalClasses, long activeClasses) { }
+
+    @Transactional(readOnly = true)
+    public ClassPage page(UUID schoolId, int page, int size, Integer grade, String year, String status, String query) {
+        requireSchoolAccess(schoolId);
+        if (query != null && query.length() > 200) throw ApiException.badRequest("Search is too long.");
+        var request = com.example.backend.common.dto.PageResponse.request(page, size,
+                org.springframework.data.domain.Sort.by("name").and(org.springframework.data.domain.Sort.by("id")));
+        org.springframework.data.jpa.domain.Specification<SchoolClass> filter = (root, cq, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            predicates.add(cb.equal(root.get("school").get("id"), schoolId));
+            if (grade != null) predicates.add(cb.equal(root.get("gradeLevel"), grade));
+            if (year != null && !year.equals("ALL")) predicates.add(cb.equal(root.get("schoolYear"), year));
+            if (status != null && !status.equals("ALL")) predicates.add(cb.equal(root.get("isActive"), status.equals("ACTIVE")));
+            if (query != null && !query.isBlank()) {
+                String needle = java.text.Normalizer.normalize(query.trim().toLowerCase(java.util.Locale.ROOT), java.text.Normalizer.Form.NFD)
+                        .replaceAll("\\p{M}", "").replace("!","!!").replace("%","!%").replace("_","!_");
+                var text = cb.concat(cb.concat(root.get("name"), " "), cb.coalesce(root.get("subject"), ""));
+                var normalized = cb.function("translate", String.class, cb.lower(text), cb.literal("àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ"), cb.literal("aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyy"));
+                predicates.add(cb.like(normalized, "%" + needle + "%", '!'));
+            }
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
+        var result = classes.findAll(filter, request);
+        if (page > 0 && result.isEmpty() && result.getTotalElements() > 0)
+            result = classes.findAll(filter, request.withPage(result.getTotalPages() - 1));
+        var stateCounts = classes.classStateCounts(schoolId);
+        long total = stateCounts.stream().mapToLong(SchoolClassRepository.StateCount::getTotal).sum();
+        long active = stateCounts.stream().filter(row -> Boolean.TRUE.equals(row.getActive())).mapToLong(SchoolClassRepository.StateCount::getTotal).sum();
+        return new ClassPage(summaries(result.getContent()), result.getTotalElements(), result.getTotalPages(), result.getNumber(), size, classes.schoolYears(schoolId), total, active);
+    }
+
+    private List<ClassSummary> summaries(List<SchoolClass> rows) {
+        if (rows.isEmpty()) return List.of();
+        var ids = rows.stream().map(SchoolClass::getId).toList();
+        var teachers = teacherAssignments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
+                ClassTeacherAssignmentRepository.ClassCount::getClassId, ClassTeacherAssignmentRepository.ClassCount::getTotal));
+        var students = enrollments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
+                ClassEnrollmentRepository.ClassCount::getClassId, ClassEnrollmentRepository.ClassCount::getTotal));
+        return rows.stream().map(row -> new ClassSummary(row.getId(), row.getName(), row.getGradeLevel(), row.getSchoolYear(),
+                row.getSubject(), Boolean.TRUE.equals(row.getIsActive()), teachers.getOrDefault(row.getId(), 0L),
+                students.getOrDefault(row.getId(), 0L))).toList();
     }
 
     @Transactional(readOnly = true)
     public ClassDetail get(UUID schoolId, UUID classId) {
         return getInternal(schoolId, classId);
+    }
+
+    @Transactional(readOnly = true)
+    public com.example.backend.system.school.dto.SchoolClassContracts.ClassOverview overview(UUID schoolId, UUID classId) {
+        requireSchoolAccess(schoolId);
+        SchoolClass classroom = classInSchool(schoolId, classId);
+        List<Person> teachers = teacherAssignments.findByClassIdAndIsActiveTrue(classId).stream()
+                .map(item -> person(item.getTeacher())).toList();
+        return new com.example.backend.system.school.dto.SchoolClassContracts.ClassOverview(classroom.getId(),
+                classroom.getName(), classroom.getGradeLevel(), classroom.getSchoolYear(), classroom.getSubject(),
+                Boolean.TRUE.equals(classroom.getIsActive()), teachers, enrollments.countActiveByClass(classId));
     }
 
     private ClassDetail getInternal(UUID schoolId, UUID classId) {
@@ -235,8 +291,8 @@ public class SchoolClassService {
     private ClassSummary summary(SchoolClass schoolClass) {
         return new ClassSummary(schoolClass.getId(), schoolClass.getName(), schoolClass.getGradeLevel(), schoolClass.getSchoolYear(),
                 schoolClass.getSubject(), Boolean.TRUE.equals(schoolClass.getIsActive()),
-                teacherAssignments.findByClassIdAndIsActiveTrue(schoolClass.getId()).size(),
-                enrollments.findActiveStudentsByClassId(schoolClass.getId()).size());
+                teacherAssignments.countActiveByClass(schoolClass.getId()),
+                enrollments.countActiveByClass(schoolClass.getId()));
     }
 
     private User requireWriteAccess(UUID schoolId) {

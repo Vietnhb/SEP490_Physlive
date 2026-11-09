@@ -46,12 +46,12 @@ public class SchoolReportService {
 
     public Summary summary(UUID schoolId) {
         requireAccess(schoolId); School school = school(schoolId);
-        long teachers = users.findBySchoolIdAndRoleName(schoolId, RoleName.STAFF.name()).size();
+        long teachers = users.countReportAccounts(schoolId, RoleName.STAFF.name());
         long students = users.countActiveStudents(schoolId);
-        long managers = users.findBySchoolIdAndRoleName(schoolId, RoleName.SCHOOL.name()).size();
+        long managers = users.countReportAccounts(schoolId, RoleName.SCHOOL.name());
         long enrolled = enrollments.countActiveStudentsBySchoolId(schoolId);
         return new Summary(schoolId, school.getName(), students, teachers, managers,
-                classes.findBySchoolIdAndIsActiveTrue(schoolId).size(), enrolled,
+                classes.countBySchoolIdAndIsActiveTrue(schoolId), enrolled,
                 aiQuota.usedThisMonth(school), school.getMonthlyTokenQuota(), school.getLicenseEnd(),
                 aiQuota.currentMonth(), school.getStudentQuota(), school.getPlanCode(), school.getLicenseStart(),
                 SchoolContracts.Response.from(school).subscriptionStatus());
@@ -59,8 +59,15 @@ public class SchoolReportService {
 
     public List<ClassRow> classes(UUID schoolId) {
         requireAccess(schoolId);
-        return classes.findBySchoolIdAndIsActiveTrue(schoolId).stream().map(item -> new ClassRow(item.getId(), item.getName(), item.getGradeLevel(), item.getSchoolYear(),
-                teacherAssignments.findByClassIdAndIsActiveTrue(item.getId()).size(), enrollments.findActiveStudentsByClassId(item.getId()).size())).toList();
+        var rows = classes.findBySchoolIdAndIsActiveTrue(schoolId);
+        if (rows.isEmpty()) return List.of();
+        var ids = rows.stream().map(com.example.backend.system.school.model.entity.SchoolClass::getId).toList();
+        var teachers = teacherAssignments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
+                ClassTeacherAssignmentRepository.ClassCount::getClassId, ClassTeacherAssignmentRepository.ClassCount::getTotal));
+        var students = enrollments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
+                ClassEnrollmentRepository.ClassCount::getClassId, ClassEnrollmentRepository.ClassCount::getTotal));
+        return rows.stream().map(item -> new ClassRow(item.getId(), item.getName(), item.getGradeLevel(), item.getSchoolYear(),
+                teachers.getOrDefault(item.getId(), 0L), students.getOrDefault(item.getId(), 0L))).toList();
     }
 
     public List<TokenRow> tokenAudit(UUID schoolId) {

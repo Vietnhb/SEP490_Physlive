@@ -22,6 +22,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
     private final AdminService adminService;
 
+    @GetMapping("/users/page")
+    public com.example.backend.system.account.service.AdminService.UserPage usersPage(
+
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "") String query,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "ALL") String role,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "ALL") String tier,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "") String status) {
+        return adminService.usersPage(null, page, size, query, role, tier, status);
+    }
+
     @GetMapping("/users")
     public List<UserStatusResponse> users() {
         return adminService.users();

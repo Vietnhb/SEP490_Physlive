@@ -64,7 +64,7 @@ public class SecurityConfig {
                 .requestMatchers(PUT, "/api/admin/appeals/**").hasAnyRole(MANAGER, SCHOOL)
                 .requestMatchers("/api/appeals", "/api/appeals/**").hasAnyRole(ADMIN, MANAGER, REVIEWER, SCHOOL, STAFF, STUDENT)
                 // ADMIN manages only MANAGER accounts; target-role restrictions remain in the service.
-                .requestMatchers(GET, "/api/admin/users", "/api/admin/analytics", "/api/admin/appeals", "/api/admin/payments", "/api/admin/payment-report", "/api/admin/payment-analytics").hasAnyRole(ADMIN, MANAGER)
+                .requestMatchers(GET, "/api/admin/users", "/api/admin/users/page", "/api/admin/analytics", "/api/admin/overview-counts", "/api/admin/appeals", "/api/admin/payments", "/api/admin/payment-report", "/api/admin/payment-analytics").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers(PUT, "/api/admin/appeals/**").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers(POST, "/api/admin/users").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers(PUT, "/api/admin/users/**").hasAnyRole(ADMIN, MANAGER)
@@ -75,7 +75,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/reviewer/library", "/api/reviewer/library/**").hasRole(REVIEWER)
                 .requestMatchers("/api/reviewer/**").hasAnyRole(REVIEWER, MANAGER)
                 // School services validate membership, department-head permissions and class creation.
-                .requestMatchers(GET, "/api/schools/*/users").hasAnyRole(SCHOOL, MANAGER, STAFF)
+                .requestMatchers(GET, "/api/schools/*/users", "/api/schools/*/users/page").hasAnyRole(SCHOOL, MANAGER, STAFF)
                 .requestMatchers("/api/schools/*/users/**").hasAnyRole(SCHOOL, MANAGER)
                 .requestMatchers("/api/schools/*/classes/**").hasAnyRole(SCHOOL, MANAGER, STAFF)
                 .requestMatchers("/api/schools/*/library/**", "/api/schools/*/assignments", "/api/schools/*/imports/**")
@@ -85,6 +85,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/evaluations", "/api/evaluations/**").hasAnyRole(REVIEWER, MANAGER)
                 .requestMatchers("/api/classes/*/students").hasAnyRole(STAFF, SCHOOL, MANAGER)
                 .requestMatchers("/api/student/**").hasRole(STUDENT)
+                .requestMatchers(GET, "/api/support/inbox", "/api/support/inbox/pending-count").hasAnyRole(MANAGER, SCHOOL)
                 .requestMatchers("/api/support/admin", "/api/support/admin/**").hasRole(MANAGER)
                 .requestMatchers("/api/support/**").hasAnyRole(APPLICATION_ROLES)
                 .requestMatchers("/api/school/billing", "/api/school/billing/**").hasRole(SCHOOL)

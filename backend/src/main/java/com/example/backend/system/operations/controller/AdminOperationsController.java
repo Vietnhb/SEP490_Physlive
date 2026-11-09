@@ -27,6 +27,9 @@ public class AdminOperationsController {
     private final AdminOperationsService service;
     private final com.example.backend.system.operations.service.AdminAnalyticsService analyticsService;
 
+    @GetMapping("/overview-counts")
+    public AdminOperationsService.OverviewCounts overviewCounts() { return service.overviewCounts(); }
+
     @GetMapping("/analytics")
     public com.example.backend.system.operations.dto.AdminAnalyticsDto analytics() {
         return analyticsService.getAnalytics();
@@ -46,6 +49,20 @@ public class AdminOperationsController {
     public LicensePlanResponse updatePlan(@PathVariable String code,
                                   @Valid @RequestBody PlanRequest request) {
         return service.updatePlan(code, request);
+    }
+
+    @GetMapping("/schools/page")
+    public com.example.backend.common.dto.PageResponse<SchoolContracts.Response> schoolsPage(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size) {
+        return service.schoolsPage(page, size);
+    }
+
+    @GetMapping("/validation-runs/page")
+    public com.example.backend.common.dto.PageResponse<ValidationRow> validationPage(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size) {
+        return service.validationPage(page, size);
     }
 
     @GetMapping("/schools")
