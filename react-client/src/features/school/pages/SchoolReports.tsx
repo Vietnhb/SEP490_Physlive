@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Callout, Card, Progress, Select, Table, TextField } from "@radix-ui/themes";
 import { Link } from "react-router-dom";
@@ -51,6 +52,7 @@ export default function SchoolReports() {
     } catch (cause) { setError(apiMessage(cause, "Không thể tải báo cáo trường.")); }
     finally { setLoading(false); }
   }, [schoolId]);
+  useApiRefresh(["/schools/reports"], load);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {

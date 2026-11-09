@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Button, Card, Heading, SegmentedControl, Text, TextArea } from "@radix-ui/themes";
@@ -24,6 +25,7 @@ export function ComplaintsDesk() {
     catch { setError("Chưa tải được danh sách khiếu nại. Vui lòng thử lại."); }
     finally { setLoading(false); }
   }, []);
+  useApiRefresh(["/support/complaints"], load);
   useEffect(() => { void load(); }, [load]);
 
   const visible = useMemo(() => items.filter(item => (item.status === "RESOLVED") === (filter === "done")), [items, filter]);

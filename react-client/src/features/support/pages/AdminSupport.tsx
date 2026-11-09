@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { adminSupportItems, updateSupportItem, type SupportItem, type SupportKind, type SupportStatus } from "../api/supportApi";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
@@ -24,6 +25,7 @@ export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) 
     }
   }, [kind]);
 
+  useApiRefresh(["/support"], load);
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => window.clearTimeout(timer);

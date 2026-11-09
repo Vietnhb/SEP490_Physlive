@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
+import type { AccountPage } from "../../../shared/api/page";
+import { useState } from "react";
 import { Avatar, Badge, Button, Callout, Card, Dialog, Flex, Heading, IconButton, Select, Table, Text, TextField } from "@radix-ui/themes";
 import { ArrowRightIcon, CheckCircledIcon, Cross2Icon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PersonIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { motion } from "motion/react";
-import { adminUsers } from "../api/userApi";
-import { apiMessage } from "../../../shared/lib/apiError";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { ROLE_NAMES, getRoleLabel } from "../../../shared/auth/roles";
 import type { User, AccountStatus } from "../../../shared/auth/types";
@@ -51,64 +52,40 @@ function accountStatusBadge(user: User) {
 
 export default function AdminDirectory() {
   const canManageManagers = useSessionStore(state => state.user?.role === "ADMIN");
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState<UserTier>("ALL");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
+  const [selectedSnapshot, setSelectedSnapshot] = useState<User | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
 
-  const selected = users.find(item => item.id === selectedId);
-  const openDetails = (id: number) => { setNotice(""); setSelectedId(id); };
+  const search = useDebouncedValue(query);
+  const resource = useResource<AccountPage<User>>("/admin/users/page?" + new URLSearchParams({
+    page: String(page - 1), size: String(pageSize), query: search, tier, role, status }));
+  const users = resource.data?.items ?? [];
+  const counts = resource.data?.counts ?? {};
+  const total = resource.data?.totalElements ?? 0;
+  const loading = resource.loading;
+  const error = resource.error;
+  const load = resource.refresh;
+  const selected = users.find(item => item.id === selectedId) ?? (selectedSnapshot?.id === selectedId ? selectedSnapshot : undefined);
+  const openDetails = (id: number) => { setNotice(""); setSelectedSnapshot(users.find(item => item.id === id) ?? null); setSelectedId(id); };
   const managerSaved = (saved: User, message: string) => {
     const exists = users.some(item => item.id === saved.id);
-    setUsers(current => exists ? current.map(item => item.id === saved.id ? saved : item) : [saved, ...current]);
-    setSelectedId(saved.id); setNotice(message);
+    load();
+    setSelectedSnapshot(saved); setSelectedId(saved.id); setNotice(message);
     if (!exists) { setQuery(""); setTier("SYSTEM"); setRole("MANAGER"); setStatus(""); setPage(1); }
   };
 
-  const load = async () => {
-    setLoading(true); setError("");
-    try { setUsers(await adminUsers()); }
-    catch (err) { setError(apiMessage(err, "Không thể tải danh sách tài khoản. Vui lòng thử lại.")); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { void load(); }, []);
-
-  // Filter accounts by tier, role, status and search query
-  const filtered = users.filter(item => {
-    if (tier !== "ALL" && !USER_TIERS[tier].roles.includes(item.role)) return false;
-    if (role && item.role !== role) return false;
-    if (status) {
-      const userStatus: AccountStatus = item.accountStatus ?? (item.active === false ? "SUSPENDED_READ_ONLY" : "ACTIVE");
-      if (status === "ACTIVE" && (userStatus !== "ACTIVE" || item.active === false)) return false;
-      if (status === "WARNED" && userStatus !== "WARNED") return false;
-      if (status === "SUSPENDED" && userStatus !== "SUSPENDED_READ_ONLY" && item.active !== false) return false;
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      const match = `${item.fullName} ${item.email} ${item.id} ${item.schoolName ?? ""}`.toLowerCase();
-      if (!match.includes(q)) return false;
-    }
-    return true;
-  });
-
-  const tierCounts = {
-    ALL: users.length,
-    SCHOOL: users.filter(u => USER_TIERS.SCHOOL.roles.includes(u.role)).length,
-    SYSTEM: users.filter(u => USER_TIERS.SYSTEM.roles.includes(u.role)).length,
-    INDIVIDUAL: users.filter(u => USER_TIERS.INDIVIDUAL.roles.includes(u.role)).length,
-  };
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
+  const tierCounts = { ALL: counts.total ?? 0, SCHOOL: (counts.SCHOOL ?? 0) + (counts.STAFF ?? 0),
+    SYSTEM: (counts.ADMIN ?? 0) + (counts.MANAGER ?? 0), INDIVIDUAL: (counts.STUDENT ?? 0) + (counts.REVIEWER ?? 0) };
+  const pageCount = Math.max(1, resource.data?.totalPages ?? 1);
+  const currentPage = resource.data ? resource.data.page + 1 : page;
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleUsers = filtered.slice(pageStart, pageStart + pageSize);
+  const visibleUsers = users;
 
   return (
     <div className="directory-main">
@@ -133,7 +110,7 @@ export default function AdminDirectory() {
         {/* High-level Stats */}
         <div className="directory-stats" aria-label="Thống kê tài khoản">
           {[
-            { label: "Tổng tài khoản", value: users.length, icon: <PersonIcon /> },
+            { label: "Tổng tài khoản", value: (counts.total ?? 0), icon: <PersonIcon /> },
             { label: "Trường học", value: tierCounts.SCHOOL, icon: <LearningIcon name="book" /> },
             { label: "Hệ thống", value: tierCounts.SYSTEM, icon: <LearningIcon name="shield" /> },
             { label: "Cá nhân", value: tierCounts.INDIVIDUAL, icon: <PersonIcon /> },
@@ -165,7 +142,7 @@ export default function AdminDirectory() {
                     {USER_TIERS[tier].label}
                   </Heading>
                   <Text as="p" size="2" color="gray">
-                    {loading ? "Đang tải dữ liệu…" : `${filtered.length} / ${users.length} tài khoản`}
+                    {loading ? "Đang tải dữ liệu…" : `${total} / ${(counts.total ?? 0)} tài khoản`}
                   </Text>
                 </div>
               </div>
@@ -231,7 +208,7 @@ export default function AdminDirectory() {
                 </div>
               ) : loading ? (
                 <TableLoadingSkeleton label="Đang tải tài khoản…" headers={["Người dùng", "Vai trò", "Đơn vị trực thuộc", "Trạng thái", "Chi tiết"]} />
-              ) : filtered.length === 0 ? (
+              ) : total === 0 ? (
                 <div className="directory-empty">
                   <MagnifyingGlassIcon />
                   <Heading as="h3" size="4">Chưa tìm thấy tài khoản</Heading>
@@ -284,7 +261,7 @@ export default function AdminDirectory() {
                 </Table.Root>
               )}
 
-              {!error && !loading && filtered.length > 0 && (
+              {!error && !loading && total > 0 && (
                 <div className="directory-mobile-list" aria-label="Danh sách tài khoản">
                   {visibleUsers.map(item => (
                     <article key={item.id} className={`directory-user-card ${selectedId === item.id ? "selected" : ""}`}>
@@ -306,10 +283,10 @@ export default function AdminDirectory() {
                 </div>
               )}
 
-              {!error && !loading && filtered.length > 0 && (
+              {!error && !loading && total > 0 && (
                 <div className="directory-pagination">
                   <Text size="2" color="gray" aria-live="polite">
-                    Hiển thị {pageStart + 1}–{Math.min(pageStart + pageSize, filtered.length)} / {filtered.length} tài khoản
+                    Hiển thị {pageStart + 1}–{Math.min(pageStart + pageSize, total)} / {total} tài khoản
                   </Text>
                   <div className="directory-pagination__controls">
                     <label>

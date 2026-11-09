@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Outlet, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { Card, Heading, Text } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
@@ -7,10 +7,10 @@ import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppS
 import { reviewerAccess, type ReviewerAccess, type ReviewerView } from "../model/reviewerAccess";
 import { ReviewerIcon } from "../components/ReviewerKit";
 import { ReviewerOverview } from "../components/ReviewerOverview";
-import { ContentModeration } from "../components/ContentModeration";
-import { TopicsWorkspace } from "../components/TopicsWorkspace";
-import { LawGapsDesk } from "../components/LawGapsDesk";
-import { ComplaintsDesk } from "../components/ComplaintsDesk";
+const ContentModeration = lazy(() => import("../components/ContentModeration").then(module => ({ default: module.ContentModeration })));
+const TopicsWorkspace = lazy(() => import("../components/TopicsWorkspace").then(module => ({ default: module.TopicsWorkspace })));
+const LawGapsDesk = lazy(() => import("../components/LawGapsDesk").then(module => ({ default: module.LawGapsDesk })));
+const ComplaintsDesk = lazy(() => import("../components/ComplaintsDesk").then(module => ({ default: module.ComplaintsDesk })));
 import { complaintsForReview } from "../../support/api/supportApi";
 import "../styles/reviewer.css";
 import "../../support/styles/complaints.css";
@@ -88,7 +88,7 @@ export function ReviewerHomePage() {
 
 export function ReviewerModerationPage() {
   const { access } = useReviewer();
-  return access.canReview ? <ContentModeration /> : <Navigate to="/reviewer" replace />;
+  return access.canReview ? <Suspense fallback={<p role="status">Đang tải…</p>}><ContentModeration /></Suspense> : <Navigate to="/reviewer" replace />;
 }
 
 export function ReviewerTopicsPage() {
@@ -96,16 +96,16 @@ export function ReviewerTopicsPage() {
   const { section } = useParams();
   if (!access.canEdit) return <Navigate to="/reviewer" replace />;
   if (section) return <Navigate to="/reviewer/topics" replace />;
-  return <TopicsWorkspace />;
+  return <Suspense fallback={<p role="status">Đang tải…</p>}><TopicsWorkspace /></Suspense>;
 }
 
 export function ReviewerComplaintsPage() {
   const { access } = useReviewer();
   if (access.isManager) return <Navigate to="/manager/support?kind=COMPLAINT" replace />;
-  return access.canEdit || access.canReview ? <ComplaintsDesk /> : <Navigate to="/reviewer" replace />;
+  return access.canEdit || access.canReview ? <Suspense fallback={<p role="status">Đang tải…</p>}><ComplaintsDesk /></Suspense> : <Navigate to="/reviewer" replace />;
 }
 
 export function ReviewerGapsPage() {
   const { access } = useReviewer();
-  return access.canEdit ? <LawGapsDesk /> : <Navigate to="/reviewer" replace />;
+  return access.canEdit ? <Suspense fallback={<p role="status">Đang tải…</p>}><LawGapsDesk /></Suspense> : <Navigate to="/reviewer" replace />;
 }

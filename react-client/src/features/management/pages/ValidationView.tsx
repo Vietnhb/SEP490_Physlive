@@ -1,20 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import type { DataPage } from "../../../shared/api/page";
+import { useRef, useState } from "react";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { Badge, Select, Table } from "@radix-ui/themes";
-import { validationRuns, type ValidationRun } from "../api/operationsApi";
-import { apiMessage } from "../../../shared/lib/apiError";
+import { type ValidationRun } from "../api/operationsApi";
 import { PageHeader, Panel, Loading, ErrorNotice, Button } from "../../../shared/ui/ManagementUI";
 import tableScroll from "../../../shared/ui/TableScroll.module.css";
 
 export function ValidationView() {
-  const [items, setItems] = useState<ValidationRun[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const load = async () => { setLoading(true); try { setItems(await validationRuns()); setError(""); } catch (e) { setError(apiMessage(e, "Không thể tải các lần kiểm định.")); } finally { setLoading(false); } }; useEffect(() => { void load(); }, []);
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const resource = useResource<DataPage<ValidationRun>>(`/admin/validation-runs/page?page=${page - 1}&size=${pageSize}`);
+  const items = resource.data?.items ?? [];
+  const total = resource.data?.totalElements ?? 0;
+  const loading = resource.loading;
+  const error = resource.error;
+  const load = resource.refresh;
   const tableRef = useRef<HTMLDivElement>(null);
-  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
+  const pageCount = Math.max(1, resource.data?.totalPages ?? 1);
+  const currentPage = resource.data ? resource.data.page + 1 : page;
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleItems = items.slice(pageStart, pageStart + pageSize);
+  const visibleItems = items;
   const changePage = (next: number) => {
     setPage(Math.max(1, Math.min(next, pageCount)));
     tableRef.current?.scrollTo({ top: 0 });
@@ -23,7 +30,7 @@ export function ValidationView() {
   return <div className="admin-content">
     <PageHeader title="Kiểm định mô phỏng" description="Nhật ký kết quả kiểm tra do hệ thống ghi nhận khi chạy mô phỏng; không phải trạng thái kiểm duyệt nội dung." action={<Button disabled={loading} onClick={() => void load()}><LearningIcon name="refresh" /> Làm mới</Button>} />
     {error && <ErrorNotice error={error} onRetry={() => void load()} />}
-    {loading ? <Loading text="Đang tải các lần kiểm định…" headers={["Thời gian", "Chủ đề", "Schema", "Bộ giải", "Trạng thái", "Lỗi"]} /> : <Panel title={`${items.length} lần chạy`} description="Theo dõi kết quả đã lưu và thông báo lỗi của từng lần chạy. Manager có quyền xem nhật ký này.">
+    {loading ? <Loading text="Đang tải các lần kiểm định…" headers={["Thời gian", "Chủ đề", "Schema", "Bộ giải", "Trạng thái", "Lỗi"]} /> : <Panel title={`${total} lần chạy`} description="Theo dõi kết quả đã lưu và thông báo lỗi của từng lần chạy. Manager có quyền xem nhật ký này.">
       <Table.Root ref={tableRef} size="2" variant="ghost" className={`admin-table ${tableScroll.viewport}`}>
         <Table.Header><Table.Row>
           <Table.ColumnHeaderCell>Thời gian</Table.ColumnHeaderCell>
@@ -43,7 +50,7 @@ export function ValidationView() {
         </Table.Row>)}</Table.Body>
       </Table.Root>
       <div className="admin-table-pagination">
-        <span aria-live="polite">{items.length === 0 ? "0 lần chạy" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, items.length)} / ${items.length} lần chạy`}</span>
+        <span aria-live="polite">{total === 0 ? "0 lần chạy" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, total)} / ${total} lần chạy`}</span>
         <div>
           <label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); tableRef.current?.scrollTo({ top: 0 }); }}><Select.Trigger aria-label="Số lần chạy trên mỗi trang" /><Select.Content>{[10, 25, 50].map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label>
           <Button disabled={currentPage <= 1} onClick={() => changePage(currentPage - 1)}>Trước</Button>

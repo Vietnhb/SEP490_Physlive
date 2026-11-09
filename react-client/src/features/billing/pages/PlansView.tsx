@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Checkbox, Dialog, Table, Text, TextField } from "@radix-ui/themes";
 import { adminPlans, saveManagedPlan, type ManagedPlan } from "../api/billingApi";
@@ -13,6 +14,7 @@ export function PlansView() {
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
   const load = async () => { setLoading(true); try { setItems(await adminPlans()); setError(""); } catch (err) { setError(apiMessage(err, "Không thể tải danh mục gói.")); } finally { setLoading(false); } };
+  useApiRefresh(["/admin/plans"], load);
   useEffect(() => { void load(); }, []);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!form || busy) return; setBusy(true); setFormError("");

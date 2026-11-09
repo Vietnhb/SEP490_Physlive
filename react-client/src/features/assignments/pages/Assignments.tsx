@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { createAssignment, setAssignmentOpen, studentOptions, teacherAssignments, teacherAssignmentClasses } from "../api/assignmentApi";
@@ -84,6 +85,7 @@ export default function Assignments({
     }
   }, [isStudent, user]);
 
+  useApiRefresh(["/assignments", "/schools/classes"], loadData);
   useEffect(() => {
     void loadData();
   }, [loadData]);

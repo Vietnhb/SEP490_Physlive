@@ -1,11 +1,14 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import type { DataPage } from "../../../shared/api/page";
+import { useState, type FormEvent } from "react";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { Badge, Button as ThemeButton, Callout, Checkbox, Dialog, Select, Table, Text, TextField } from "@radix-ui/themes";
-import { adminSchools, createSchool, updateSchool, type ManagedSchool } from "../api/schoolApi";
+import { createSchool, updateSchool, type ManagedSchool } from "../api/schoolApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { PageHeader, Panel, Loading, ErrorNotice, Button, FormField } from "../../../shared/ui/ManagementUI";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import tableScroll from "../../../shared/ui/TableScroll.module.css";
+import ManagerSchoolClassesDialog from "../components/ManagerSchoolClassesDialog";
 import SchoolSubscriptionDialog from "../components/SchoolSubscriptionDialog";
 import { SUBSCRIPTION_STATUS } from "../model/schoolSubscription";
 
@@ -15,19 +18,25 @@ const blankSchool: SchoolForm = { code: "", name: "", address: "", active: true,
 const SCHOOL_PAGE_SIZES = [10, 25, 50] as const;
 
 export function SchoolsView() {
-  const [items, setItems] = useState<ManagedSchool[]>([]); const [form, setForm] = useState<SchoolForm>(blankSchool); const [editing, setEditing] = useState<string | null>(null); const [showForm, setShowForm] = useState(false); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const [form, setForm] = useState<SchoolForm>(blankSchool); const [editing, setEditing] = useState<string | null>(null); const [showForm, setShowForm] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
+  const [classSchool, setClassSchool] = useState<ManagedSchool | null>(null);
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
-  const load = async () => { setLoading(true); try { setItems(await adminSchools()); setError(""); } catch (e) { setError(apiMessage(e, "Không thể tải danh sách trường học.")); } finally { setLoading(false); } }; useEffect(() => { void load(); }, []);
-  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
+  const resource = useResource<DataPage<ManagedSchool>>(`/admin/schools/page?page=${page - 1}&size=${pageSize}`);
+  const items = resource.data?.items ?? [];
+  const total = resource.data?.totalElements ?? 0;
+  const loading = resource.loading;
+  const load = resource.refresh;
+  const pageCount = Math.max(1, resource.data?.totalPages ?? 1);
+  const currentPage = resource.data ? resource.data.page + 1 : page;
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleItems = items.slice(pageStart, pageStart + pageSize);
+  const visibleItems = items;
   const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); try { const payload = { ...form, licenseStart: form.licenseStart || null, licenseEnd: form.licenseEnd || null, monthlyTokenQuota: form.monthlyTokenQuota === "" ? null : Number(form.monthlyTokenQuota) }; if (editing) { await updateSchool(editing, payload); } else { await createSchool(payload); } setShowForm(false); setEditing(null); setForm(blankSchool); await load(); } catch (e) { setError(apiMessage(e, "Không thể lưu trường học.")); } finally { setBusy(false); } };
   return <div className="admin-content">
     <PageHeader title="" description="" action={<Button primary onClick={() => { setEditing(null); setForm(blankSchool); setShowForm(true); }}><LearningIcon name="plus" />Thêm trường</Button>} />
-    {error && <ErrorNotice error={error} onRetry={() => void load()} />}
+    {(error || resource.error) && <ErrorNotice error={error || resource.error || ""} onRetry={() => void load()} />}
+    <ManagerSchoolClassesDialog key={classSchool?.id ?? "no-school"} school={classSchool} onClose={() => setClassSchool(null)} />
     <SchoolSubscriptionDialog key={subscriptionId ?? "closed"} schoolId={subscriptionId} onClose={() => setSubscriptionId(null)} />
     <Dialog.Root open={showForm} onOpenChange={setShowForm}><Dialog.Content className={modal.dialog} maxWidth="620px" aria-describedby={undefined}><div className={modal.body}><Dialog.Title>{editing ? "Cập nhật trường" : "Thêm trường"}</Dialog.Title>
       {error && <Callout.Root color="red" size="1" mb="4" role="alert"><Callout.Text>{error}</Callout.Text></Callout.Root>}
@@ -42,6 +51,6 @@ export function SchoolsView() {
         <div className="admin-form-actions"><Button onClick={() => setShowForm(false)}>Hủy</Button><ThemeButton type="submit" size="3" loading={busy} disabled={busy}>{busy ? "Đang lưu…" : "Lưu trường"}</ThemeButton></div>
       </form>
     </div></Dialog.Content></Dialog.Root>
-    {loading ? <Loading text="Đang tải danh sách trường học…" headers={["Mã", "Tên trường", "Gói hiện tại", "Ngày hết hạn", "Trạng thái gói", "Trạng thái trường", "Thao tác"]} /> : <Panel title={`${items.length} trường học`}><Table.Root className={tableScroll.viewport} size="2" variant="ghost"><Table.Header><Table.Row><Table.ColumnHeaderCell>Mã</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Tên trường</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Gói hiện tại</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Ngày hết hạn</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Trạng thái gói</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Trạng thái trường</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Thao tác</Table.ColumnHeaderCell></Table.Row></Table.Header><Table.Body>{visibleItems.map(item => <Table.Row key={item.id}><Table.Cell><Text weight="medium">{item.code}</Text></Table.Cell><Table.Cell><Text as="div">{item.name}</Text><Text as="div" size="1" color="gray">{item.address || "Chưa cập nhật địa chỉ"}</Text></Table.Cell><Table.Cell><Badge variant="soft" color={item.planCode ? "indigo" : "gray"}>{item.planCode || "Chưa gắn gói"}</Badge></Table.Cell><Table.Cell>{item.licenseEnd ? item.licenseEnd.split("-").reverse().join("/") : "Chưa thiết lập"}</Table.Cell><Table.Cell><Badge color={SUBSCRIPTION_STATUS[item.subscriptionStatus ?? "UNKNOWN"].color}>{SUBSCRIPTION_STATUS[item.subscriptionStatus ?? "UNKNOWN"].label}</Badge></Table.Cell><Table.Cell><Badge color={item.active ? "cyan" : "gray"} size="2">{item.active ? "Hoạt động" : "Đã tắt"}</Badge></Table.Cell><Table.Cell><div style={{ display: "flex", gap: 8, whiteSpace: "nowrap" }}><Button onClick={() => setSubscriptionId(item.id)}>Xem gói</Button><Button onClick={() => { setEditing(item.id); setForm({ code: item.code, name: item.name, address: item.address ?? "", active: item.active, licenseStart: item.licenseStart ?? "", licenseEnd: item.licenseEnd ?? "", monthlyTokenQuota: item.monthlyTokenQuota == null ? "" : String(item.monthlyTokenQuota) }); setShowForm(true); }}>Sửa</Button></div></Table.Cell></Table.Row>)}</Table.Body></Table.Root><div className="admin-table-pagination"><span aria-live="polite">{items.length === 0 ? "0 trường học" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, items.length)} / ${items.length} trường học`}</span><div><label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); }}><Select.Trigger aria-label="Số trường học trên mỗi trang" /><Select.Content>{SCHOOL_PAGE_SIZES.map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</ThemeButton><span>Trang {currentPage}/{pageCount}</span><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</ThemeButton></div></div></Panel>}
+    {loading ? <Loading text="Đang tải danh sách trường học…" headers={["Mã", "Tên trường", "Gói hiện tại", "Ngày hết hạn", "Trạng thái gói", "Trạng thái trường", "Thao tác"]} /> : <Panel title={`${total} trường học`}><Table.Root className={tableScroll.viewport} size="2" variant="ghost"><Table.Header><Table.Row><Table.ColumnHeaderCell>Mã</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Tên trường</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Gói hiện tại</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Ngày hết hạn</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Trạng thái gói</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Trạng thái trường</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Thao tác</Table.ColumnHeaderCell></Table.Row></Table.Header><Table.Body>{visibleItems.map(item => <Table.Row key={item.id}><Table.Cell><Text weight="medium">{item.code}</Text></Table.Cell><Table.Cell><Text as="div">{item.name}</Text><Text as="div" size="1" color="gray">{item.address || "Chưa cập nhật địa chỉ"}</Text></Table.Cell><Table.Cell><Badge variant="soft" color={item.planCode ? "indigo" : "gray"}>{item.planCode || "Chưa mua gói"}</Badge></Table.Cell><Table.Cell>{item.licenseEnd ? item.licenseEnd.split("-").reverse().join("/") : "Chưa thiết lập"}</Table.Cell><Table.Cell><Badge color={SUBSCRIPTION_STATUS[item.subscriptionStatus ?? "UNKNOWN"].color}>{SUBSCRIPTION_STATUS[item.subscriptionStatus ?? "UNKNOWN"].label}</Badge></Table.Cell><Table.Cell><Badge color={item.active ? "cyan" : "gray"} size="2">{item.active ? "Hoạt động" : "Đã tắt"}</Badge></Table.Cell><Table.Cell><div style={{ display: "flex", gap: 8, whiteSpace: "nowrap" }}><Button onClick={() => setClassSchool(item)}>Xem lớp học</Button><Button onClick={() => setSubscriptionId(item.id)}>Xem gói</Button><Button onClick={() => { setEditing(item.id); setForm({ code: item.code, name: item.name, address: item.address ?? "", active: item.active, licenseStart: item.licenseStart ?? "", licenseEnd: item.licenseEnd ?? "", monthlyTokenQuota: item.monthlyTokenQuota == null ? "" : String(item.monthlyTokenQuota) }); setShowForm(true); }}>Sửa</Button></div></Table.Cell></Table.Row>)}</Table.Body></Table.Root><div className="admin-table-pagination"><span aria-live="polite">{total === 0 ? "0 trường học" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, total)} / ${total} trường học`}</span><div><label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); }}><Select.Trigger aria-label="Số trường học trên mỗi trang" /><Select.Content>{SCHOOL_PAGE_SIZES.map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</ThemeButton><span>Trang {currentPage}/{pageCount}</span><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</ThemeButton></div></div></Panel>}
   </div>;
 }

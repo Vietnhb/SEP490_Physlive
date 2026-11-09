@@ -1,34 +1,16 @@
+import { invalidateServerData } from "../../shared/api/queryClient";
 import { realtimeClientId as clientId } from "../../shared/api/client";
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { API_URL } from "../../config/api";
 import { getToken } from "../../shared/lib/token";
 
 type ChangeEvent = { revision: number; path: string; clientId: string | null };
 
-const relevant = (page: string, api: string) => {
-  if (page.startsWith("/admin") || page.startsWith("/manager")) return true;
-  if (page.startsWith("/school"))
-    return /\/(schools|school|assignments|student|user|auth\/payments|simulations|problems)/.test(api);
-  if (page.startsWith("/reviewer"))
-    return /\/(reviewer|schemas|evaluations|library|simulations|problems)/.test(api);
-  if (page.startsWith("/assignments")) return /\/(assignments|schools|user)/.test(api);
-  if (page === "/library" || page === "/community") return api.includes("/library");
-  if (page === "/curriculum") return api.includes("/curriculum");
-  if (page === "/profile") return /\/(user|admin\/users|schools)/.test(api);
-  if (["/workspace", "/lab", "/models", "/player"].includes(page))
-    return /\/(simulations|problems|library|curriculum|assignments)/.test(api);
-  if (page === "/") return /\/(library|curriculum|simulations)/.test(api);
-  return false;
-};
 
 
 export function useRealtimeRevision(enabled: boolean) {
-  const { pathname } = useLocation();
   const [revision, setRevision] = useState(0);
-  const pageRef = useRef(pathname);
   const lastServerRevision = useRef<number | null>(null);
-  pageRef.current = pathname;
 
   useEffect(() => {
     if (!enabled) return;
@@ -36,7 +18,9 @@ export function useRealtimeRevision(enabled: boolean) {
     let retryMs = 1_000;
 
     const refresh = (apiPath?: string) => {
-      if (!apiPath || relevant(pageRef.current, apiPath)) setRevision(value => value + 1);
+      invalidateServerData(apiPath);
+      if (!apiPath || /\/(users?|accounts?|auth)(\/|$)/.test(apiPath) || /\/schools\/[^/]+(?:\/(?:activate|deactivate))?$/.test(apiPath))
+        setRevision(value => value + 1);
     };
 
     const consume = async () => {

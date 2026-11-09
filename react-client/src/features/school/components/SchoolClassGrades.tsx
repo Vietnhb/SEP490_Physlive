@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Dialog, Flex, Select, TextField } from "@radix-ui/themes";
 import { DownloadIcon, ReloadIcon } from "@radix-ui/react-icons";
@@ -27,6 +28,7 @@ export default function SchoolClassGrades({ schoolId, classId }: Readonly<{ scho
     catch (err) { if (!signal?.aborted) setError(apiMessage(err, "Không thể tải bảng điểm.")); }
     finally { if (!signal?.aborted) setLoading(false); }
   }, [schoolId, classId]);
+  useApiRefresh(["/schools/classes/grades", "/assignments"], () => load());
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
   const students = (book?.students ?? []).filter(item => (membership === "ALL" || item.current === (membership === "CURRENT"))
     && `${item.fullName} ${item.email}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")));

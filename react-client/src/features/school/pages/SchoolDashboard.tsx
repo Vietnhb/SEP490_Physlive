@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import type { DataPage } from "../../../shared/api/page";
+import type { SchoolClassSummary } from "../types";
+import { ClassTableLoading } from "../components/SchoolLoading";
 import { Link } from "react-router-dom";
 import { Badge, Button, Card, Progress, Table } from "@radix-ui/themes";
 import { motion, useReducedMotion } from "motion/react";
-import { getLicenseStatus, type LicenseStatus } from "../../account/api/userApi";
-import { schoolReportClasses, schoolReportSummary, type SchoolReportClass, type SchoolReportSummary } from "../api/schoolApi";
-import { apiMessage } from "../../../shared/lib/apiError";
+import { type LicenseStatus } from "../../account/api/userApi";
+import { type SchoolReportSummary } from "../api/schoolApi";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { DashboardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
@@ -26,45 +28,17 @@ function SummaryCard({ label, value, icon, tone, detail }: Readonly<{ label: str
 export default function SchoolDashboard() {
   const reducedMotion = useReducedMotion();
   const schoolId = useSessionStore(state => state.user?.schoolId);
-  const [summary, setSummary] = useState<SchoolReportSummary | null>(null);
-  const [classes, setClasses] = useState<SchoolReportClass[]>([]);
-  const [license, setLicense] = useState<LicenseStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [licenseUnavailable, setLicenseUnavailable] = useState(false);
-  const [classesUnavailable, setClassesUnavailable] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!schoolId) return;
-    setLoading(true);
-    setError("");
-    setLicenseUnavailable(false);
-    setClassesUnavailable(false);
-    const [summaryResult, classesResult, licenseResult] = await Promise.allSettled([
-      schoolReportSummary(schoolId),
-      schoolReportClasses(schoolId),
-      getLicenseStatus(),
-    ]);
-    if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
-    else setError(apiMessage(summaryResult.reason, "Không thể tải tổng quan trường."));
-    if (classesResult.status === "fulfilled") setClasses(classesResult.value);
-    else {
-      setClasses([]);
-      setClassesUnavailable(true);
-      if (summaryResult.status === "fulfilled") setError(apiMessage(classesResult.reason, "Không thể tải danh sách lớp."));
-    }
-    if (licenseResult.status === "fulfilled") setLicense(licenseResult.value);
-    else {
-      setLicense(null);
-      setLicenseUnavailable(true);
-    }
-    setLoading(false);
-  }, [schoolId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => { void load(); }, 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
+  const report = useResource<SchoolReportSummary>(`/schools/${schoolId}/reports/summary`, Boolean(schoolId));
+  const roster = useResource<DataPage<SchoolClassSummary>>(`/schools/${schoolId}/classes/page?page=0&size=5&status=ACTIVE`, Boolean(schoolId));
+  const entitlement = useResource<LicenseStatus>("/user/me/license", Boolean(schoolId));
+  const summary = report.data;
+  const classes = roster.data?.items ?? [];
+  const license = entitlement.data;
+  const loading = report.loading;
+  const error = report.error || roster.error;
+  const licenseUnavailable = Boolean(entitlement.error);
+  const classesUnavailable = Boolean(roster.error);
+  const load = () => Promise.all([report.refresh(), roster.refresh(), entitlement.refresh()]);
 
   const quota = summary?.tokenQuota;
   const tokenUsage = summary?.usedTokens ?? 0;
@@ -86,7 +60,7 @@ export default function SchoolDashboard() {
         <Card size="3" asChild><section className="admin-panel school-license-panel">
           <div className="admin-panel-heading">
             <div><h2>Gói sử dụng</h2></div>
-            <Badge color={licenseUnavailable ? "gray" : license?.canPerformWriteOperations ? "green" : "orange"} size="2">{licenseUnavailable ? "Chưa xác minh" : license?.canPerformWriteOperations ? "Đang hiệu lực" : "Chưa hiệu lực"}</Badge>
+            <Badge color={entitlement.loading || licenseUnavailable ? "gray" : license?.canPerformWriteOperations ? "green" : "orange"} size="2">{entitlement.loading ? "Đang kiểm tra…" : licenseUnavailable ? "Chưa xác minh" : license?.canPerformWriteOperations ? "Đang hiệu lực" : "Chưa hiệu lực"}</Badge>
           </div>
           {licenseUnavailable && <p className="school-license-unavailable" role="status">Không tải được trạng thái license. Hãy thử làm mới để kiểm tra lại.</p>}
           <div className="school-license-details">
@@ -109,7 +83,7 @@ export default function SchoolDashboard() {
 
         <Card size="3" asChild><section className="admin-panel school-classes-panel">
           <div className="admin-panel-heading"><div><h2>Lớp học gần đây</h2></div><Button asChild variant="soft"><Link to="/school/classes">Tất cả lớp học</Link></Button></div>
-          {classesUnavailable ? <p className="school-license-unavailable" role="status">Không thể tải danh sách lớp. Hãy thử làm mới.</p> : classes.length === 0 ? <div className="school-empty-classes"><LearningIcon name="book" /><p>Trường chưa có lớp đang hoạt động.</p><Button asChild><Link to="/school/classes">Tạo lớp đầu tiên</Link></Button></div> : <div className="admin-table-scroll"><Table.Root variant="surface" size="2"><Table.Header><Table.Row><Table.ColumnHeaderCell>Lớp</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Năm học</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Giáo viên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Học sinh</Table.ColumnHeaderCell></Table.Row></Table.Header><Table.Body>{classes.slice(0, 5).map(item => <Table.Row key={item.id}><Table.RowHeaderCell><strong>{item.name}</strong><small className="school-class-subtitle">Khối {item.gradeLevel}</small></Table.RowHeaderCell><Table.Cell>{item.schoolYear}</Table.Cell><Table.Cell>{item.teachers}</Table.Cell><Table.Cell>{item.students}</Table.Cell></Table.Row>)}</Table.Body></Table.Root></div>}
+          {roster.loading ? <ClassTableLoading headers={["Lớp", "Năm học", "Giáo viên", "Học sinh"]} /> : classesUnavailable ? <p className="school-license-unavailable" role="status">Không thể tải danh sách lớp. Hãy thử làm mới.</p> : classes.length === 0 ? <div className="school-empty-classes"><LearningIcon name="book" /><p>Trường chưa có lớp đang hoạt động.</p><Button asChild><Link to="/school/classes">Tạo lớp đầu tiên</Link></Button></div> : <div className="admin-table-scroll"><Table.Root variant="surface" size="2"><Table.Header><Table.Row><Table.ColumnHeaderCell>Lớp</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Năm học</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Giáo viên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Học sinh</Table.ColumnHeaderCell></Table.Row></Table.Header><Table.Body>{classes.slice(0, 5).map(item => <Table.Row key={item.id}><Table.RowHeaderCell><strong>{item.name}</strong><small className="school-class-subtitle">Khối {item.gradeLevel}</small></Table.RowHeaderCell><Table.Cell>{item.schoolYear}</Table.Cell><Table.Cell>{item.teacherCount}</Table.Cell><Table.Cell>{item.studentCount}</Table.Cell></Table.Row>)}</Table.Body></Table.Root></div>}
         </section></Card>
       </motion.div>
     </>}

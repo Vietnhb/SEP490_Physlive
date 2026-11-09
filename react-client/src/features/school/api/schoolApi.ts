@@ -1,11 +1,13 @@
 import axiosClient from "../../../shared/api/client";
-import type { SchoolClassDetail, SchoolClassRequest, SchoolClassSummary } from "../types";
+import type { SchoolClassDetail, SchoolClassRequest, SchoolClassSummary, SchoolClassOverview } from "../types";
 
 const classesPath = (schoolId: string) => `/schools/${schoolId}/classes`;
 
-export const schoolClasses = (schoolId: string, includeInactive = false) => axiosClient.get<SchoolClassSummary[]>(classesPath(schoolId), { params: { includeInactive } }).then(r => r.data);
+export const schoolClasses = (schoolId: string, includeInactive = false, signal?: AbortSignal) => axiosClient.get<SchoolClassSummary[]>(classesPath(schoolId), { params: { includeInactive }, signal }).then(r => r.data);
 
 export const schoolClass = (schoolId: string, classId: string) => axiosClient.get<SchoolClassDetail>(`${classesPath(schoolId)}/${classId}`).then(r => r.data);
+
+export const schoolClassOverview = (schoolId: string, classId: string, signal?: AbortSignal) => axiosClient.get<SchoolClassOverview>(`${classesPath(schoolId)}/${classId}/overview`, { signal }).then(r => r.data);
 
 export const downloadSchoolClassStudentsCsv = async (schoolId: string, classId: string, className: string, schoolYear: string) => {
   const response = await axiosClient.get<Blob>(`${classesPath(schoolId)}/${classId}/students.csv`, { responseType: "blob" });

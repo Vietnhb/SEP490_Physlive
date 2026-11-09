@@ -1,21 +1,14 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { getLicenseStatus, type LicenseStatus } from "../features/account/api/userApi";
+import { useResource } from "../shared/hooks/operationsData";
+import { useState } from "react";
+import { type LicenseStatus } from "../features/account/api/userApi";
 import { useSessionStore } from "../shared/auth/sessionStore";
 import { isAccountSuspended } from "../shared/auth/permissions";
 
 export default function LicenseNotice() {
   const user = useSessionStore(state => state.user);
   const suspended = isAccountSuspended(user);
-  const { pathname } = useLocation();
-  const [license, setLicense] = useState<LicenseStatus | null>(null);
+  const { data: license } = useResource<LicenseStatus>("/user/me/license", Boolean(user?.schoolId) && !suspended);
   const [dismissedLicenseNoticeKey, setDismissedLicenseNoticeKey] = useState("");
-  useEffect(() => {
-    if (!user?.schoolId || suspended) return;
-    let active = true;
-    void getLicenseStatus().then(value => { if (active) setLicense(value); }).catch(() => { if (active) setLicense(null); });
-    return () => { active = false; };
-  }, [user?.id, user?.schoolId, suspended, pathname]);
   const effectiveLicense = user?.schoolId && !suspended ? license : null;
   const licenseNoticeKey = effectiveLicense
     ? `${user?.id}:${user?.schoolId}:${effectiveLicense.canPerformWriteOperations ? `renewal:${effectiveLicense.daysUntilExpiry}` : "inactive"}`

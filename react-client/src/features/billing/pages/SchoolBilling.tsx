@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, Button, Card, Table } from "@radix-ui/themes";
@@ -74,6 +75,7 @@ export default function SchoolBilling() {
       setLoading(false);
     }
   }, [setUser, user]);
+  useApiRefresh(["/school/billing", "/user/me/license"], load);
   useEffect(() => {
     void load();
   }, [load]);

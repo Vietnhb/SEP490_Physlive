@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
@@ -32,6 +33,7 @@ export function LawGapsDesk() {
     catch { setError("Chưa tải được danh sách. Vui lòng thử lại."); }
     finally { setLoading(false); }
   }, [filter]);
+  useApiRefresh(["/reviewer/law-gaps", "/schemas"], load);
   useEffect(() => { void load(); }, [load]);
 
   const decide = async (gap: Gap, status: Filter) => {

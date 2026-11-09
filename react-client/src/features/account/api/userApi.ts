@@ -1,11 +1,9 @@
+import { readData } from "../../../shared/api/readData";
 import type { User } from "../../../shared/auth/types";
 import type { PermissionCode } from "../../../shared/auth/permissions";
 import axiosClient from "../../../shared/api/client";
 
-export const getMe = async (): Promise<User> => {
-    const res = await axiosClient.get<User>("/user/me");
-    return res.data;
-};
+export const getMe = (): Promise<User> => readData<User>("/user/me", 0);
 export const updateProfile = async (payload: { fullName: string; dateOfBirth?: string }) => {
     const res = await axiosClient.put<User>("/user/me/profile", payload);
     return res.data;
@@ -29,7 +27,7 @@ export type LicenseStatus = {
     canPerformWriteOperations: boolean;
     licenseEnd: string | null;
 };
-export const getLicenseStatus = () => axiosClient.get<LicenseStatus>("/user/me/license").then(r => r.data);
+export const getLicenseStatus = () => readData<LicenseStatus>("/user/me/license");
 
 const usersPath = (schoolId?: string) => schoolId ? `/schools/${schoolId}/users` : "/admin/users";
 

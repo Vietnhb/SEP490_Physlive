@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Heading, Text } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
@@ -50,6 +51,7 @@ function useOverview(access: ReviewerAccess) {
     setFailed(expected > 0 && !library && !complaints && !gaps);
     setCounts(next); setLoading(false);
   }), [access.canEdit, access.canReview, canHandleComplaints]);
+  useApiRefresh(["/reviewer", "/evaluations", "/support/complaints"], load);
   useEffect(() => { void load(); }, [load]);
   return { counts, loading, failed, canHandleComplaints, refresh: () => { setLoading(true); setFailed(false); void load(); } };
 }

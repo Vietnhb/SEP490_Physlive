@@ -32,7 +32,7 @@ export default function SchoolSubscriptionDialog({ schoolId, onClose }: Readonly
         {loading ? <CardLoadingSkeleton cards={2} label="Đang tải thông tin gói…" /> : error ? <div role="alert"><p>{error}</p><Button variant="soft" onClick={() => { setLoading(true); setError(""); setRevision(value => value + 1); }}>Thử lại</Button></div> : data && <>
           <h3 className={s.schoolName}>{data.school.name}</h3>
           <dl className={s.details}>
-            <div><dt>Gói hiện tại</dt><dd>{data.planName || data.school.planCode || "Chưa gắn gói"}</dd></div>
+            <div><dt>Gói hiện tại</dt><dd>{data.planName || data.school.planCode || "Chưa mua gói"}</dd></div>
             <div><dt>Mã gói</dt><dd>{data.school.planCode || "—"}</dd></div>
             <div><dt>Trạng thái gói</dt><dd><Badge color={SUBSCRIPTION_STATUS[data.school.subscriptionStatus ?? "UNKNOWN"].color}>{SUBSCRIPTION_STATUS[data.school.subscriptionStatus ?? "UNKNOWN"].label}</Badge></dd></div>
             <div><dt>Ngày bắt đầu</dt><dd>{dateLabel(data.school.licenseStart)}</dd></div>

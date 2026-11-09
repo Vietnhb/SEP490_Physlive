@@ -1,9 +1,9 @@
+import { affectedBy, type DataChange } from "../../../shared/api/queryClient";
+import api from "../../../shared/api/client";
 import { useEffect, useState } from "react";
 import { DropdownMenu, IconButton } from "@radix-ui/themes";
 import { useNavigate } from "react-router-dom";
 import { paymentNotifications, type PaymentNotification } from "../../billing/api/billingApi";
-import { adminSupportItems } from "../../support/api/supportApi";
-import { getAdminAppeals } from "../../account/api/appealApi";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppSidebar";
 
@@ -18,18 +18,20 @@ export default function AdminLayout() {
     let revision = 0;
     const load = () => {
       const request = ++revision;
-      void Promise.all([adminSupportItems(), getAdminAppeals()]).then(([support, appeals]) => {
-        if (active && request === revision) setPendingSupport(support.filter(item => item.kind !== "COMPLAINT" && item.status !== "RESOLVED").length
-          + appeals.filter(item => item.status === "PENDING" && item.canResolve).length);
+      void api.get<{ count: number }>("/support/inbox/pending-count").then(({ data }) => {
+        if (active && request === revision) setPendingSupport(data.count);
       }).catch(() => { /* Keep the previous count if a refresh fails. */ });
     };
     load();
     const timer = window.setInterval(load, 30000);
     window.addEventListener("physlive:support-updated", load);
+    const changed = (event: Event) => { if (affectedBy("/support/inbox/pending-count", (event as CustomEvent<DataChange>).detail?.path)) load(); };
+    window.addEventListener("physlive:data-change", changed);
     window.addEventListener("focus", load);
     return () => {
       active = false; window.clearInterval(timer);
       window.removeEventListener("physlive:support-updated", load);
+      window.removeEventListener("physlive:data-change", changed);
       window.removeEventListener("focus", load);
     };
   }, []);

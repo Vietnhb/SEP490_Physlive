@@ -36,4 +36,7 @@ export interface SchoolClassDetail extends SchoolClassSummary {
   teachers: { id: number; fullName: string; email: string }[];
   students: { id: number; fullName: string; email: string }[];
 }
+export interface SchoolClassOverview extends Omit<SchoolClassSummary, "teacherCount"> {
+  teachers: { id: number; fullName: string; email: string }[];
+}
 export interface SchoolClassRequest { name: string; gradeLevel: number; schoolYear: string; subject: string; }

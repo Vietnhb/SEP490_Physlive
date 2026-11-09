@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
-import { loadTopicNames } from "../api/topicCatalog";
+import { useMemo } from "react";
+import { useResource } from "./operationsData";
 
-/** The Vietnamese name of a topic code; the code itself until the catalogue has loaded. */
+type TopicSchema = { topic?: string | null; name?: string | null; lifecycleStatus?: string | null };
 export function useTopicName() {
-  const [names, setNames] = useState<Map<string, string> | null>(null);
-  useEffect(() => { let active = true; void loadTopicNames().then(value => { if (active) setNames(value); }); return () => { active = false; }; }, []);
-  return (code?: string | null) => !code ? "" : names?.get(code) ?? code;
+  const { data } = useResource<TopicSchema[]>("/schemas");
+  const names = useMemo(() => {
+    const result = new Map<string, string>();
+    const rows = [...(data ?? [])].sort((a, b) => Number(b.lifecycleStatus === "APPROVED") - Number(a.lifecycleStatus === "APPROVED"));
+    for (const row of rows) if (row.topic && row.name && !result.has(row.topic)) result.set(row.topic, row.name);
+    return result;
+  }, [data]);
+  return (code?: string | null) => !code ? "" : names.get(code) ?? code;
 }

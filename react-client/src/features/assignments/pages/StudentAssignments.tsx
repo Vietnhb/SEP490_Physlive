@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
-import { Outlet, useNavigate, useOutletContext } from "react-router-dom";
+import { lazy, Suspense, type ReactNode } from "react";
+import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import { AssignmentList } from "../components/StudentAssignmentList";
 import { StudentClassOverview } from "../components/StudentClassOverview";
-import { AssignmentWorkbench } from "../components/StudentAssignmentWorkbench";
-import { ResourceDiscovery } from "../../library/components/ResourceDiscovery";
+const AssignmentWorkbench = lazy(() => import("../components/StudentAssignmentWorkbench").then(module => ({ default: module.AssignmentWorkbench })));
+const ResourceDiscovery = lazy(() => import("../../library/components/ResourceDiscovery").then(module => ({ default: module.ResourceDiscovery })));
 import { useAssignmentPractice } from "../hooks/useAssignmentPractice";
 import { useStudentResources } from "../hooks/useStudentResources";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -21,7 +21,8 @@ const useStudent = () => useOutletContext<StudentContext>();
 /** One data load for the whole student area; pages read it through the outlet context. */
 function StudentArea({ user }: Readonly<{ user: User | null }>) {
   const practice = useAssignmentPractice(user?.id);
-  const resources = useStudentResources(user?.id);
+  const { pathname } = useLocation();
+  const resources = useStudentResources(user?.id, pathname === "/student/community");
   const groups: SidebarGroup[] = [
     { items: [{ to: "/student", label: "Tổng quan", icon: "grid", end: true }] },
     { label: "Học tập", items: [
@@ -68,11 +69,11 @@ export function StudentHomePage() {
 export function StudentAssignmentsPage() {
   const { practice } = useStudent();
   return <StudentPage layout="assigned">
-    {practice.workbench ? <AssignmentWorkbench {...practice.workbench} /> : <AssignmentList {...practice.list} />}
+    {practice.workbench ? <Suspense fallback={<p role="status">Đang tải bài thực hành…</p>}><AssignmentWorkbench {...practice.workbench} /></Suspense> : <AssignmentList {...practice.list} />}
   </StudentPage>;
 }
 
 export function StudentCommunityPage() {
   const { practice, resources } = useStudent();
-  return <StudentPage layout="library"><ResourceDiscovery {...resources.discovery} vectors={practice.vectors} /></StudentPage>;
+  return <StudentPage layout="library"><Suspense fallback={<p role="status">Đang tải kho mô phỏng…</p>}><ResourceDiscovery {...resources.discovery} vectors={practice.vectors} /></Suspense></StudentPage>;
 }

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
+import type { DataPage } from "../../../shared/api/page";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button as ThemeButton, Select, TextField } from "@radix-ui/themes";
 import { apiMessage } from "../../../shared/lib/apiError";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { ErrorNotice } from "../../../shared/ui/ManagementUI";
 import {
-  adminPaymentAnalytics,
-  adminPayments,
   reconcileAdminPayment,
   type AdminPayment,
   type PaymentAnalytics,
@@ -131,11 +132,7 @@ export default function AdminPayments() {
   const [month, setMonth] = useState(initialNow.getMonth() + 1);
   const [quarter, setQuarter] = useState(Math.floor(initialNow.getMonth() / 3) + 1);
   const [date, setDate] = useState(() => `${initialNow.getFullYear()}-${String(initialNow.getMonth() + 1).padStart(2, "0")}-${String(initialNow.getDate()).padStart(2, "0")}`);
-  const requestRef = useRef(0);
-  const [items, setItems] = useState<AdminPayment[]>([]);
-  const [analytics, setAnalytics] = useState<PaymentAnalytics | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
   const [reconcilingId, setReconcilingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"ALL" | PaymentStatus>("ALL");
   const [query, setQuery] = useState("");
@@ -145,25 +142,14 @@ export default function AdminPayments() {
   const filter = useMemo<PaymentPeriodFilter>(() => ({ period, year, month, quarter, date, timezone }), [date, month, period, quarter, timezone, year]);
   const years = useMemo(() => Array.from({ length: 11 }, (_, index) => initialNow.getFullYear() - index), [initialNow]);
 
-  const load = useCallback(async () => {
-    const request = ++requestRef.current;
-    setLoading(true);
-    setAnalytics(null);
-    setError("");
-    try {
-      const [payments, report] = await Promise.all([adminPayments(filter), adminPaymentAnalytics(filter)]);
-      if (request !== requestRef.current) return;
-      setItems(payments);
-      setAnalytics(report);
-      setError("");
-    } catch (err) {
-      if (request === requestRef.current) setError(apiMessage(err, "Không thể tải dữ liệu thanh toán."));
-    } finally {
-      if (request === requestRef.current) setLoading(false);
-    }
-  }, [filter]);
-
-  useEffect(() => { const requests = requestRef; void load(); return () => { requests.current++; }; }, [load]);
+  const search = useDebouncedValue(query);
+  const periodParams = new URLSearchParams(Object.entries(filter).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])).toString();
+  const transactions = useResource<DataPage<AdminPayment>>(`/admin/payments/page?${periodParams}&page=${page - 1}&size=${pageSize}&status=${activeTab}&query=${encodeURIComponent(search)}`);
+  const report = useResource<PaymentAnalytics>(`/admin/payment-analytics?${periodParams}`);
+  const items = transactions.data?.items ?? [];
+  const analytics = report.data ?? null;
+  const loading = report.loading || transactions.loading;
+  const load = () => { transactions.refresh(); report.refresh(); };
   useEffect(() => { setPage(1); setActiveTab("ALL"); }, [period, year, month, quarter, date]);
 
   const reconcile = async (id: string) => {
@@ -179,17 +165,11 @@ export default function AdminPayments() {
   };
 
   const statusCount = useCallback((status: PaymentStatus) => analytics?.statuses.find(item => item.status === status)?.transactions ?? 0, [analytics]);
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return items.filter(item => {
-      if (activeTab !== "ALL" && normalizeStatus(item.status) !== activeTab) return false;
-      return !normalizedQuery || `${item.schoolName} ${item.managerEmail} ${item.planCode} ${item.id}`.toLowerCase().includes(normalizedQuery);
-    });
-  }, [activeTab, items, query]);
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
+  const total = transactions.data?.totalElements ?? 0;
+  const pageCount = Math.max(1, transactions.data?.totalPages ?? 1);
+  const currentPage = transactions.data ? transactions.data.page + 1 : page;
   const pageStart = (currentPage - 1) * pageSize;
-  const visibleItems = filteredItems.slice(pageStart, pageStart + pageSize);
+  const visibleItems = items;
 
   const kpis = analytics?.kpis;
   return <div className="admin-content">
@@ -207,7 +187,7 @@ export default function AdminPayments() {
       </div>
     </header>
 
-    {error && <ErrorNotice error={error} onRetry={() => void load()} />}
+    {(error || report.error || transactions.error) && <ErrorNotice error={error || report.error || transactions.error || ""} onRetry={() => void load()} />}
     {loading && !analytics ? <DashboardSkeleton /> : analytics && <>
       <section className={styles.kpiGrid} aria-label={`Tổng quan ${periodDescription(filter)}`}>
         <article className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.blue}`}><LearningIcon name="chart" /></div><span>Doanh thu đã thanh toán</span><strong title={formatVnd(kpis?.grossPaidVnd ?? 0)}>{formatVnd(kpis?.grossPaidVnd ?? 0)}</strong><small>{periodDescription(filter)}</small></article>
@@ -244,7 +224,7 @@ export default function AdminPayments() {
 
           <div className={styles.mobileList}>{visibleItems.length === 0 ? <div className={styles.mobileEmpty}>Không có giao dịch phù hợp.</div> : visibleItems.map(item => { const status = normalizeStatus(item.status); const config = STATUS_CONFIG[status]; const relevantTime = status === "PAID" && item.paidAt ? item.paidAt : item.createdAt; return <article key={item.id} className={styles.mobilePayment}><div className={styles.mobilePaymentHeading}><div><strong>{item.schoolName || "Chưa xác định"}</strong><span>{item.managerEmail || "—"}</span></div><span className={`${styles.status} ${config.className}`}>{config.label}</span></div><dl><div><dt>Gói</dt><dd>{item.planCode} · {PURPOSE_LABELS[item.purpose] ?? item.purpose}</dd></div><div><dt>Số tiền</dt><dd>{formatVnd(item.amountVnd)}</dd></div><div><dt>Thời gian</dt><dd>{new Date(relevantTime).toLocaleString("vi-VN")}</dd></div><div><dt>Mã</dt><dd>{item.id.slice(0, 8).toUpperCase()}</dd></div></dl>{status === "PENDING" && <ThemeButton type="button" size="2" variant="soft" color="gray" loading={reconcilingId === item.id} disabled={reconcilingId !== null} onClick={() => void reconcile(item.id)}>Đối soát giao dịch</ThemeButton>}</article>; })}</div>
 
-          <div className="admin-table-pagination"><span aria-live="polite">{filteredItems.length === 0 ? "0 giao dịch" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, filteredItems.length)} / ${filteredItems.length} giao dịch`}</span><div><label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); }}><Select.Trigger aria-label="Số giao dịch trên mỗi trang" /><Select.Content>{PAGE_SIZES.map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</ThemeButton><span>Trang {currentPage}/{pageCount}</span><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</ThemeButton></div></div>
+          <div className="admin-table-pagination"><span aria-live="polite">{total === 0 ? "0 giao dịch" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, total)} / ${total} giao dịch`}</span><div><label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); }}><Select.Trigger aria-label="Số giao dịch trên mỗi trang" /><Select.Content>{PAGE_SIZES.map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</ThemeButton><span>Trang {currentPage}/{pageCount}</span><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</ThemeButton></div></div>
         </>}
       </section>
     </>}

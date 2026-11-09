@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { adjustAssignedSimulation, assignedSimulation, studentAssignments, submitAssignmentPrediction, completeAssignment, logStudentAction } from "../api/assignmentApi";
 import { createSimulationAdjustment } from "../../simulation/model/simulationAdjustment";
@@ -22,6 +23,7 @@ export function useAssignmentPractice(userId: number | undefined) {
   // Assigned items
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const assignmentsLoaded = useRef(false);
   const [error, setError] = useState("");
 
   // Selected assignment for practicing
@@ -75,17 +77,19 @@ export function useAssignmentPractice(userId: number | undefined) {
   const loadAssignments = useCallback(async () => {
     if (!isCurrentSession()) return;
     const requestId = ++listRequestRef.current;
-    setLoading(true);
+    setLoading(!assignmentsLoaded.current);
     setError("");
     try {
       const data = await studentAssignments();
-      if (isCurrentSession() && requestId === listRequestRef.current) setAssignments(data);
+      if (isCurrentSession() && requestId === listRequestRef.current) { assignmentsLoaded.current = true; setAssignments(data); }
     } catch {
       if (isCurrentSession() && requestId === listRequestRef.current) setError("Không thể tải danh sách bài tập được giao.");
     } finally {
       if (isCurrentSession() && requestId === listRequestRef.current) setLoading(false);
     }
   }, [isCurrentSession]);
+
+  useApiRefresh(["/assignments", "/student/classes"], loadAssignments);
 
   const clearParameterState = useCallback(() => {
     parameterAdjustment.cancel();

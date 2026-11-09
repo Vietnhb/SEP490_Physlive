@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { getSharedSimulation } from "../../simulation/api/simulationApi";
 import { communityLibrary } from "../../library/api/libraryApi";
@@ -8,7 +9,7 @@ import { useSessionStore } from "../../../shared/auth/sessionStore";
 import type { Curriculum, LibraryItem, Simulation } from "../../../shared/types/physlive";
 import type { ResourceDiscovery } from "../../library/components/ResourceDiscovery";
 
-export function useStudentResources(userId: number | undefined) {
+export function useStudentResources(userId: number | undefined, loadLibrary = true) {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,14 +62,16 @@ export function useStudentResources(userId: number | undefined) {
 
   useEffect(() => {
     mountedRef.current = true;
-    void load();
+    if (loadLibrary) void load();
     void loadClasses();
     return () => {
       mountedRef.current = false;
       listRequestRef.current += 1;
       simulationRequestRef.current += 1;
     };
-  }, [load, loadClasses]);
+  }, [load, loadClasses, loadLibrary]);
+  useApiRefresh(["/student/classes"], loadClasses);
+  useApiRefresh(["/library", "/curriculum"], () => { if (loadLibrary) return load(); });
 
   const close = () => {
     simulationRequestRef.current += 1;

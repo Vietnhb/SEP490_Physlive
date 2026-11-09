@@ -1,3 +1,4 @@
+import { apiKey, queryClient, sessionScope } from "../../../shared/api/queryClient";
 import { useEffect, useRef, useState } from "react";
 import { getSharedSimulation } from "../../simulation/api/simulationApi";
 import { openSharedGeneratedSimulation, type GeneratedSimulationResult } from "../../simulation/api/simulationUnderstandingApi";
@@ -17,7 +18,6 @@ const MAX_PARALLEL = 2;
 /** Each live scene is a sandboxed frame with its own renderer, so only a handful run at once. */
 const MAX_LIVE = 6;
 
-const cache = new Map<string, Promise<Preview>>();
 let running = 0;
 const waiting: (() => void)[] = [];
 const slot = () => new Promise<void>(resolve => { if (running < MAX_PARALLEL) { running += 1; resolve(); } else waiting.push(resolve); });
@@ -73,12 +73,16 @@ async function fetchPreview(simulationId: string): Promise<Preview> {
 }
 
 function load(simulationId: string) {
-  let entry = cache.get(simulationId);
-  if (!entry) {
-    entry = slot().then(() => fetchPreview(simulationId)).catch(() => ({ scene: null, curve: null })).finally(release);
-    cache.set(simulationId, entry);
-  }
-  return entry;
+  const previews = queryClient.getQueryCache().findAll({ predicate: query => String(query.queryKey[2]).endsWith("/preview") });
+  if (previews.length > 60) previews.filter(query => query.getObserversCount() === 0)
+    .sort((a, b) => a.state.dataUpdatedAt - b.state.dataUpdatedAt).slice(0, previews.length - 60)
+    .forEach(query => queryClient.removeQueries({ queryKey: query.queryKey, exact: true }));
+  const scope = sessionScope();
+  return queryClient.fetchQuery({ queryKey: apiKey(`/simulations/${simulationId}/preview`), staleTime: 60_000,
+    queryFn: async ({ signal }) => { await slot(); try {
+      if (signal.aborted || scope !== sessionScope()) return { scene: null, curve: null };
+      return await fetchPreview(simulationId);
+    } finally { release(); } } });
 }
 
 /**

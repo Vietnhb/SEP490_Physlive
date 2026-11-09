@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Dialog, Flex, Select, TextArea, TextField } from "@radix-ui/themes";
 import { getAdminAppeals, resolveAppeal, type Appeal } from "../api/appealApi";
@@ -26,6 +27,7 @@ export default function AccountAppeals() {
     catch (err) { setError(apiMessage(err, "Không thể tải khiếu nại.")); }
     finally { setLoading(false); }
   }, []);
+  useApiRefresh(["/appeals", "/support/mine"], load);
   useEffect(() => { void load(); }, [load]);
   const filtered = items.filter(item => (filter === "ALL" || item.status === filter)
     && `${item.userName} ${item.userEmail} ${item.reason}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")));

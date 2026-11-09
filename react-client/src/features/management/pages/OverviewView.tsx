@@ -1,50 +1,22 @@
-import { useEffect, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
 import { Badge, Heading, Progress, Text } from "@radix-ui/themes";
-import { adminUsers } from "../../account/api/userApi";
-import { adminSchools, type ManagedSchool } from "../../school/api/schoolApi";
-import { validationMetrics } from "../api/operationsApi";
-import type { User } from "../../../shared/auth/types";
-import { apiMessage } from "../../../shared/lib/apiError";
 import { ErrorNotice, Panel, Stat } from "../../../shared/ui/ManagementUI";
 import { DashboardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 
-const SYSTEM_ROLES = new Set(["ADMIN", "MANAGER"]);
-const SCHOOL_ROLES = new Set(["SCHOOL", "STAFF"]);
-
 export function OverviewView() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [schools, setSchools] = useState<ManagedSchool[]>([]);
-  const [metrics, setMetrics] = useState<{ total: number; failed: number; failureRate: number } | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [nextUsers, nextSchools, nextMetrics] = await Promise.all([
-        adminUsers(),
-        adminSchools(),
-        validationMetrics(),
-      ]);
-      setUsers(nextUsers);
-      setSchools(nextSchools);
-      setMetrics(nextMetrics);
-      setError("");
-    } catch (e) {
-      setError(apiMessage(e, "Không thể tải tổng quan."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { void load(); }, []);
-
-  const activeUsers = users.filter(item => item.active !== false).length;
-  const teachers = users.filter(item => item.role === "STAFF").length;
-  const systemAccounts = users.filter(item => SYSTEM_ROLES.has(item.role)).length;
-  const schoolAccounts = users.filter(item => SCHOOL_ROLES.has(item.role)).length;
-  const individualAccounts = users.length - systemAccounts - schoolAccounts;
-  const activeSchools = schools.filter(item => item.active).length;
+  const resource = useResource<{ accounts: Record<string, number>; schools: number; activeSchools: number; validation: { total: number; failed: number; failureRate: number } }>("/admin/overview-counts");
+  const counts = resource.data?.accounts ?? {};
+  const total = counts.total ?? 0;
+  const metrics = resource.data?.validation;
+  const loading = resource.loading;
+  const error = resource.error;
+  const load = resource.refresh;
+  const activeUsers = total - (counts.suspended ?? 0);
+  const teachers = counts.STAFF ?? 0;
+  const systemAccounts = (counts.ADMIN ?? 0) + (counts.MANAGER ?? 0);
+  const schoolAccounts = (counts.SCHOOL ?? 0) + (counts.STAFF ?? 0);
+  const individualAccounts = total - systemAccounts - schoolAccounts;
+  const activeSchools = resource.data?.activeSchools ?? 0;
   const passed = metrics ? metrics.total - metrics.failed : 0;
   const hasValidationData = Boolean(metrics?.total);
   const rate = hasValidationData && metrics ? (passed / metrics.total) * 100 : 0;
@@ -57,10 +29,10 @@ export function OverviewView() {
       {error && <ErrorNotice error={error} onRetry={() => void load()} />}
 
       <div className="admin-stats-grid">
-        <Stat label="Tổng người dùng" value={users.length} icon="users" tone="blue" />
-        <Stat label="Đang hoạt động" value={activeUsers} icon="activity" tone="green" note={`${users.length - activeUsers} tài khoản tạm khóa`} />
+        <Stat label="Tổng người dùng" value={total} icon="users" tone="blue" />
+        <Stat label="Đang hoạt động" value={activeUsers} icon="activity" tone="green" note={`${total - activeUsers} tài khoản tạm khóa`} />
         <Stat label="Giáo viên" value={teachers} icon="book" tone="orange" />
-        <Stat label="Trường học" value={schools.length} icon="grid" tone="purple" note={`${activeSchools} đang hoạt động`} />
+        <Stat label="Trường học" value={(resource.data?.schools ?? 0)} icon="grid" tone="purple" note={`${activeSchools} đang hoạt động`} />
       </div>
 
       <div className="admin-dashboard-grid">
@@ -75,7 +47,7 @@ export function OverviewView() {
           </div>
         </Panel>
 
-        <Panel title="Phân bổ tài khoản" description={`Ba nhóm bao phủ toàn bộ ${users.length} tài khoản.`}>
+        <Panel title="Phân bổ tài khoản" description={`Ba nhóm bao phủ toàn bộ ${total} tài khoản.`}>
           <div className="admin-breakdown-list">
             <div><Text>Quản trị hệ thống</Text><Badge color="gray" size="2">{systemAccounts}</Badge></div>
             <div><Text>Trường học</Text><Badge color="gray" size="2">{schoolAccounts}</Badge></div>

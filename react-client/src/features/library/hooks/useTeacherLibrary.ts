@@ -1,3 +1,5 @@
+import { sessionScope } from "../../../shared/api/queryClient";
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { libraryFolders, personalLibrary } from "../api/libraryApi";
@@ -7,6 +9,7 @@ import type { LibraryFolder, LibraryItem } from "../../../shared/types/physlive"
 import { canTeach } from "../../../shared/auth/permissions";
 import { useTopicName } from "../../../shared/hooks/useTopicName";
 
+const librarySession = () => getToken() ? String(sessionScope()) : null;
 const FRESH_MS = 60_000;
 const emptyFolders: LibraryFolder[] = [];
 const emptyItems: LibraryItem[] = [];
@@ -23,9 +26,13 @@ export const teacherLibraryStore = create<LibraryState>(() => ({
   loading: false, error: "", loadedAt: 0,
 }));
 let pending: { session: string; promise: Promise<void> } | undefined;
+window.addEventListener("physlive:session-reset", () => {
+  pending = undefined;
+  teacherLibraryStore.setState({ session: null, folders: emptyFolders, items: emptyItems, loading: false, error: "", loadedAt: 0 });
+});
 
 export function loadTeacherLibrary(force = false): Promise<void> {
-  const session = getToken();
+  const session = librarySession();
   if (!session) return Promise.resolve();
   if (pending?.session === session) return pending.promise;
   if (teacherLibraryStore.getState().session !== session) {
@@ -38,7 +45,7 @@ export function loadTeacherLibrary(force = false): Promise<void> {
   pending = request;
   request.promise = Promise.all([libraryFolders(), personalLibrary()])
     .then(([folders, items]) => {
-      if (pending !== request || getToken() !== session) return;
+      if (pending !== request || librarySession() !== session) return;
       const current = teacherLibraryStore.getState();
       teacherLibraryStore.setState({
         // A refresh must not overwrite a folder/item saved while it was in flight.
@@ -48,7 +55,7 @@ export function loadTeacherLibrary(force = false): Promise<void> {
       });
     })
     .catch(() => {
-      if (pending === request && getToken() === session) teacherLibraryStore.setState({ error: "Chưa tải được thư viện cá nhân." });
+      if (pending === request && librarySession() === session) teacherLibraryStore.setState({ error: "Chưa tải được thư viện cá nhân." });
     })
     .finally(() => {
       if (pending === request) {
@@ -62,15 +69,16 @@ export function loadTeacherLibrary(force = false): Promise<void> {
 export function useTeacherLibrary() {
   const topicName = useTopicName();
   const user = useSessionStore(state => state.user);
-  const session = getToken();
+  const session = librarySession();
   const state = teacherLibraryStore();
   const enabled = Boolean(session) && canTeach(user);
   useEffect(() => {
     if (enabled) void loadTeacherLibrary();
   }, [enabled, session, user?.id]);
+  useApiRefresh(["/library"], () => { if (enabled) return loadTeacherLibrary(true); });
   const visible = enabled && state.session === session;
   const update = (patch: Partial<LibraryState>) => {
-    if (visible && getToken() === session) teacherLibraryStore.setState(patch);
+    if (visible && librarySession() === session) teacherLibraryStore.setState(patch);
   };
   return {
     folders: visible ? state.folders : emptyFolders,

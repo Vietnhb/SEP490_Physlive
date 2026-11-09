@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiKey, sessionScope } from "../api/queryClient";
+import { useRef, useState } from "react";
 import axios from "axios";
 import api from "../api/client";
 
@@ -8,16 +10,13 @@ export function message(error: unknown) {
   return "Thao tác chưa hoàn tất.";
 }
 
-export function useResource<T>(url: string) {
-  const [revision, setRevision] = useState(0);
-  const key = `${url}:${revision}`;
-  const [result, setResult] = useState<{ key: string; data?: T; error?: string }>({ key: "" });
-  useEffect(() => {
-    const controller = new AbortController();
-    void api.get<T>(url, { signal: controller.signal }).then((response) => { if (!controller.signal.aborted) setResult({ key, data: response.data }); }).catch((error) => { if (!controller.signal.aborted) setResult({ key, error: message(error) }); });
-    return () => controller.abort();
-  }, [url, key]);
-  return { data: result.key === key ? result.data : undefined, error: result.key === key ? result.error : undefined, loading: result.key !== key, refresh: () => setRevision((value) => value + 1) };
+export function useResource<T>(url: string, enabled = true) {
+  const result = useQuery<T>({ enabled, queryKey: apiKey(url), placeholderData: (previous, query) => {
+    const scope = (value: string) => { const parsed = new URL(value, "https://physlive.local"); parsed.searchParams.delete("page"); parsed.searchParams.delete("size"); return parsed.pathname + parsed.search; };
+    return query?.queryKey[1] === sessionScope() && scope(String(query.queryKey[2])) === scope(url) ? previous : undefined;
+  }, queryFn: ({ signal }) => api.get<T>(url, { signal }).then(response => response.data) });
+  return { data: result.data, error: result.error ? message(result.error) : undefined,
+    loading: result.isPending, refreshing: result.isFetching, refresh: () => result.refetch() };
 }
 
 export function useAction() {

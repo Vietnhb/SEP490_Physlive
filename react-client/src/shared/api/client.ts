@@ -1,3 +1,4 @@
+import { invalidateServerData } from "./queryClient";
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { API_URL } from "../../config/api";
 import { clearToken, getToken } from "../lib/token";
@@ -19,7 +20,11 @@ axiosClient.interceptors.request.use((config) => {
     return config;
 });
 type ReadRetryConfig = InternalAxiosRequestConfig & { readRetryCount?: number };
-axiosClient.interceptors.response.use(response => response, async (error: unknown) => {
+axiosClient.interceptors.response.use(response => {
+    if (["post", "put", "patch", "delete"].includes(response.config.method ?? "")
+      && !/\/(auth\/login|billing\/quote)$/.test(response.config.url ?? "")) invalidateServerData(response.config.url);
+    return response;
+}, async (error: unknown) => {
     if (!axios.isAxiosError(error) || axios.isCancel(error)) throw error;
     const config = error.config as ReadRetryConfig | undefined;
     const status = error.response?.status;
@@ -39,9 +44,9 @@ axiosClient.interceptors.response.use(response => response, async (error: unknow
             useSessionStore.getState().setUser(null);
         }
     }
-    const transient = status === undefined || [500, 502, 503, 504].includes(status);
+    const transient = error.code !== "ECONNABORTED" && (status === undefined || [502, 503, 504].includes(status));
     if (!config) throw error;
-    if (config?.method !== "get" || !transient || (config.readRetryCount ?? 0) >= 2) throw error;
+    if (config?.method !== "get" || !transient || (config.readRetryCount ?? 0) >= 1) throw error;
     const authorization = config.headers.Authorization;
     config.readRetryCount = (config.readRetryCount ?? 0) + 1;
     await new Promise(resolve => setTimeout(resolve, 500 * config.readRetryCount!));

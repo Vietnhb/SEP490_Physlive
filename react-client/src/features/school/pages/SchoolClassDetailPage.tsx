@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AlertDialog, Badge, Button, Card, Popover, Select, Table, TextField } from "@radix-ui/themes";
 import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, DownloadIcon, MagnifyingGlassIcon, Pencil1Icon } from "@radix-ui/react-icons";
@@ -79,7 +80,7 @@ export default function SchoolClassDetailPage() {
       setDetail(nextDetail);
       setClasses(nextClasses);
       setUsers(nextUsers);
-      setForm({ name: nextDetail.name, gradeLevel: nextDetail.gradeLevel, schoolYear: nextDetail.schoolYear, subject: nextDetail.subject ?? "" });
+      if (showSkeleton) setForm({ name: nextDetail.name, gradeLevel: nextDetail.gradeLevel, schoolYear: nextDetail.schoolYear, subject: nextDetail.subject ?? "" });
     } catch (err) {
       setError(apiMessage(err, "Không thể tải chi tiết lớp học."));
     } finally {
@@ -110,6 +111,7 @@ export default function SchoolClassDetailPage() {
   const pageStart = (currentPage - 1) * studentPageSize;
   const visibleStudents = detail?.students.slice(pageStart, pageStart + studentPageSize) ?? [];
 
+  useApiRefresh(["/schools/classes", "/schools/users"], () => load(false));
   const runAction = async (work: () => Promise<unknown>, successMessage: string) => {
     if (busy) return;
     setBusy(true);

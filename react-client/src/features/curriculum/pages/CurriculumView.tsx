@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useEffect, useState, type FormEvent } from "react";
 import { Badge, Button, Callout, Dialog, Select, Switch, TextField } from "@radix-ui/themes";
 import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
@@ -37,6 +38,7 @@ export function CurriculumView() {
     catch (e) { setError(apiMessage(e, "Không thể tải chương trình học.")); }
     finally { setLoading(false); }
   };
+  useApiRefresh(["/curriculum", "/schemas"], load);
   useEffect(() => { void load(); }, []);
 
   const create = async (event: FormEvent) => {

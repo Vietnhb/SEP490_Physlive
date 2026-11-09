@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
+import type { DataPage } from "../../../shared/api/page";
+import { useRef, useState, type FormEvent } from "react";
 import { AlertDialog, Badge, Button, Callout, Card, Dialog, Flex, Select, Table, TextField } from "@radix-ui/themes";
 import { EyeOpenIcon, MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
 import { motion, useReducedMotion } from "motion/react";
 import { useNavigate } from "react-router-dom";
-import { archiveSchoolClass, createSchoolClass, restoreSchoolClass, schoolClasses } from "../api/schoolApi";
+import { archiveSchoolClass, createSchoolClass, restoreSchoolClass } from "../api/schoolApi";
 import type { SchoolClassRequest, SchoolClassSummary } from "../types";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -12,7 +15,6 @@ import { ClassTableLoading } from "./SchoolLoading";
 import { FormField } from "../../../shared/ui/ManagementUI";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 
-const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("vi");
 const blankClass = (): SchoolClassRequest => {
   const today = new Date();
   const year = today.getMonth() >= 7 ? today.getFullYear() : today.getFullYear() - 1;
@@ -24,13 +26,11 @@ export default function SchoolClasses() {
   const navigate = useNavigate();
   const schoolId = useSessionStore(state => state.user?.schoolId);
   const actorRole = useSessionStore(state => state.user?.role);
-  const [items, setItems] = useState<SchoolClassSummary[]>([]);
   const [query, setQuery] = useState("");
   const [grade, setGrade] = useState("ALL");
   const [schoolYear, setSchoolYear] = useState("ALL");
   const [status, setStatus] = useState("ACTIVE");
   const [classPage, setClassPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [statusTarget, setStatusTarget] = useState<SchoolClassSummary | null>(null);
@@ -46,7 +46,7 @@ export default function SchoolClasses() {
     createLock.current = true; setBusy(true); setFormError(""); setNotice("");
     try {
       const created = await createSchoolClass(schoolId, { ...form, name: form.name.trim(), schoolYear: form.schoolYear.trim(), subject: form.subject.trim() });
-      setItems(current => [{ ...created, teacherCount: created.teachers.length, studentCount: created.students.length }, ...current]);
+      load();
       setQuery(""); setGrade("ALL"); setSchoolYear("ALL"); setStatus("ACTIVE"); setClassPage(1);
       setShowCreate(false); setForm(blankClass());
       setNotice(`Đã tạo lớp ${created.name}. Bạn có thể chọn Sửa để phân công giáo viên và thêm học sinh.`);
@@ -57,39 +57,19 @@ export default function SchoolClasses() {
     }
   };
 
-  const load = useCallback(async () => {
-    if (!schoolId) return;
-    setLoading(true);
-    setError("");
-    try {
-      setItems(await schoolClasses(schoolId, true));
-    } catch (err) {
-      setError(apiMessage(err, "Không thể tải danh sách lớp."));
-    } finally {
-      setLoading(false);
-    }
-  }, [schoolId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => { void load(); }, 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
-
-  const years = useMemo(() => [...new Set(items.map(item => item.schoolYear))].sort((a, b) => b.localeCompare(a)), [items]);
-  const filteredItems = useMemo(() => {
-    const needle = normalize(query.trim());
-    return items.filter(item => {
-      const matchesQuery = !needle || normalize(`${item.name} ${item.subject ?? ""}`).includes(needle);
-      return matchesQuery && (grade === "ALL" || String(item.gradeLevel) === grade) && (schoolYear === "ALL" || item.schoolYear === schoolYear)
-        && (status === "ALL" || item.active === (status === "ACTIVE"));
-    });
-  }, [grade, items, query, schoolYear, status]);
-
+  const search = useDebouncedValue(query);
+  const params = new URLSearchParams({ page: String(classPage - 1), size: "10", query: search, year: schoolYear, status });
+  if (grade !== "ALL") params.set("grade", grade);
+  const resource = useResource<DataPage<SchoolClassSummary> & { years: string[] }>(`/schools/${schoolId}/classes/page?${params}`, Boolean(schoolId));
+  const total = resource.data?.totalElements ?? 0;
+  const years = resource.data?.years ?? [];
+  const loading = resource.loading;
+  const load = resource.refresh;
   const classPageSize = 10;
-  const classPageCount = Math.max(1, Math.ceil(filteredItems.length / classPageSize));
-  const currentClassPage = Math.min(classPage, classPageCount);
+  const classPageCount = Math.max(1, resource.data?.totalPages ?? 1);
+  const currentClassPage = resource.data ? resource.data.page + 1 : classPage;
   const classPageStart = (currentClassPage - 1) * classPageSize;
-  const visibleClasses = filteredItems.slice(classPageStart, classPageStart + classPageSize);
+  const visibleClasses = resource.data?.items ?? [];
 
   const updateQuery = (value: string) => { setQuery(value); setClassPage(1); };
   const updateGrade = (value: string) => { setGrade(value); setClassPage(1); };
@@ -104,11 +84,11 @@ export default function SchoolClasses() {
     try {
       if (target.active) {
         await archiveSchoolClass(schoolId, target.id);
-        setItems(current => current.map(item => item.id === target.id ? { ...item, active: false, teacherCount: 0, studentCount: 0 } : item));
+        load();
         setNotice(`Đã tắt lớp ${target.name}. Có thể mở lại trong bộ lọc Đã tắt.`);
       } else {
         const restored = await restoreSchoolClass(schoolId, target.id);
-        setItems(current => current.map(item => item.id === restored.id ? restored : item));
+        load();
         setStatus("ACTIVE"); setClassPage(1);
         setNotice(`Đã mở lại lớp ${restored.name}. Chọn Sửa để phân công giáo viên và xếp học sinh lại.`);
       }
@@ -123,12 +103,12 @@ export default function SchoolClasses() {
 
   return <div className="admin-content">
     {notice && <Callout.Root color="green" role="status" mb="4"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
-    {error && <div className="admin-error-banner" role="alert">{error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
+    {(error || resource.error) && <div className="admin-error-banner" role="alert">{error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
 
     <motion.div className="school-classes-grid" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0 : .18 }}>
       <Card asChild size="3"><section className="admin-panel">
         <div className="admin-panel-heading">
-          <div><h2>Danh sách lớp</h2><p className="admin-panel-description">{loading ? "Đang tải dữ liệu lớp học…" : `${filteredItems.length.toLocaleString("vi-VN")} lớp ${status === "ACTIVE" ? "đang hoạt động" : status === "INACTIVE" ? "đã tắt" : "phù hợp"}`}</p></div>
+          <div><h2>Danh sách lớp</h2><p className="admin-panel-description">{loading ? "Đang tải dữ liệu lớp học…" : `${total.toLocaleString("vi-VN")} lớp ${status === "ACTIVE" ? "đang hoạt động" : status === "INACTIVE" ? "đã tắt" : "phù hợp"}`}</p></div>
           {actorRole === "SCHOOL" && <Button disabled={busy || loading} onClick={() => { setForm(blankClass()); setFormError(""); setNotice(""); setShowCreate(true); }}><PlusIcon />Tạo lớp</Button>}
         </div>
 
@@ -181,7 +161,7 @@ export default function SchoolClasses() {
               </Table.Row>)}
             </Table.Body>
           </Table.Root></div>
-          {filteredItems.length > 0 && <Pagination start={classPageStart} pageSize={classPageSize} total={filteredItems.length} page={currentClassPage} pageCount={classPageCount} onPageChange={setClassPage} />}
+          {total > 0 && <Pagination start={classPageStart} pageSize={classPageSize} total={total} page={currentClassPage} pageCount={classPageCount} onPageChange={setClassPage} />}
         </>}
       </section></Card>
 

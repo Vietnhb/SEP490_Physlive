@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, Button, Dialog, IconButton, Select, TextArea, TextField } from "@radix-ui/themes";
@@ -56,6 +57,7 @@ export default function MySupport() {
     catch (err) { setError(apiMessage(err, "Không thể tải lịch sử yêu cầu. Vui lòng thử lại.")); }
     finally { setLoading(false); }
   }, []);
+  useApiRefresh(["/support/mine", "/appeals"], load);
   useEffect(() => { void load(); }, [load]);
   const suspended = isAccountSuspended(user);
   const internalAdmin = suspended && ["MANAGER", "ADMIN"].includes(user?.role ?? "");

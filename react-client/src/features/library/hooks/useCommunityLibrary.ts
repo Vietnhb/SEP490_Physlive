@@ -1,3 +1,4 @@
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { communityLibrary } from "../api/libraryApi";
 import { curriculum as getCurriculum } from "../../curriculum/api/curriculumApi";
@@ -40,6 +41,7 @@ export function useCommunityLibrary() {
     }
   }, []);
 
+  useApiRefresh(["/library", "/curriculum"], load);
   useEffect(() => {
     void load();
     return () => { listRequestRef.current += 1; requestRef.current += 1; };

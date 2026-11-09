@@ -1,3 +1,4 @@
+import { sessionScope } from "../shared/api/queryClient";
 import { useEffect } from "react";
 import AppRoutes from "./AppRoutes";
 import AppShell from "./AppShell";
@@ -21,7 +22,7 @@ export default function App() {
     return () => { active = false; };
   }, [hasUser, realtimeRevision, setUser]);
   return (
-    <AppShell key={realtimeRevision}>
+    <AppShell key={sessionScope()}>
       <AppRoutes authReady={authReady} />
     </AppShell>
   );

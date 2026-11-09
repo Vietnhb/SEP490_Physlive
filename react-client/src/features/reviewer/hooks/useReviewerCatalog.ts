@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import api from "../../../shared/api/client";
+import { useMemo } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
 import type { Version } from "../model/reviewerTypes";
 
 /** Vietnamese names for topic codes (KINEMATICS) and quantity keys (initial_velocity),
@@ -7,13 +7,11 @@ import type { Version } from "../model/reviewerTypes";
 export type ReviewerCatalog = { topicName: (code?: string | null) => string; quantityLabel: (key?: string | null) => string; humanize: (text?: string | null) => string };
 
 type Maps = { topics: Map<string, string>; quantities: Map<string, string> };
-let cache: Promise<Maps> | null = null;
 
-function load(): Promise<Maps> {
-  cache ??= api.get<Version[]>("/schemas").then(response => {
+function buildMaps(data: Version[]): Maps {
     const topics = new Map<string, string>();
     const quantities = new Map<string, string>();
-    const ordered = [...response.data].sort((a, b) => Number(b.lifecycleStatus === "APPROVED") - Number(a.lifecycleStatus === "APPROVED"));
+    const ordered = [...data].sort((a, b) => Number(b.lifecycleStatus === "APPROVED") - Number(a.lifecycleStatus === "APPROVED"));
     for (const schema of ordered) {
       if (schema.topic && schema.name && !topics.has(schema.topic)) topics.set(schema.topic, schema.name);
       const definition = schema.definition as { quantityDefinitions?: { key?: string; label?: string }[] } | undefined;
@@ -22,15 +20,13 @@ function load(): Promise<Maps> {
       }
     }
     return { topics, quantities };
-  }).catch(() => { cache = null; return { topics: new Map(), quantities: new Map() }; });
-  return cache;
 }
 
 const prettyKey = (key: string) => key.replace(/_/g, " ");
 
 export function useReviewerCatalog(): ReviewerCatalog {
-  const [maps, setMaps] = useState<Maps | null>(null);
-  useEffect(() => { let active = true; void load().then(value => { if (active) setMaps(value); }); return () => { active = false; }; }, []);
+  const { data } = useResource<Version[]>("/schemas");
+  const maps = useMemo(() => buildMaps(data ?? []), [data]);
   const quantityLabel = (key?: string | null) => !key ? "" : maps?.quantities.get(key) ?? prettyKey(key);
   return {
     topicName: code => !code ? "" : maps?.topics.get(code) ?? code,
