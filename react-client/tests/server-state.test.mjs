@@ -39,3 +39,34 @@ test("payment, curriculum and assignment dependencies refresh their reports", ()
   assert.ok(affectedBy("/anywhere", undefined));
   resetServerState();
 });
+
+test("school reports, rosters and billing refresh after relevant changes only", () => {
+  const school = "/schools/10000000-0000-0000-0000-000000000001";
+  const other = "/schools/20000000-0000-0000-0000-000000000002";
+  assert.ok(affectedBy(school + "/reports/summary", school + "/users/1/suspend"));
+  assert.ok(affectedBy(school + "/reports/classes", school + "/classes/1/students/2/transfer"));
+  assert.ok(affectedBy(school + "/classes/1/grades", "/assignments/1/submissions/2"));
+  assert.ok(affectedBy("/user/students", school + "/classes/1/students"));
+  assert.ok(affectedBy("/assignments/mine/teacher/classes", school + "/classes/1/teachers"));
+  assert.ok(affectedBy("/student/classes", school + "/classes/1/students/2/transfer"));
+  assert.ok(affectedBy("/auth/plans", "/admin/plans/STARTER"));
+  assert.equal(affectedBy(school + "/reports/summary", other + "/users/1/suspend"), false);
+  assert.equal(affectedBy(school + "/classes/1/grades", "/support/admin/1"), false);
+});
+
+test("submission reads stay bounded and cancelled queued reads never start", async () => {
+  const { createRequestLimiter } = await import("../src/shared/api/requestLimiter.ts");
+  const schedule = createRequestLimiter(4);
+  let running = 0, max = 0, cancelledRan = false;
+  const releases = [];
+  const work = () => { running++; max = Math.max(max, running); return new Promise(resolve => releases.push(() => { running--; resolve("done"); })); };
+  const requests = Array.from({ length: 8 }, () => schedule(work, new AbortController().signal));
+  const controller = new AbortController();
+  const cancelled = schedule(async () => { cancelledRan = true; }, controller.signal);
+  const rejected = assert.rejects(cancelled, { name: "AbortError" }); controller.abort();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(running, 4);
+  for (let batch = 0; batch < 2; batch++) { releases.splice(0).forEach(release => release()); await new Promise(resolve => setTimeout(resolve, 0)); }
+  await Promise.all(requests); await rejected;
+  assert.equal(max, 4); assert.equal(cancelledRan, false);
+});
