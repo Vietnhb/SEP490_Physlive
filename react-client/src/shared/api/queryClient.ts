@@ -23,7 +23,7 @@ export function affectedBy(read: string, write?: string) {
   if (/\/(users?|accounts?|appeals?)(\/|$)/.test(write))
     return /\/(users?|accounts?|appeals?|schools|assignments|student|support)(\/|$)|\/admin\/(overview-counts|analytics)(?:\/|$)/.test(read);
   if (/\/schools\/[^/]+\/classes(?:\/|$)/.test(write))
-    return /^(?:\/api)?\/schools\/|\/(assignments|student)(?:\/|$)/.test(read);
+    return /^(?:\/api)?\/schools\/|\/user\/students|\/(assignments|student)(?:\/|$)/.test(read);
   if (/\/schools(?:\/|$)/.test(write))
     return /schools|\/user\/me|\/school\/billing|\/admin\/(overview-counts|analytics)|\/assignments|\/student/.test(read);
   if (/\/(support|complaints)(\/|$)/.test(write)) return /support|appeal|complaint|notification/.test(read);

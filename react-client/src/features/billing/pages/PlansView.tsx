@@ -1,21 +1,20 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useEffect, useState, type FormEvent } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useState, type FormEvent } from "react";
 import { Badge, Checkbox, Dialog, Table, Text, TextField } from "@radix-ui/themes";
-import { adminPlans, saveManagedPlan, type ManagedPlan } from "../api/billingApi";
+import { saveManagedPlan, type ManagedPlan } from "../api/billingApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { PageHeader, Panel, Loading, ErrorNotice, Button, FormField } from "../../../shared/ui/ManagementUI";
 
 export function PlansView() {
-  const [items, setItems] = useState<ManagedPlan[]>([]);
   const [form, setForm] = useState<ManagedPlan | null>(null);
   const [editing, setEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
-  const load = async () => { setLoading(true); try { setItems(await adminPlans()); setError(""); } catch (err) { setError(apiMessage(err, "Không thể tải danh mục gói.")); } finally { setLoading(false); } };
-  useApiRefresh(["/admin/plans"], load);
-  useEffect(() => { void load(); }, []);
+  const plansResource = useResource<ManagedPlan[]>("/admin/plans", true);
+  const items = plansResource.data ?? [];
+  const loading = plansResource.loading;
+  const error = plansResource.error || "";
+  const load = plansResource.refresh;
   const submit = async (event: FormEvent) => {
     event.preventDefault(); if (!form || busy) return; setBusy(true); setFormError("");
     try { await saveManagedPlan(form, editing); setForm(null); await load(); }

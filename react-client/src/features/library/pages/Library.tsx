@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
+import { lazy, Suspense, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { library, personalLibrary } from "../api/libraryApi";
+import { useResource } from "../../../shared/hooks/operationsData";
 import type { LibraryItem } from "../../../shared/types/physlive";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { isStudentRole } from "../../../shared/auth/roles";
@@ -8,7 +9,8 @@ import { canTeach } from "../../../shared/auth/permissions";
 
 const StudentAssignments = lazy(() => import("../../assignments/pages/StudentAssignments"));
 
-function LibraryRows({ items, assignable }: Readonly<{ items: LibraryItem[]; assignable: boolean }>) {
+function LibraryRows({ items, assignable, loading = false }: Readonly<{ items: LibraryItem[]; assignable: boolean; loading?: boolean }>) {
+  if (loading) return <TableLoadingSkeleton headers={["Tên", "Chủ đề", "Chia sẻ", "Người chia sẻ", "Ngày lưu", ...(assignable ? ["Thao tác"] : [])]} label="Đang tải thư viện…" />;
   if (!items.length) return <p className="muted">{assignable ? "Bạn chưa lưu mô phỏng nào. Dựng một mô phỏng rồi bấm “Lưu mô phỏng” để thấy ở đây." : "Chưa có mô phỏng nào được chia sẻ với bạn."}</p>;
   const visibilityLabel = (item: LibraryItem) => {
     if (item.visibility === "PERSONAL") return "Chỉ mình tôi";
@@ -29,19 +31,17 @@ export default function Library() {
 }
 
 function LibraryCatalog({ canManage }: Readonly<{ canManage: boolean }>) {
-  const [mine, setMine] = useState<LibraryItem[]>([]);
-  const [accessible, setAccessible] = useState<LibraryItem[]>([]);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    const requests = canManage ? [personalLibrary(), library()] : [Promise.resolve([]), library()];
-    void Promise.all(requests).then(([owned, all]) => { setMine(owned); setAccessible(all); }).catch(() => setError("Không thể tải thư viện."));
-  }, [canManage]);
+  const mineResource = useResource<LibraryItem[]>("/library/mine", canManage);
+  const accessibleResource = useResource<LibraryItem[]>("/library");
+  const mine = useMemo(() => mineResource.data ?? [], [mineResource.data]);
+  const accessible = accessibleResource.data ?? [];
+  const error = mineResource.error || accessibleResource.error || "";
   const mineIds = useMemo(() => new Set(mine.map(item => item.id)), [mine]);
   const shared = accessible.filter(item => item.visibility !== "PERSONAL" && !mineIds.has(item.id));
   return <main className="main">
     <div className="hero"><div><h1>Thư viện mô phỏng</h1><p className="muted">Mô phỏng đã lưu của bạn và mô phỏng người khác chia sẻ. Chỉ mô phỏng đã được hệ thống kiểm tra kết quả mới lưu và giao bài được. Muốn chia sẻ, đổi tên hay xếp thư mục, dùng menu “⋯” ở khung thư viện bên trái trang Mô phỏng.</p></div></div>
-    {canManage && <section className="card library-section"><div className="section-heading"><div><h2>Mô phỏng của tôi</h2></div><Link to="/workspace" className="secondary page-action">Tạo mô phỏng</Link></div><LibraryRows items={mine} assignable /></section>}
-    <section className="card library-section"><div className="section-heading"><div><h2>Được chia sẻ với bạn</h2></div></div><LibraryRows items={shared} assignable={false} /></section>
+    {canManage && <section className="card library-section"><div className="section-heading"><div><h2>Mô phỏng của tôi</h2></div><Link to="/workspace" className="secondary page-action">Tạo mô phỏng</Link></div><LibraryRows items={mine} assignable loading={mineResource.loading} /></section>}
+    <section className="card library-section"><div className="section-heading"><div><h2>Được chia sẻ với bạn</h2></div></div><LibraryRows items={shared} assignable={false} loading={accessibleResource.loading} /></section>
     {error && <p className="error" role="alert">{error}</p>}
   </main>;
 }

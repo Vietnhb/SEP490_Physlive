@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Button, Card, Flex, Heading, Text, Tooltip } from "@radix-ui/themes";
 import { ArrowRightIcon, CheckCircledIcon, CrossCircledIcon, StopwatchIcon } from "@radix-ui/react-icons";
-import { adminUsers, getAdminAnalytics, type AdminAnalytics } from "../api/userApi";
-import { apiMessage } from "../../../shared/lib/apiError";
+import type { AdminAnalytics } from "../api/userApi";
+import { useResource } from "../../../shared/hooks/operationsData";
 import { ROLE_LABELS, type RoleType } from "../../../shared/auth/roles";
 import type { User } from "../../../shared/auth/types";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -27,27 +27,14 @@ const ROLE_ORDER: RoleType[] = ["ADMIN", "MANAGER", "REVIEWER", "SCHOOL", "STAFF
 
 export function AdminOverviewPage() {
   const name = useSessionStore(state => state.user?.fullName);
-  const [users, setUsers] = useState<User[]>([]);
-  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [timeframe, setTimeframe] = useState<"week" | "month">("week");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      adminUsers().catch(err => { if (active) setError(apiMessage(err, "Không thể tải danh sách tài khoản.")); return []; }),
-      getAdminAnalytics().catch(() => null),
-    ]).then(([userList, analyticsData]) => {
-      if (active) {
-        setUsers(userList);
-        setAnalytics(analyticsData);
-      }
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
-    return () => { active = false; };
-  }, []);
+  const usersResource = useResource<User[]>("/admin/users");
+  const analyticsResource = useResource<AdminAnalytics>("/admin/analytics");
+  const users = usersResource.data ?? [];
+  const analytics = analyticsResource.data;
+  const loading = usersResource.loading || analyticsResource.loading;
+  const error = usersResource.error || analyticsResource.error || "";
 
   const managers = users.filter(item => item.role === "MANAGER");
   const locked = users.filter(item => item.active === false).length;

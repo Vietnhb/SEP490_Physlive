@@ -1,7 +1,7 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { createAssignment, setAssignmentOpen, studentOptions, teacherAssignments, teacherAssignmentClasses } from "../api/assignmentApi";
+import { createAssignment, setAssignmentOpen } from "../api/assignmentApi";
 import { createLibraryFolder } from "../../library/api/libraryApi";
 import { getSimulation } from "../../simulation/api/simulationApi";
 import TeacherLibraryPane from "../../library/components/TeacherLibraryPane";
@@ -32,14 +32,11 @@ export default function Assignments({
   const isStudent = isStudentRole(user?.role);
 
   // STAFF ASSIGNMENT STUDIO & SUBMISSIONS MANAGEMENT
-  const [items, setItems] = useState<Assignment[]>([]);
   // Only validated simulations can be assigned; the list comes from the shared library store (one request).
   const saved = useMemo(() => libraryItems.filter(item => item.validationStatus === "PASSED"), [libraryItems]);
   const [view, setView] = useState<"create" | "history">(() => workspaceLayout ? "create" : "history");
   const [formVersion, setFormVersion] = useState(0);
   const navigate = useNavigate();
-  const [students, setStudents] = useState<StudentOption[]>([]);
-  const [classes, setClasses] = useState<TeacherClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState("");
   const [libraryItemId, setLibraryItemId] = useState(
     queryLibraryItemId,
@@ -60,35 +57,19 @@ export default function Assignments({
   const [dueAt, setDueAt] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [actionError, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const loadData = useCallback(async () => {
-    if (!user || isStudent) return;
-    setLoading(true);
-    setError("");
-    try {
-      const [assignments, studentItems, classItems] =
-        await Promise.all([
-          teacherAssignments(),
-          studentOptions(),
-          teacherAssignmentClasses(),
-        ]);
-      setItems(assignments);
-      setStudents(studentItems);
-      setClasses(classItems);
-    } catch {
-      setError("Không thể tải dữ liệu bài tập và danh sách học sinh.");
-    } finally {
-      setLoading(false);
-    }
-  }, [isStudent, user]);
-
-  useApiRefresh(["/assignments", "/schools/classes"], loadData);
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  const assignmentsResource = useResource<Assignment[]>("/assignments/mine/teacher", Boolean(user && !isStudent));
+  const studentsResource = useResource<StudentOption[]>("/user/students", Boolean(user && !isStudent));
+  const classesResource = useResource<TeacherClassOption[]>("/assignments/mine/teacher/classes", Boolean(user && !isStudent));
+  const items = assignmentsResource.data ?? [];
+  const setItems = assignmentsResource.setData;
+  const students = studentsResource.data ?? [];
+  const classes = useMemo(() => classesResource.data ?? [], [classesResource.data]);
+  const loading = assignmentsResource.loading || studentsResource.loading || classesResource.loading;
+  const error = actionError || assignmentsResource.error || studentsResource.error || classesResource.error || "";
+  const loadData = () => { setError(""); return Promise.all([assignmentsResource.refresh(), studentsResource.refresh(), classesResource.refresh()]); };
 
   useEffect(() => {
     setLibraryItemId(queryLibraryItemId);

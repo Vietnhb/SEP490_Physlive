@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { Theme } from "@radix-ui/themes";
 import { useEffectiveTheme } from "../../../shared/theme/themeStore";
 import { Link, NavLink, Outlet } from "react-router-dom";
@@ -6,7 +7,7 @@ import LearningHeader from "../../../shared/layout/LearningHeader";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { isDepartmentHead } from "../../../shared/auth/permissions";
-import { mySupportItems, type SimulationComplaint, type SupportStatus } from "../../support/api/supportApi";
+import type { SimulationComplaint, SupportStatus } from "../../support/api/supportApi";
 import { COMPLAINT_STATUS } from "../../support/model/complaintStatus";
 import "../../support/styles/complaints.css";
 import "../../simulation/styles/learning.css";
@@ -24,12 +25,8 @@ type RailItem = { to: string; label: string; icon: ComponentProps<typeof Learnin
 export default function TeacherAreaLayout() {
   const user = useSessionStore(state => state.user);
   // A reply can come from Manager or Reviewer; referral alone is not a reply.
-  const [answered, setAnswered] = useState(0);
-  useEffect(() => {
-    let active = true;
-    mySupportItems().then(items => { if (active) setAnswered(complaintsOnly(items).filter(item => item.status === "READ" && item.adminResponse?.trim()).length); }).catch(() => undefined);
-    return () => { active = false; };
-  }, []);
+  const supportResource = useResource<SimulationComplaint[]>("/support/mine");
+  const answered = complaintsOnly(supportResource.data ?? []).filter(item => item.status === "READ" && item.adminResponse?.trim()).length;
 
   const groups: { label: string; items: RailItem[] }[] = [
     { label: "Theo dõi", items: [
@@ -68,13 +65,12 @@ export function TeacherThemed({ children }: Readonly<{ children: ReactNode }>) {
 type Filter = "ALL" | SupportStatus;
 
 export function TeacherComplaintsPage() {
-  const [items, setItems] = useState<SimulationComplaint[] | null>(null);
-  const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
-  const load = useCallback(() => mySupportItems().then(
-    all => { setItems(complaintsOnly(all)); setError(""); },
-    () => { setItems(current => current ?? []); setError("Chưa tải được danh sách khiếu nại. Vui lòng thử lại."); }), []);
-  useEffect(() => { void load(); }, [load]);
+  const resource = useResource<SimulationComplaint[]>("/support/mine");
+  const items = resource.data ? complaintsOnly(resource.data) : null;
+  const error = resource.error || "";
+  const load = resource.refresh;
+
   const visible = useMemo(() => (items ?? []).filter(item => filter === "ALL" || item.status === filter), [items, filter]);
   const count = (status: SupportStatus) => (items ?? []).filter(item => item.status === status).length;
 

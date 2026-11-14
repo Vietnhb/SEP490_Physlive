@@ -1,8 +1,8 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useMemo, useState } from "react";
 import axios from "axios";
 import { Button, Card, Heading, SegmentedControl, Text, TextArea } from "@radix-ui/themes";
-import { complaintsForReview, resolveComplaint, type SimulationComplaint, type SupportStatus } from "../../support/api/supportApi";
+import { resolveComplaint, type SimulationComplaint, type SupportStatus } from "../../support/api/supportApi";
 import { COMPLAINT_STATUS } from "../../support/model/complaintStatus";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 
@@ -10,24 +10,18 @@ type Filter = "todo" | "done";
 
 /** Reviewer side: answer teachers' complaints about simulations and mark them resolved. */
 export function ComplaintsDesk() {
-  const [items, setItems] = useState<SimulationComplaint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState<Filter>("todo");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState("");
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { setItems(await complaintsForReview()); }
-    catch { setError("Chưa tải được danh sách khiếu nại. Vui lòng thử lại."); }
-    finally { setLoading(false); }
-  }, []);
-  useApiRefresh(["/support/complaints"], load);
-  useEffect(() => { void load(); }, [load]);
-
+  const complaintsResource = useResource<SimulationComplaint[]>("/support/complaints/review", true);
+  const items = useMemo(() => complaintsResource.data ?? [], [complaintsResource.data]);
+  const setItems = complaintsResource.setData;
+  const loading = complaintsResource.loading;
+  const error = complaintsResource.error || "";
+  const load = complaintsResource.refresh;
   const visible = useMemo(() => items.filter(item => (item.status === "RESOLVED") === (filter === "done")), [items, filter]);
   const todo = items.filter(item => item.status !== "RESOLVED").length;
 

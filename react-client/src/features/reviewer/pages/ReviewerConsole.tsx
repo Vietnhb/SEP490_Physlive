@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Navigate, Outlet, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { Card, Heading, Text } from "@radix-ui/themes";
-import api from "../../../shared/api/client";
+import { useResource } from "../../../shared/hooks/operationsData";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppSidebar";
 import { reviewerAccess, type ReviewerAccess, type ReviewerView } from "../model/reviewerAccess";
@@ -11,7 +11,7 @@ const ContentModeration = lazy(() => import("../components/ContentModeration").t
 const TopicsWorkspace = lazy(() => import("../components/TopicsWorkspace").then(module => ({ default: module.TopicsWorkspace })));
 const LawGapsDesk = lazy(() => import("../components/LawGapsDesk").then(module => ({ default: module.LawGapsDesk })));
 const ComplaintsDesk = lazy(() => import("../components/ComplaintsDesk").then(module => ({ default: module.ComplaintsDesk })));
-import { complaintsForReview } from "../../support/api/supportApi";
+import type { SimulationComplaint } from "../../support/api/supportApi";
 import "../styles/reviewer.css";
 import "../../support/styles/complaints.css";
 
@@ -28,34 +28,13 @@ export default function ReviewerLayout() {
   const user = useSessionStore(state => state.user);
   const [params] = useSearchParams();
   const access = reviewerAccess(user);
-  const [pending, setPending] = useState(0);
-  useEffect(() => {
-    if (!access.canReview) return;
-    let active = true;
-    const load = () => void api.get<unknown[]>("/reviewer/library", { params: { status: "PENDING" } }).then(response => { if (active) setPending(response.data.length); }).catch(() => undefined);
-    load(); const timer = window.setInterval(load, 60000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [access.canReview]);
-
-  // Complaints are open to every reviewer account, whichever permission it holds.
+  const pendingResource = useResource<unknown[]>("/reviewer/library?status=PENDING", access.canReview, 60_000);
+  const pending = pendingResource.data?.length ?? 0;
   const canHandleComplaints = !access.isManager && (access.canEdit || access.canReview);
-  const [openComplaints, setOpenComplaints] = useState(0);
-  useEffect(() => {
-    if (!canHandleComplaints) return;
-    let active = true;
-    const load = () => void complaintsForReview().then(items => { if (active) setOpenComplaints(items.filter(item => item.status !== "RESOLVED").length); }).catch(() => undefined);
-    load(); const timer = window.setInterval(load, 60000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [canHandleComplaints]);
-
-  const [openGaps, setOpenGaps] = useState(0);
-  useEffect(() => {
-    if (!access.canEdit) return;
-    let active = true;
-    const load = () => void api.get<unknown[]>("/reviewer/law-gaps", { params: { status: "OPEN" } }).then(response => { if (active) setOpenGaps(response.data.length); }).catch(() => undefined);
-    load(); const timer = window.setInterval(load, 60000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [access.canEdit]);
+  const complaintsResource = useResource<SimulationComplaint[]>("/support/complaints/review", canHandleComplaints, 60_000);
+  const openComplaints = complaintsResource.data?.filter(item => item.status !== "RESOLVED").length ?? 0;
+  const gapsResource = useResource<unknown[]>("/reviewer/law-gaps?status=OPEN", access.canEdit, 60_000);
+  const openGaps = gapsResource.data?.length ?? 0;
 
   const legacy = params.get("view") ?? params.get("tab");
   if (legacy !== null && legacy in LEGACY) return <Navigate to={`/reviewer${LEGACY[legacy] ? `/${LEGACY[legacy]}` : ""}`} replace />;

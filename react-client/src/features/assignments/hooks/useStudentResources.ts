@@ -1,22 +1,13 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { getSharedSimulation } from "../../simulation/api/simulationApi";
-import { communityLibrary } from "../../library/api/libraryApi";
-import { curriculum } from "../../curriculum/api/curriculumApi";
-import { studentClasses, type StudentClassSummary } from "../../school/api/schoolApi";
+import type { StudentClassSummary } from "../../school/api/schoolApi";
 import { indexAtTime } from "../../simulation/model/learningModel";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import type { Curriculum, LibraryItem, Simulation } from "../../../shared/types/physlive";
 import type { ResourceDiscovery } from "../../library/components/ResourceDiscovery";
 
 export function useStudentResources(userId: number | undefined, loadLibrary = true) {
-  const [items, setItems] = useState<LibraryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [catalog, setCatalog] = useState<Curriculum | null>(null);
-  const [classes, setClasses] = useState<StudentClassSummary[]>([]);
-  const [classesLoading, setClassesLoading] = useState(true);
-  const [classesError, setClassesError] = useState("");
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   const [simulationLoading, setSimulationLoading] = useState(false);
@@ -25,53 +16,25 @@ export function useStudentResources(userId: number | undefined, loadLibrary = tr
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const mountedRef = useRef(true);
-  const listRequestRef = useRef(0);
   const simulationRequestRef = useRef(0);
   const isCurrentSession = useCallback(() => mountedRef.current && userId !== undefined && useSessionStore.getState().user?.id === userId, [userId]);
 
-  const load = useCallback(async () => {
-    if (!isCurrentSession()) return;
-    const requestId = ++listRequestRef.current;
-    setLoading(true);
-    setError("");
-    try {
-      const [data, loadedCurriculum] = await Promise.all([communityLibrary(), curriculum()]);
-      if (!isCurrentSession() || requestId !== listRequestRef.current) return;
-      setItems(data.filter(item => item.visibility === "SHARED" || item.visibility === "PUBLIC"));
-      setCatalog(loadedCurriculum);
-    } catch {
-      if (isCurrentSession() && requestId === listRequestRef.current) setError("Không thể tải tài nguyên cộng đồng.");
-    } finally {
-      if (isCurrentSession() && requestId === listRequestRef.current) setLoading(false);
-    }
-  }, [isCurrentSession]);
-
-  const loadClasses = useCallback(async () => {
-    if (!isCurrentSession()) return;
-    setClassesLoading(true);
-    setClassesError("");
-    try {
-      const data = await studentClasses();
-      if (isCurrentSession()) setClasses(data);
-    } catch {
-      if (isCurrentSession()) setClassesError("Không thể tải danh sách lớp học.");
-    } finally {
-      if (isCurrentSession()) setClassesLoading(false);
-    }
-  }, [isCurrentSession]);
-
+  const libraryResource = useResource<LibraryItem[]>("/library/community", Boolean(userId && loadLibrary));
+  const curriculumResource = useResource<Curriculum>("/curriculum", Boolean(userId && loadLibrary));
+  const classesResource = useResource<StudentClassSummary[]>("/student/classes", Boolean(userId));
+  const items = useMemo(() => (libraryResource.data ?? []).filter(item => item.visibility === "SHARED" || item.visibility === "PUBLIC"), [libraryResource.data]);
+  const catalog = curriculumResource.data ?? null;
+  const classes = classesResource.data ?? [];
+  const loading = loadLibrary && (libraryResource.loading || curriculumResource.loading);
+  const classesLoading = classesResource.loading;
+  const error = libraryResource.error || curriculumResource.error || "";
+  const classesError = classesResource.error || "";
+  const load = () => Promise.all([libraryResource.refresh(), curriculumResource.refresh()]);
+  const loadClasses = classesResource.refresh;
   useEffect(() => {
     mountedRef.current = true;
-    if (loadLibrary) void load();
-    void loadClasses();
-    return () => {
-      mountedRef.current = false;
-      listRequestRef.current += 1;
-      simulationRequestRef.current += 1;
-    };
-  }, [load, loadClasses, loadLibrary]);
-  useApiRefresh(["/student/classes"], loadClasses);
-  useApiRefresh(["/library", "/curriculum"], () => { if (loadLibrary) return load(); });
+    return () => { mountedRef.current = false; simulationRequestRef.current += 1; };
+  }, []);
 
   const close = () => {
     simulationRequestRef.current += 1;

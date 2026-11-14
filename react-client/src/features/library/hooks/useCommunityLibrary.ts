@@ -1,17 +1,11 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
+import { useResource } from "../../../shared/hooks/operationsData";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { communityLibrary } from "../api/libraryApi";
-import { curriculum as getCurriculum } from "../../curriculum/api/curriculumApi";
 import { getSharedSimulation } from "../../simulation/api/simulationApi";
 import { openSharedGeneratedSimulation, type GeneratedSimulationResult } from "../../simulation/api/simulationUnderstandingApi";
 import type { Curriculum, LibraryItem, Simulation } from "../../../shared/types/physlive";
 import { indexAtTime } from "../../simulation/model/learningModel";
 
 export function useCommunityLibrary() {
-  const [items, setItems] = useState<LibraryItem[]>([]);
-  const [curriculum, setCurriculum] = useState<Curriculum | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const [simulation, setSimulation] = useState<Simulation | null>(null);
   /** The author's own scene; when present the dialog shows it instead of the generic player. */
@@ -22,30 +16,15 @@ export function useCommunityLibrary() {
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const requestRef = useRef(0);
-  const listRequestRef = useRef(0);
 
-  const load = useCallback(async () => {
-    const requestId = ++listRequestRef.current;
-    setLoading(true);
-    setError("");
-    try {
-      const [itemsResult, catalogResult] = await Promise.allSettled([communityLibrary(), getCurriculum()]);
-      if (requestId !== listRequestRef.current) return;
-      if (itemsResult.status === "rejected") throw itemsResult.reason;
-      setItems(itemsResult.value);
-      setCurriculum(catalogResult.status === "fulfilled" ? catalogResult.value : null);
-    } catch {
-      if (requestId === listRequestRef.current) setError("Không tải được thư viện. Vui lòng thử lại.");
-    } finally {
-      if (requestId === listRequestRef.current) setLoading(false);
-    }
-  }, []);
-
-  useApiRefresh(["/library", "/curriculum"], load);
-  useEffect(() => {
-    void load();
-    return () => { listRequestRef.current += 1; requestRef.current += 1; };
-  }, [load]);
+  const libraryResource = useResource<LibraryItem[]>("/library/community");
+  const curriculumResource = useResource<Curriculum>("/curriculum");
+  const items = libraryResource.data ?? [];
+  const curriculum = curriculumResource.data ?? null;
+  const loading = libraryResource.loading || curriculumResource.loading;
+  const error = libraryResource.error || curriculumResource.error || "";
+  const load = () => Promise.all([libraryResource.refresh(), curriculumResource.refresh()]);
+  useEffect(() => () => { requestRef.current += 1; }, []);
 
   const close = useCallback(() => {
     requestRef.current += 1;

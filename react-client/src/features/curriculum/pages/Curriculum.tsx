@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { curriculum } from "../api/curriculumApi";
+import { useResource } from "../../../shared/hooks/operationsData";
 import type { Curriculum as CurriculumTree } from "../../../shared/types/physlive";
 import { formatTopicCode, formatGradeCode, formatLessonCode } from "../model/curriculumCodeGenerator";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
@@ -9,8 +8,8 @@ type Topic = CurriculumTree["topics"][number];
 type Module = Topic["modules"][number];
 
 function Curriculum() {
-  const [tree, setTree] = useState<CurriculumTree | null>(null);
-  useEffect(() => { void curriculum().then(setTree).catch(() => setTree({ topics: [] })); }, []);
+  const resource = useResource<CurriculumTree>("/curriculum");
+  const tree = resource.data ?? null;
   const topics = tree?.topics ?? [];
 
   return (
@@ -21,7 +20,8 @@ function Curriculum() {
           <p className="muted">Cấu trúc môn học, chương, khối lớp và bài học chi tiết dùng chung cho mô phỏng, đề bài và kiểm tra.</p>
         </div>
       </div>
-      {tree === null && <CardLoadingSkeleton cards={3} label="Đang tải chương trình học…" />}
+      {resource.error && <p role="alert">{resource.error} <button onClick={() => void resource.refresh()}>Thử lại</button></p>}
+      {resource.loading && <CardLoadingSkeleton cards={3} label="Đang tải chương trình học…" />}
       {tree !== null && topics.length === 0 && (
         <section className="card">
           <p className="muted">Chưa có nội dung chương trình học. Quản lý hệ thống có thể tạo trong trang Quản trị chương trình học.</p>

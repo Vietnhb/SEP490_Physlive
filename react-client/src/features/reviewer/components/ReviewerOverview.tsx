@@ -1,8 +1,6 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
 import { Button, Card, Heading, Text } from "@radix-ui/themes";
-import api from "../../../shared/api/client";
-import { complaintsForReview } from "../../support/api/supportApi";
+import type { SimulationComplaint } from "../../support/api/supportApi";
 import type { ReviewerAccess, ReviewerView } from "../model/reviewerAccess";
 import type { Version } from "../model/reviewerTypes";
 import { timeAgo } from "../model/reviewerUtils";
@@ -17,43 +15,27 @@ type Counts = {
 };
 type Task = { id: string; view: ReviewerView; icon: ReviewerIconName; count: number; title: string; detail: string; action: string };
 
-async function settle<T>(request: Promise<{ data: T }>) {
-  try { return (await request).data; } catch { return undefined; }
-}
-
 function useOverview(access: ReviewerAccess) {
-  const [counts, setCounts] = useState<Counts>({});
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
   const canHandleComplaints = !access.isManager && (access.canEdit || access.canReview);
-  // State is set only when the requests answer; a manual refresh shows the loading state itself.
-  const load = useCallback(() => Promise.all([
-      access.canReview ? settle(api.get<PendingItem[]>("/reviewer/library", { params: { status: "PENDING" } })) : undefined,
-      canHandleComplaints ? complaintsForReview().catch(() => undefined) : undefined,
-      access.canEdit ? settle(api.get<Version[]>("/reviewer/schemas")) : undefined,
-      access.canEdit ? settle(api.get<{ occurrences: number }[]>("/reviewer/law-gaps", { params: { status: "OPEN" } })) : undefined,
-  ]).then(([library, complaints, schemas, gaps]) => {
-    const next: Counts = {};
-    if (access.canReview && library) {
-      const oldest = library.map(item => item.createdAt).filter(Boolean).sort()[0];
-      next.moderation = { pending: library.length, oldest };
-    }
-    if (canHandleComplaints && complaints) {
-      const open = complaints.filter(item => item.status !== "RESOLVED");
-      const oldest = open.map(item => item.createdAt).filter(Boolean).sort()[0];
-      next.complaints = { open: open.length, oldest };
-    }
-    if (access.canEdit) {
-      next.drafts = schemas?.filter(item => item.lifecycleStatus === "DRAFT").length ?? 0;
-      if (gaps) next.gaps = { open: gaps.length, met: gaps.reduce((sum, item) => sum + item.occurrences, 0) };
-    }
-    const expected = (access.canReview ? 1 : 0) + (canHandleComplaints ? 1 : 0) + (access.canEdit ? 1 : 0);
-    setFailed(expected > 0 && !library && !complaints && !gaps);
-    setCounts(next); setLoading(false);
-  }), [access.canEdit, access.canReview, canHandleComplaints]);
-  useApiRefresh(["/reviewer", "/evaluations", "/support/complaints"], load);
-  useEffect(() => { void load(); }, [load]);
-  return { counts, loading, failed, canHandleComplaints, refresh: () => { setLoading(true); setFailed(false); void load(); } };
+  const libraryResource = useResource<PendingItem[]>("/reviewer/library?status=PENDING", access.canReview);
+  const complaintsResource = useResource<SimulationComplaint[]>("/support/complaints/review", canHandleComplaints);
+  const schemasResource = useResource<Version[]>("/reviewer/schemas", access.canEdit);
+  const gapsResource = useResource<{ occurrences: number }[]>("/reviewer/law-gaps?status=OPEN", access.canEdit);
+  const library = libraryResource.data, complaints = complaintsResource.data, schemas = schemasResource.data, gaps = gapsResource.data;
+  const counts: Counts = {};
+  if (access.canReview && library) counts.moderation = { pending: library.length, oldest: library.map(item => item.createdAt).filter(Boolean).sort()[0] };
+  if (canHandleComplaints && complaints) {
+    const open = complaints.filter(item => item.status !== "RESOLVED");
+    counts.complaints = { open: open.length, oldest: open.map(item => item.createdAt).filter(Boolean).sort()[0] };
+  }
+  if (access.canEdit) {
+    counts.drafts = schemas?.filter(item => item.lifecycleStatus === "DRAFT").length ?? 0;
+    if (gaps) counts.gaps = { open: gaps.length, met: gaps.reduce((sum, item) => sum + item.occurrences, 0) };
+  }
+  const active = [access.canReview && libraryResource, canHandleComplaints && complaintsResource, access.canEdit && schemasResource, access.canEdit && gapsResource].filter(item => item !== false);
+  const loading = active.some(item => item.loading);
+  const failed = active.some(item => Boolean(item.error));
+  return { counts, loading, failed, canHandleComplaints, refresh: () => { void Promise.all(active.map(item => item.refresh())); } };
 }
 
 export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: ReviewerAccess; name?: string; onOpen: (view: ReviewerView) => void }>) {

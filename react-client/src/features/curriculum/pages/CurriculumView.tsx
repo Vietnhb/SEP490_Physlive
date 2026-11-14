@@ -1,8 +1,8 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useEffect, useState, type FormEvent } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useState, type FormEvent } from "react";
 import { Badge, Button, Callout, Dialog, Select, Switch, TextField } from "@radix-ui/themes";
 import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
-import { adminCurriculum, createCurriculumNode, toggleCurriculum, type CurriculumTree, type CurriculumTopic, type CurriculumModule } from "../api/curriculumApi";
+import { createCurriculumNode, toggleCurriculum, type CurriculumTree, type CurriculumTopic, type CurriculumModule } from "../api/curriculumApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { topicLabel } from "../../../shared/lib/topicLabel";
 import type { LocalizedName } from "../../../shared/types/localization";
@@ -17,10 +17,8 @@ const lessonCount = (topic: CurriculumTopic) => topic.modules.reduce((sum, modul
 const matches = (query: string, ...values: (string | LocalizedName)[]) => normalize(values.flatMap(value => typeof value === "string" ? [value] : Object.values(value)).join(" ")).includes(query);
 
 export function CurriculumView() {
-  const [tree, setTree] = useState<CurriculumTree | null>(null);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
@@ -32,15 +30,12 @@ export function CurriculumView() {
   const [kind, setKind] = useState<CurriculumKind>("topic");
   const [parentId, setParentId] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    try { setTree(await adminCurriculum()); setError(""); }
-    catch (e) { setError(apiMessage(e, "Không thể tải chương trình học.")); }
-    finally { setLoading(false); }
-  };
-  useApiRefresh(["/curriculum", "/schemas"], load);
-  useEffect(() => { void load(); }, []);
-
+  const curriculumResource = useResource<CurriculumTree>("/admin/curriculum", true);
+  const tree = curriculumResource.data ?? null;
+  const setTree = curriculumResource.setData;
+  const loading = curriculumResource.loading;
+  const error = actionError || curriculumResource.error || "";
+  const load = () => { setError(""); return curriculumResource.refresh(); };
   const create = async (event: FormEvent) => {
     event.preventDefault();
     if (busy || !name.trim() || (kind === "topic" ? !viName.trim() : !parentId)) return;

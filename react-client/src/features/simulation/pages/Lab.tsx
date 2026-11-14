@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { apiKey, queryClient, sessionScope } from "../../../shared/api/queryClient";
+import api from "../../../shared/api/client";
+import { createRequestLimiter } from "../../../shared/api/requestLimiter";
+import axios from "axios";
+
+import { useCallback, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Icon from "../../../shared/ui/LearningIcon";
-import { assignmentSubmissions, gradeAssignmentSubmission, reopenAssignmentSubmission, studentOptions, teacherAssignments } from "../../assignments/api/assignmentApi";
-import type { AssignmentSubmission, StudentOption } from "../../../shared/types/physlive";
+import { gradeAssignmentSubmission, reopenAssignmentSubmission } from "../../assignments/api/assignmentApi";
+import type { Assignment, AssignmentSubmission, StudentOption } from "../../../shared/types/physlive";
 import { TeacherAssignmentList } from "../../assignments/components/TeacherAssignmentList";
 import { TeacherSubmissionTable } from "../../assignments/components/TeacherSubmissionTable";
 import { TeacherSubmissionTableLoading } from "../../assignments/components/TeacherSubmissionTableLoading";
@@ -12,83 +19,41 @@ import "../styles/learning.css";
 import "../styles/lab.css";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 
+const submissionsQueue = createRequestLimiter(4);
+
 export default function Lab() {
-  const [records, setRecords] = useState<AssignmentRecord[]>([]);
-  const [students, setStudents] = useState<Map<number, StudentOption>>(
-    new Map(),
-  );
   // "Xem và chấm bài nộp" on the assignment page links here with ?assignment=<id>.
   const [searchParams] = useSearchParams();
   const [selectedId, setSelectedId] = useState(() => searchParams.get("assignment") ?? "");
   const [submissionFilter, setSubmissionFilter] =
     useState<SubmissionFilter>("all");
   const [studentQuery, setStudentQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loadedIds, setLoadedIds] = useState<ReadonlySet<string>>(new Set());
-  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(new Set());
-  const [error, setError] = useState("");
-  const requested = useRef(new Set<string>());
-  const generation = useRef(0);
-
-  /** Fetches one assignment's submissions once; a failure only affects that assignment. */
-  const loadSubmissions = useCallback(async (assignmentId: string) => {
-    if (requested.current.has(assignmentId)) return;
-    requested.current.add(assignmentId);
-    const run = generation.current;
-    try {
-      const submissions = await assignmentSubmissions(assignmentId);
-      if (run !== generation.current) return;
-      setRecords(current => current.map(item => item.assignment.id === assignmentId ? { ...item, submissions } : item));
-      setLoadedIds(current => new Set(current).add(assignmentId));
-    } catch {
-      if (run !== generation.current) return;
-      requested.current.delete(assignmentId);
-      setFailedIds(current => new Set(current).add(assignmentId));
-    }
-  }, []);
-
-  const load = useCallback(async () => {
-    const run = ++generation.current;
-    requested.current = new Set();
-    setLoading(true);
-    setLoadedIds(new Set());
-    setFailedIds(new Set());
-    setError("");
-    try {
-      const assignments = await teacherAssignments();
-      if (run !== generation.current) return;
-      setRecords(assignments.map(assignment => ({ assignment, submissions: [] as AssignmentSubmission[] })));
-      const wanted = new URLSearchParams(window.location.search).get("assignment");
-      const firstId = assignments.find(item => item.id === wanted)?.id ?? assignments[0]?.id ?? "";
-      setSelectedId(current => assignments.some(item => item.id === current) ? current : firstId);
-      setLoading(false);
-      void studentOptions().then(items => { if (run === generation.current) setStudents(new Map(items.map(student => [student.id, student]))); }).catch(() => undefined);
-      // The assignment on screen first, then the rest a few at a time so a long list does not flood the server.
-      const queue = [...assignments.map(item => item.id)].sort((a, b) => Number(b === firstId) - Number(a === firstId));
-      const worker = async () => { for (let id = queue.shift(); id && run === generation.current; id = queue.shift()) await loadSubmissions(id); };
-      await Promise.all(Array.from({ length: 4 }, worker));
-    } catch {
-      if (run === generation.current) setError("Không thể tải danh sách bài đã giao. Vui lòng thử lại.");
-    } finally {
-      if (run === generation.current) setLoading(false);
-    }
-  }, [loadSubmissions]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  // Opening an assignment the queue has not reached yet fetches it right away.
-  useEffect(() => {
-    if (selectedId && !loading) void loadSubmissions(selectedId);
-  }, [selectedId, loading, loadSubmissions]);
+  const assignmentsResource = useResource<Assignment[]>("/assignments/mine/teacher");
+  const studentsResource = useResource<StudentOption[]>("/user/students");
+  const assignments = useMemo(() => assignmentsResource.data ?? [], [assignmentsResource.data]);
+  const students = useMemo(() => new Map((studentsResource.data ?? []).map(item => [item.id, item])), [studentsResource.data]);
+  const loading = assignmentsResource.loading;
+  const error = assignmentsResource.error || studentsResource.error || "";
+  const scope = sessionScope();
+  const submissions = useQueries({ queries: assignments.map(assignment => {
+    const url = "/assignments/" + assignment.id + "/submissions";
+    return { queryKey: apiKey(url), queryFn: ({ signal }: { signal: AbortSignal }) =>
+      submissionsQueue(() => api.get<AssignmentSubmission[]>(url, { signal }).then(response => response.data), signal) };
+  }) });
+  const readable = submissions.map(result => axios.isAxiosError(result.error) && [401, 403, 404].includes(result.error.response?.status ?? 0) ? undefined : result.data);
+  const records: AssignmentRecord[] = assignments.map((assignment, index) => ({ assignment, submissions: readable[index] ?? [] }));
+  const loadedIds = new Set(assignments.filter((_, index) => readable[index] !== undefined).map(item => item.id));
+  const failedIds = new Set(assignments.filter((_, index) => submissions[index]?.isError && readable[index] === undefined).map(item => item.id));
+  const wanted = searchParams.get("assignment");
+  const currentId = assignments.some(item => item.id === selectedId) ? selectedId : assignments.find(item => item.id === wanted)?.id ?? assignments[0]?.id ?? "";
+  const retrySubmissions = () => { const index = assignments.findIndex(item => item.id === currentId); if (index >= 0) void submissions[index].refetch(); };
 
   const submissionsLoading = records.some(item => !loadedIds.has(item.assignment.id) && !failedIds.has(item.assignment.id));
-  const selectedLoaded = loadedIds.has(selectedId);
-  const selectedFailed = failedIds.has(selectedId);
+  const selectedLoaded = loadedIds.has(currentId);
+  const selectedFailed = failedIds.has(currentId);
 
-  const selected = records.find((item) => item.assignment.id === selectedId);
-  const totals = useMemo(() => {
+  const selected = records.find((item) => item.assignment.id === currentId);
+  const totals = (() => {
     const assigned = records.reduce(
       (total, item) => total + item.assignment.studentIds.length,
       0,
@@ -98,7 +63,7 @@ export default function Lab() {
       0,
     );
     return { assigned, submitted, pending: Math.max(assigned - submitted, 0) };
-  }, [records]);
+  })();
 
   const selectedTotal = selected?.assignment.studentIds.length ?? 0;
   const selectedSubmitted = selected?.submissions.filter(submission => submission.completedAt).length ?? 0;
@@ -108,24 +73,23 @@ export default function Lab() {
       : Math.round((selectedSubmitted / selectedTotal) * 100);
 
   const updateSubmission = useCallback((assignmentId: string, updated: AssignmentSubmission) => {
-    setRecords(current => current.map(record => record.assignment.id === assignmentId
-      ? { ...record, submissions: record.submissions.map(item => item.id === updated.id ? updated : item) }
-      : record));
-  }, []);
+    if (scope !== sessionScope()) return;
+    queryClient.setQueryData<AssignmentSubmission[]>(["api", scope, "/assignments/" + assignmentId + "/submissions"], current => current?.map(item => item.id === updated.id ? updated : item));
+  }, [scope]);
 
-  const handleGrade = useCallback(async (submissionId: string, score: number, feedback: string) => {
-    const record = records.find(item => item.assignment.id === selectedId);
+  const handleGrade = async (submissionId: string, score: number, feedback: string, reason?: string) => {
+    const record = records.find(item => item.assignment.id === currentId);
     if (!record) return;
-    const updated = await gradeAssignmentSubmission(record.assignment.id, submissionId, score, feedback, true);
+    const updated = await gradeAssignmentSubmission(record.assignment.id, submissionId, score, feedback, true, reason);
     updateSubmission(record.assignment.id, updated);
-  }, [records, selectedId, updateSubmission]);
+  };
 
-  const handleReopen = useCallback(async (submissionId: string) => {
-    const record = records.find(item => item.assignment.id === selectedId);
+  const handleReopen = async (submissionId: string, reason?: string) => {
+    const record = records.find(item => item.assignment.id === currentId);
     if (!record) return;
-    const updated = await reopenAssignmentSubmission(record.assignment.id, submissionId);
+    const updated = await reopenAssignmentSubmission(record.assignment.id, submissionId, reason);
     updateSubmission(record.assignment.id, updated);
-  }, [records, selectedId, updateSubmission]);
+  };
 
   return (
     <>
@@ -173,11 +137,11 @@ export default function Lab() {
             </div>
           )}
 
-          {!error && records.length > 0 && (
+          {records.length > 0 && (
             <div className="lab-content-grid">
               <TeacherAssignmentList
                 records={records}
-                selectedId={selectedId}
+                selectedId={currentId}
                 onSelect={setSelectedId}
                 loadedIds={loadedIds}
               />
@@ -263,7 +227,7 @@ export default function Lab() {
                     {selectedFailed ? (
                       <div className="lab-empty-state" role="alert">
                         <strong>Chưa tải được bài nộp của bài này</strong>
-                        <button type="button" className="lab-grade-button" onClick={() => { setFailedIds(current => { const next = new Set(current); next.delete(selectedId); return next; }); void loadSubmissions(selectedId); }}>Thử lại</button>
+                        <button type="button" className="lab-grade-button" onClick={retrySubmissions}>Thử lại</button>
                       </div>
                     ) : !selectedLoaded ? (
                       <TeacherSubmissionTableLoading />

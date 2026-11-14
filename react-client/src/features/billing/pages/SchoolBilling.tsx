@@ -1,11 +1,11 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, Button, Card, Table } from "@radix-ui/themes";
 import { motion, useReducedMotion } from "motion/react";
-import { getRegistrationPlans, type LicensePlan } from "../api/billingApi";
-import { purchaseSchoolPlan, quoteSchoolPlan, schoolBilling } from "../api/billingApi";
-import { getLicenseStatus } from "../../account/api/userApi";
+import { type LicensePlan } from "../api/billingApi";
+import { purchaseSchoolPlan, quoteSchoolPlan } from "../api/billingApi";
+import type { LicenseStatus } from "../../account/api/userApi";
 import type { PlanQuote, SchoolBilling as Billing } from "../../school/types";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -35,50 +35,27 @@ export default function SchoolBilling() {
   const reducedMotion = useReducedMotion();
   const navigate = useNavigate();
   const user = useSessionStore((state) => state.user);
-  const setUser = useSessionStore((state) => state.setUser);
-  const [billing, setBilling] = useState<Billing | null>(null);
-  const [plans, setPlans] = useState<LicensePlan[]>([]);
-  const [licenseWritable, setLicenseWritable] = useState<boolean | null>(null);
-  const [selected, setSelected] = useState("");
   const [quote, setQuote] = useState<PlanQuote | null>(null);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [next, catalog, license] = await Promise.all([
-        schoolBilling(),
-        getRegistrationPlans(),
-        getLicenseStatus().catch(() => null),
-      ]);
-      setBilling(next);
-      setPlans(catalog);
-      setLicenseWritable(license?.canPerformWriteOperations ?? null);
-      const currentChoice = next.planChoices?.find(choice => choice.planCode === next.planCode && choice.allowed);
-      setSelected(currentChoice?.planCode || next.planChoices?.find(choice => choice.allowed)?.planCode || "");
-      setQuote(null);
-      if (
-        user &&
-        license &&
-        user.billingRequired !== !license.canPerformWriteOperations
-      ) {
-        setUser({
-          ...user,
-          billingRequired: !license.canPerformWriteOperations,
-        });
-      }
-    } catch (err) {
-      setError(apiMessage(err, "Không thể tải thông tin gói."));
-    } finally {
-      setLoading(false);
-    }
-  }, [setUser, user]);
-  useApiRefresh(["/school/billing", "/user/me/license"], load);
+  const [actionError, setError] = useState("");
+  const billingResource = useResource<Billing>("/school/billing");
+  const plansResource = useResource<LicensePlan[]>("/auth/plans");
+  const licenseResource = useResource<LicenseStatus>("/user/me/license");
+  const billing = billingResource.data ?? null;
+  const plans = plansResource.data ?? [];
+  const licenseWritable = licenseResource.data?.canPerformWriteOperations ?? null;
+  const loading = billingResource.loading || plansResource.loading;
+  const error = actionError || billingResource.error || plansResource.error || "";
+  const [selectedDraft, setSelected] = useState("");
+  const selected = selectedDraft || billing?.planChoices?.find(choice => choice.planCode === billing.planCode && choice.allowed)?.planCode || billing?.planChoices?.find(choice => choice.allowed)?.planCode || "";
+  const load = () => { setError(""); return Promise.all([billingResource.refresh(), plansResource.refresh(), licenseResource.refresh()]); };
   useEffect(() => {
-    void load();
-  }, [load]);
+    const actor = useSessionStore.getState().user;
+    if (actor && licenseWritable !== null && actor.billingRequired !== !licenseWritable) {
+      useSessionStore.getState().setUser({ ...actor, billingRequired: !licenseWritable });
+    }
+  }, [licenseWritable]);
+
   const getQuote = async () => {
     setBusy(true);
     setError("");

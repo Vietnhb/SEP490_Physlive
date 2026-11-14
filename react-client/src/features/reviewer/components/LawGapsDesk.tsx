@@ -1,5 +1,5 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import { Button, Card, Heading, SegmentedControl, Text, TextArea } from "@radix-ui/themes";
@@ -20,21 +20,17 @@ const KIND: Record<Gap["kind"], { title: string; todo: string }> = {
 
 /** What teachers' simulations computed that no law could check, most frequent first. */
 export function LawGapsDesk() {
-  const [items, setItems] = useState<Gap[]>([]);
   const [filter, setFilter] = useState<Filter>("OPEN");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { setItems((await api.get<Gap[]>("/reviewer/law-gaps", { params: { status: filter } })).data); }
-    catch { setError("Chưa tải được danh sách. Vui lòng thử lại."); }
-    finally { setLoading(false); }
-  }, [filter]);
-  useApiRefresh(["/reviewer/law-gaps", "/schemas"], load);
-  useEffect(() => { void load(); }, [load]);
+  const resource = useResource<Gap[]>("/reviewer/law-gaps?status=" + filter);
+  const items = resource.data ?? [];
+  const setItems = resource.setData;
+  const loading = resource.loading;
+  const error = actionError || resource.error || "";
+  const load = () => { setError(""); return resource.refresh(); };
 
   const decide = async (gap: Gap, status: Filter) => {
     setBusy(gap.id); setError("");
@@ -51,7 +47,7 @@ export function LawGapsDesk() {
     <header className="reviewer-page-head"><div>
       <Heading as="h1" size="6">Định luật còn thiếu</Heading>
       <Text as="p" size="2" color="gray" mt="1">Khi giáo viên tạo mô phỏng, có đại lượng hệ thống tính được nhưng chưa định luật nào đối chiếu. Mỗi dòng là một loại như vậy, xếp theo số lần gặp. Giáo viên vẫn dùng được mô phỏng và đã được báo là phần này đang chờ bổ sung.</Text>
-    </div></header>
+    </div><Button variant="outline" disabled={resource.refreshing} onClick={() => void load()}>Làm mới</Button></header>
     <SegmentedControl.Root value={filter} onValueChange={value => setFilter(value as Filter)}>
       <SegmentedControl.Item value="OPEN">Cần xử lý</SegmentedControl.Item>
       <SegmentedControl.Item value="RESOLVED">Đã bổ sung</SegmentedControl.Item>
