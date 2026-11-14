@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class SupportController {
     private final SupportService service;
     private final com.example.backend.system.support.service.SupportInboxService inbox;
+    private final com.example.backend.system.realtime.controller.RealtimeEvents realtime;
 
     @GetMapping("/inbox")
     public com.example.backend.system.support.service.SupportInboxService.InboxPage inbox(
@@ -27,7 +28,10 @@ public class SupportController {
     }
 
     @GetMapping("/inbox/pending-count")
-    public java.util.Map<String, Long> pendingCount() { return java.util.Map.of("count", inbox.pendingCount()); }
+    public java.util.Map<String, Long> pendingCount() {
+        long revision = realtime.currentSupportRevision();
+        return java.util.Map.of("count", inbox.pendingCount(), "revision", revision);
+    }
 
 
     @PostMapping("/feedback")

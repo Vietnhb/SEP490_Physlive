@@ -27,9 +27,16 @@ public class AccountAppealService {
     private final UserRepository userRepository;
     private final CurrentUserService currentUser;
     private final AdminService adminService;
+    private final com.example.backend.system.realtime.controller.RealtimeChangePublisher changes;
 
     @Transactional
     public AppealResponse createAppeal(Authentication authentication, CreateAppealRequest request) {
+        return createAppeal(authentication, request, ignored -> { });
+    }
+
+    @Transactional
+    public AppealResponse createAppeal(Authentication authentication, CreateAppealRequest request,
+            java.util.function.Consumer<AccountAppeal> saveEvidence) {
         if (authentication == null) throw ApiException.unauthorized("Vui lòng đăng nhập.");
         User user = userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản."));
@@ -53,7 +60,10 @@ public class AccountAppealService {
         appeal.setSuspendedAt(user.getDeactivatedAt());
         appeal.setCreatedAt(Instant.now());
         appeal.setStatus("PENDING");
-        return response(appealRepository.save(appeal), user);
+        AccountAppeal saved = appealRepository.save(appeal);
+        saveEvidence.accept(saved);
+        changes.changed("/api/appeals");
+        return response(saved, user);
     }
 
     public List<AppealResponse> myAppeals(Authentication authentication) {
@@ -88,6 +98,7 @@ public class AccountAppealService {
         appeal.setStatus(status);
         appeal.setResolutionNote(request.resolutionNote().trim());
         appeal.setResolvedAt(Instant.now());
+        changes.changed("/api/admin/appeals/" + id + "/resolve");
         return response(appealRepository.save(appeal), actor);
     }
 
@@ -112,6 +123,14 @@ public class AccountAppealService {
         return "SCHOOL".equals(role(actor)) && actor.getSchool() != null
                 && actor.getSchool().getId().equals(appeal.getSchoolId())
                 && Set.of("STAFF", "STUDENT").contains(role(appeal.getUser()));
+    }
+
+    public AccountAppeal requireView(UUID id) {
+        User actor = currentUser.requireCurrentUser();
+        AccountAppeal appeal = appealRepository.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy đơn khiếu nại."));
+        if (!Objects.equals(actor.getId(), appeal.getUser().getId()) && (actor.isSuspendedReadOnly() || !canView(actor, appeal)))
+            throw ApiException.forbidden("Bạn không có quyền xem minh chứng của đơn này.");
+        return appeal;
     }
 
     private boolean canHandle(User actor, AccountAppeal appeal, User target) {

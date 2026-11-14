@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class AppealController {
     private final AccountAppealService appeals;
 
-    @PostMapping("/appeals")
+    @PostMapping(value = "/appeals", consumes = "application/json")
     public AppealResponse createAppeal(Authentication authentication, @Valid @RequestBody CreateAppealRequest request) {
         return appeals.createAppeal(authentication, request);
     }

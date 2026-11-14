@@ -15,7 +15,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class RealtimeEvents {
     private static final long STREAM_TIMEOUT_MS = 30L * 60L * 1000L;
     private final AtomicLong revision = new AtomicLong();
+    private final AtomicLong supportRevision = new AtomicLong();
     private final Set<SseEmitter> emitters = ConcurrentHashMap.newKeySet();
+    public long currentSupportRevision() { return supportRevision.get(); }
 
     public SseEmitter connect() {
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
@@ -34,6 +36,7 @@ public class RealtimeEvents {
     }
 
     public void publish(String path, String clientId) {
+        if (path != null && path.matches("/api/(?:appeals|admin/appeals|support)(?:/.*)?")) supportRevision.incrementAndGet();
         RealtimeEvent change = new RealtimeEvent(revision.incrementAndGet(), path, clientId, Instant.now());
         broadcast(SseEmitter.event().id(Long.toString(change.revision())).name("change").data(change));
     }

@@ -60,6 +60,7 @@ public class SecurityConfig {
                 .requestMatchers(POST, "/api/simulation/render-diagnostics").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api/auth/**", "/ws/**", "/actuator/health").permitAll()
                 .requestMatchers("/api/user/me", "/api/user/me/**").hasAnyRole(ADMIN, MANAGER, REVIEWER, SCHOOL, STAFF, STUDENT)
+                .requestMatchers(GET, "/api/schools/*/users/*/profile").hasRole(SCHOOL)
                 .requestMatchers(GET, "/api/admin/appeals").hasAnyRole(MANAGER, SCHOOL)
                 .requestMatchers(PUT, "/api/admin/appeals/**").hasAnyRole(MANAGER, SCHOOL)
                 .requestMatchers("/api/appeals", "/api/appeals/**").hasAnyRole(ADMIN, MANAGER, REVIEWER, SCHOOL, STAFF, STUDENT)
@@ -90,6 +91,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/support/**").hasAnyRole(APPLICATION_ROLES)
                 .requestMatchers("/api/school/billing", "/api/school/billing/**").hasRole(SCHOOL)
                 // Match assignment actions before the broader shared reads.
+                .requestMatchers(GET, "/api/assignments/*/submissions/*/grade-history").hasAnyRole(SCHOOL, STAFF, MANAGER)
                 .requestMatchers("/api/assignments/mine/teacher", "/api/assignments/mine/teacher/classes",
                     "/api/assignments/*/submissions", "/api/assignments/*/report",
                     "/api/assignments/*/submissions/*/grade", "/api/assignments/*/submissions/*/reopen").hasAnyRole(STAFF, MANAGER)

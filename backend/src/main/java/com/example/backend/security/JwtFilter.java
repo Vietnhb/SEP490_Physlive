@@ -141,7 +141,8 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private static boolean isSuspendedPortalPath(String method, String path) {
-        return "GET".equals(method) && List.of("/api/user/me", "/api/appeals/my", "/api/support/mine").contains(path)
+        return "GET".equals(method) && (List.of("/api/user/me", "/api/appeals/my", "/api/support/mine").contains(path)
+                || path.matches("/api/appeals/[0-9a-fA-F-]{36}/evidence(?:/[0-9a-fA-F-]{36})?"))
                 || "POST".equals(method) && List.of("/api/appeals", "/api/auth/logout").contains(path);
     }
 

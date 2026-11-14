@@ -22,7 +22,8 @@ public class RealtimeMutationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         chain.doFilter(request, response);
-        if (response.getStatus() >= 400 || !changesData(request)) return;
+        if (response.getStatus() >= 400 || !changesData(request)
+                || Boolean.TRUE.equals(request.getAttribute(RealtimeChangePublisher.PUBLISHED_ATTRIBUTE))) return;
         realtime.ifPresent(events -> events.publish(request.getRequestURI(), request.getHeader(CLIENT_ID_HEADER)));
     }
 

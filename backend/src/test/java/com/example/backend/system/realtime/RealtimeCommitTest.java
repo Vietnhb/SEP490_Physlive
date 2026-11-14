@@ -1,6 +1,7 @@
 package com.example.backend.system.realtime;
 
 import com.example.backend.system.realtime.controller.RealtimeEvents;
+import com.example.backend.system.realtime.controller.RealtimeChangePublisher;
 import com.example.backend.system.realtime.dto.RealtimeEvent;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class RealtimeCommitTest {
     @Configuration @org.springframework.transaction.annotation.EnableTransactionManagement static class Config {
         @Bean RealtimeEvents events() { return new RealtimeEvents(); }
+        @Bean RealtimeChangePublisher publisher(org.springframework.context.ApplicationEventPublisher events) { return new RealtimeChangePublisher(events); }
         @Bean PlatformTransactionManager transactions() { return new AbstractPlatformTransactionManager() {
             protected Object doGetTransaction() { return new Object(); }
             protected void doBegin(Object transaction, TransactionDefinition definition) { }
@@ -25,17 +27,19 @@ class RealtimeCommitTest {
             var revision = (AtomicLong) ReflectionTestUtils.getField(context.getBean(RealtimeEvents.class), "revision");
             var transactions = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
             transactions.executeWithoutResult(status -> {
-                context.publishEvent(new RealtimeEvent.Change("/api/assignments/1", "test"));
+                context.getBean(RealtimeChangePublisher.class).changed("/api/appeals");
                 assertEquals(0, revision.get());
             });
             assertEquals(1, revision.get());
+            assertEquals(1, context.getBean(RealtimeEvents.class).currentSupportRevision());
             transactions.executeWithoutResult(status -> {
-                context.publishEvent(new RealtimeEvent.Change("/api/assignments/2", "test"));
+                context.getBean(RealtimeChangePublisher.class).changed("/api/appeals");
                 status.setRollbackOnly();
             });
             assertEquals(1, revision.get());
             context.publishEvent(new RealtimeEvent.Change("/api/library/1", "test"));
             assertEquals(2, revision.get());
+            assertEquals(1, context.getBean(RealtimeEvents.class).currentSupportRevision(), "Library updates must not force an inbox reload");
         }
     }
 }
