@@ -11,5 +11,5 @@ public record ClassGradebook(UUID classId, String className, String schoolYear,
                              String assignedBy, Instant dueAt) { }
     public record Student(Integer id, String fullName, String email, boolean current, List<Cell> cells) { }
     public record Cell(UUID assignmentId, String state, BigDecimal score, BigDecimal maxScore,
-                       String feedback, String gradedBy, Instant gradedAt, Instant completedAt) { }
+                       String feedback, String gradedBy, Instant gradedAt, Instant completedAt, UUID submissionId) { }
 }

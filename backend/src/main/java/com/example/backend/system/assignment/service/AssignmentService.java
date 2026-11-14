@@ -58,6 +58,8 @@ public class AssignmentService {
     private final SimulationService simulationService;
     private final ClassEnrollmentRepository classEnrollments;
     private final ClassTeacherAssignmentRepository classTeacherAssignments;
+    private final com.example.backend.system.assignment.repository.AssignmentGradeChangeRepository gradeChanges;
+    private final com.example.backend.system.school.repository.SchoolRepository schools;
 
     private static String activityType(JsonNode questions) {
         String value = questions == null ? "" : questions.path("activityType").asText("");
@@ -102,6 +104,7 @@ public class AssignmentService {
     @Transactional
     public AssignmentResponse create(CreateAssignmentRequest request) {
         User teacher = currentUserService.requireCurrentUser();
+        if (teacher.getSchool() != null) lockSchool(teacher.getSchool().getId());
         if (request.questions() == null || !request.questions().path("prompt").isTextual()
                 || request.questions().path("prompt").asText().isBlank())
             throw ApiException.badRequest("Vui lòng nhập câu hỏi bài tập");
@@ -222,7 +225,8 @@ public class AssignmentService {
             if (teacher.getSchool() != null && teacher.getSchool().getId().equals(classroom.getSchool().getId()))
                 assignmentRepository.findBySchoolClassIdOrderByAssignedAtDesc(classroom.getId()).forEach(item -> visible.put(item.getId(), item));
         });
-        return visible.values().stream().sorted(java.util.Comparator.comparing(Assignment::getAssignedAt).reversed())
+        return visible.values().stream().filter(item -> canReadAssignment(teacher, item))
+                .sorted(java.util.Comparator.comparing(Assignment::getAssignedAt).reversed())
                 .map(this::toResponse).toList();
     }
 
@@ -373,11 +377,14 @@ public class AssignmentService {
             prediction.put(ESTIMATED_VALUE, request.estimatedValue());
         if (assignment.isAutoGrade() && !finiteNumber(prediction.path(ESTIMATED_VALUE)))
             throw ApiException.badRequest("Vui lòng nhập kết quả đo dạng số cho bài tập này");
+        var automaticChange = assignment.isAutoGrade() ? captureGrade(submission, null, "AUTO_GRADED", "Chấm tự động theo tiêu chí bài đo") : null;
         submission.setCompletedAt(Instant.now());
         submission.setRetryAllowed(false);
         submission.setGradingStatus(com.example.backend.system.assignment.model.enums.GradingStatus.PENDING);
         if (assignment.isAutoGrade()) autoGrade(assignment, submission);
-        return toSubmission(submissionRepository.save(submission));
+        submission = submissionRepository.save(submission);
+        if (automaticChange != null && submission.getScore() != null) saveGradeChange(automaticChange, submission);
+        return toSubmission(submission);
     }
 
     private static boolean finiteNumber(JsonNode value) {
@@ -401,43 +408,69 @@ public class AssignmentService {
     @Transactional
     public AssignmentSubmissionResponse grade(java.util.UUID assignmentId, java.util.UUID submissionId,
                                                BigDecimal score, String feedback, boolean confirm) {
+        return grade(assignmentId, submissionId, score, feedback, confirm, null);
+    }
+
+    @Transactional
+    public AssignmentSubmissionResponse grade(java.util.UUID assignmentId, java.util.UUID submissionId,
+                                               BigDecimal score, String feedback, boolean confirm, String reason) {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
+        lockAssignmentSchool(assignment);
         if (!canManageAssignment(teacher, assignment))
             throw ApiException.forbidden("Bạn không có quyền chấm bài này. Sau bàn giao, giáo viên đang phụ trách lớp sẽ tiếp nhận.");
-        AssignmentSubmission submission = submissionRepository.findById(submissionId)
+        AssignmentSubmission submission = submissionRepository.findByIdForUpdate(submissionId)
                 .filter(item -> item.getAssignment().getId().equals(assignmentId))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy bài nộp"));
         if (submission.getCompletedAt() == null)
             throw ApiException.badRequest("Học sinh chưa nộp bài tập này");
         BigDecimal assignmentMaxScore = assignment.getMaxScore();
-        if (score.compareTo(assignmentMaxScore) > 0) throw ApiException.badRequest("Điểm không được vượt quá điểm tối đa của bài tập");
+        if (score == null || score.signum() < 0 || score.compareTo(assignmentMaxScore) > 0)
+            throw ApiException.badRequest("Điểm phải từ 0 đến điểm tối đa của bài tập");
+        String nextFeedback = feedback == null ? null : feedback.trim();
+        if (confirm && submission.getGradingStatus() == GradingStatus.TEACHER_CONFIRMED && submission.getScore() != null
+                && submission.getScore().compareTo(score) == 0 && java.util.Objects.equals(submission.getFeedback(), nextFeedback))
+            return toSubmission(submission);
+        requireGradeChangeReason(submission, reason);
+        var change = captureGrade(submission, teacher, "GRADED", reason);
         submission.setScore(score); submission.setMaxScore(assignmentMaxScore); submission.setFeedback(feedback == null ? null : feedback.trim());
         submission.setGradingStatus(confirm ? com.example.backend.system.assignment.model.enums.GradingStatus.TEACHER_CONFIRMED : com.example.backend.system.assignment.model.enums.GradingStatus.AI_GRADED);
         submission.setGradedAt(Instant.now()); submission.setGradedBy(teacher); submission.setRetryAllowed(false);
-        return toSubmission(submissionRepository.save(submission));
+        submission = submissionRepository.save(submission);
+        saveGradeChange(change, submission);
+        return toSubmission(submission);
     }
 
     @Transactional
     public AssignmentSubmissionResponse reopen(java.util.UUID assignmentId, java.util.UUID submissionId) {
+        return reopen(assignmentId, submissionId, null);
+    }
+
+    @Transactional
+    public AssignmentSubmissionResponse reopen(java.util.UUID assignmentId, java.util.UUID submissionId, String reason) {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
+        lockAssignmentSchool(assignment);
         if (!canManageAssignment(teacher, assignment))
             throw ApiException.forbidden("Bạn không có quyền trả bài làm lại. Sau bàn giao, giáo viên đang phụ trách lớp sẽ tiếp nhận.");
-        AssignmentSubmission submission = submissionRepository.findById(submissionId)
+        AssignmentSubmission submission = submissionRepository.findByIdForUpdate(submissionId)
                 .filter(item -> item.getAssignment().getId().equals(assignmentId))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy bài nộp"));
         if (assignment.getStatus() != AssignmentStatus.ACTIVE)
             throw ApiException.badRequest("Bài tập đã đóng. Hãy mở lại bài tập trước khi trả bài cho học sinh.");
         if (submission.getCompletedAt() == null)
             throw ApiException.badRequest("Học sinh chưa nộp bài này nên không thể trả lại.");
+        requireGradeChangeReason(submission, reason);
+        var change = captureGrade(submission, teacher, "REOPENED", reason);
         // The old grade belongs to the returned attempt; the new attempt is graded afresh.
         submission.setScore(null); submission.setMaxScore(null); submission.setGradedAt(null); submission.setGradedBy(null);
         submission.setRetryAllowed(true); submission.setGradingStatus(com.example.backend.system.assignment.model.enums.GradingStatus.RETURNED);
         submission.setCompletedAt(null);
-        return toSubmission(submissionRepository.save(submission));
+        submission = submissionRepository.save(submission);
+        saveGradeChange(change, submission);
+        return toSubmission(submission);
     }
 
     /** Closing stops new work from students; reopening accepts it again. Grades already given are kept. */
@@ -446,6 +479,7 @@ public class AssignmentService {
         User teacher = currentUserService.requireCurrentUser();
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
+        lockAssignmentSchool(assignment);
         if (!canManageAssignment(teacher, assignment))
             throw ApiException.forbidden("Bạn không có quyền đóng hoặc mở bài này. Sau bàn giao, giáo viên đang phụ trách lớp sẽ tiếp nhận.");
         assignment.setStatus(status);
@@ -505,8 +539,67 @@ public class AssignmentService {
                 item.getTeacher().getId(), item.getTeacher().getFullName());
     }
 
+    @Transactional(readOnly = true)
+    public com.example.backend.common.dto.PageResponse<com.example.backend.system.assignment.dto.AssignmentContracts.GradeChangeResponse> gradeHistory(
+            UUID assignmentId, UUID submissionId, int page, int size) {
+        User actor = currentUserService.requireCurrentUser();
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
+        boolean schoolReader = actor.getRole() != null && RoleName.SCHOOL.matches(actor.getRole().getName())
+                && actor.getSchool() != null && assignment.getSchoolClass() != null
+                && actor.getSchool().getId().equals(assignment.getSchoolClass().getSchool().getId());
+        if (actor.isSuspendedReadOnly() || (!schoolReader && !canReadAssignment(actor, assignment)))
+            throw ApiException.forbidden("Bạn không có quyền xem lịch sử điểm của bài này.");
+        submissionRepository.findById(submissionId).filter(item -> item.getAssignment().getId().equals(assignmentId))
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy bài nộp"));
+        var request = com.example.backend.common.dto.PageResponse.request(page, size,
+                org.springframework.data.domain.Sort.by("createdAt").descending().and(org.springframework.data.domain.Sort.by("id").descending()));
+        return com.example.backend.common.dto.PageResponse.from(gradeChanges.findBySubmissionId(submissionId, request).map(item ->
+                new com.example.backend.system.assignment.dto.AssignmentContracts.GradeChangeResponse(item.getId(), item.getCreatedAt(),
+                        item.getActor() == null ? null : item.getActor().getId(), item.getActorName(), item.getEventType(),
+                        item.getPreviousScore(), item.getNewScore(), item.getPreviousFeedback(), item.getNewFeedback(),
+                        item.getPreviousStatus(), item.getNewStatus(), item.getPreviousGraderId(), item.getPreviousGraderName(),
+                        item.getPreviousGradedAt(), item.getReason())));
+    }
+
+    private void lockSchool(UUID schoolId) {
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+    }
+
+    private void lockAssignmentSchool(Assignment assignment) {
+        if (assignment.getSchoolClass() != null) lockSchool(assignment.getSchoolClass().getSchool().getId());
+    }
+
+    private static void requireGradeChangeReason(AssignmentSubmission submission, String reason) {
+        if (reason != null && reason.length() > 2000) throw ApiException.badRequest("Lý do tối đa 2000 ký tự.");
+        if (submission.getGradingStatus() == GradingStatus.TEACHER_CONFIRMED && (reason == null || reason.isBlank()))
+            throw ApiException.badRequest("Vui lòng nhập lý do khi thay đổi điểm hoặc trả lại bài đã xác nhận.");
+    }
+
+    private com.example.backend.system.assignment.model.entity.AssignmentGradeChange captureGrade(
+            AssignmentSubmission submission, User actor, String eventType, String reason) {
+        var change = new com.example.backend.system.assignment.model.entity.AssignmentGradeChange();
+        change.setSubmission(submission); change.setActor(actor);
+        change.setActorName(actor == null ? "Hệ thống" : actor.getFullName()); change.setEventType(eventType);
+        change.setPreviousScore(submission.getScore()); change.setPreviousFeedback(submission.getFeedback());
+        change.setPreviousStatus(submission.getGradingStatus() == null ? null : submission.getGradingStatus().name());
+        change.setPreviousGradedAt(submission.getGradedAt());
+        if (submission.getGradedBy() != null) {
+            change.setPreviousGraderId(submission.getGradedBy().getId());
+            change.setPreviousGraderName(submission.getGradedBy().getFullName());
+        }
+        change.setReason(reason == null || reason.isBlank() ? null : reason.trim());
+        return change;
+    }
+
+    private void saveGradeChange(com.example.backend.system.assignment.model.entity.AssignmentGradeChange change, AssignmentSubmission submission) {
+        change.setSubmission(submission); change.setNewScore(submission.getScore()); change.setNewFeedback(submission.getFeedback());
+        change.setNewStatus(submission.getGradingStatus() == null ? null : submission.getGradingStatus().name());
+        gradeChanges.save(change);
+    }
+
     private boolean canReadAssignment(User actor, Assignment assignment) {
-        return canManageAssignment(actor, assignment) || (isTeachingStaff(actor) && assignment.getTeacher().getId().equals(actor.getId()));
+        return canManageAssignment(actor, assignment);
     }
 
     private boolean canManageAssignment(User actor, Assignment assignment) {
@@ -527,6 +620,8 @@ public class AssignmentService {
     private AssignmentSubmissionResponse toSubmission(AssignmentSubmission item) {
         return new AssignmentSubmissionResponse(item.getId(), item.getAssignment().getId(), item.getStudent().getId(),
                 item.getStudent().getFullName(), item.getPredictions(), item.getSubmittedAt(), item.getCompletedAt(), item.getScore(), item.getMaxScore(),
-                item.getFeedback(), item.getGradingStatus(), item.getGradedAt(), item.isRetryAllowed());
+                item.getFeedback(), item.getGradingStatus(), item.getGradedAt(), item.isRetryAllowed(),
+                item.getGradedBy() == null ? null : item.getGradedBy().getId(),
+                item.getGradedBy() == null ? null : item.getGradedBy().getFullName());
     }
 }

@@ -58,8 +58,16 @@ public final class AssignmentContracts {
     public record GradeAssignmentRequest(
             @NotNull @DecimalMin("0.0") BigDecimal score,
             @Size(max = 4000) String feedback,
-            boolean confirm) {
+            boolean confirm,
+            @Size(max = 2000) String reason) {
     }
+
+    public record ReopenAssignmentRequest(@Size(max = 2000) String reason) { }
+
+    public record GradeChangeResponse(UUID id, Instant createdAt, Integer actorId, String actorName, String eventType,
+            BigDecimal previousScore, BigDecimal newScore, String previousFeedback, String newFeedback,
+            String previousStatus, String newStatus, Integer previousGraderId, String previousGraderName,
+            Instant previousGradedAt, String reason) { }
 
     public record AssignmentResponse(
             UUID id,
@@ -96,7 +104,8 @@ public final class AssignmentContracts {
     public record AssignmentSubmissionResponse(UUID id, UUID assignmentId, Integer studentId,
                                                String studentName, JsonNode predictions, Instant submittedAt, Instant completedAt,
                                                BigDecimal score, BigDecimal maxScore, String feedback,
-                                               GradingStatus gradingStatus, Instant gradedAt, boolean retryAllowed) {
+                                               GradingStatus gradingStatus, Instant gradedAt, boolean retryAllowed,
+                                               Integer gradedById, String gradedByName) {
     }
 
     public record StudentActionLogRequest(

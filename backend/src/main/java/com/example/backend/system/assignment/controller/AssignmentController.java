@@ -86,7 +86,7 @@ public class AssignmentController {
     public AssignmentSubmissionResponse grade(@PathVariable UUID assignmentId,
                                                @PathVariable UUID submissionId,
                                                @Valid @RequestBody GradeAssignmentRequest request) {
-        return assignmentService.grade(assignmentId, submissionId, request.score(), request.feedback(), request.confirm());
+        return assignmentService.grade(assignmentId, submissionId, request.score(), request.feedback(), request.confirm(), request.reason());
     }
 
     @PostMapping("/{id}/close")
@@ -100,7 +100,16 @@ public class AssignmentController {
     }
 
     @PostMapping("/{assignmentId}/submissions/{submissionId}/reopen")
-    public AssignmentSubmissionResponse reopen(@PathVariable UUID assignmentId, @PathVariable UUID submissionId) {
-        return assignmentService.reopen(assignmentId, submissionId);
+    public AssignmentSubmissionResponse reopen(@PathVariable UUID assignmentId, @PathVariable UUID submissionId,
+            @Valid @RequestBody(required = false) AssignmentContracts.ReopenAssignmentRequest request) {
+        return assignmentService.reopen(assignmentId, submissionId, request == null ? null : request.reason());
+    }
+
+    @GetMapping("/{assignmentId}/submissions/{submissionId}/grade-history")
+    public com.example.backend.common.dto.PageResponse<AssignmentContracts.GradeChangeResponse> gradeHistory(
+            @PathVariable UUID assignmentId, @PathVariable UUID submissionId,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size) {
+        return assignmentService.gradeHistory(assignmentId, submissionId, page, size);
     }
 }

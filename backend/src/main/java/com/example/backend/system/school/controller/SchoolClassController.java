@@ -72,6 +72,11 @@ public class SchoolClassController {
     public SchoolClassContracts.ClassSummary restore(@PathVariable UUID schoolId, @PathVariable UUID classId) { return service.restore(schoolId, classId); }
     @PostMapping("/{classId}/teachers")
     public SchoolClassContracts.TeacherAssignment assignTeacher(@PathVariable UUID schoolId, @PathVariable UUID classId, @Valid @RequestBody AssignTeacherRequest request) { return service.assignTeacher(schoolId, classId, request.teacherId()); }
+    @PutMapping("/{classId}/teacher")
+    public SchoolClassContracts.TeacherAssignment replaceTeacher(@PathVariable UUID schoolId, @PathVariable UUID classId,
+            @Valid @RequestBody SchoolClassContracts.ReplaceTeacherRequest request) {
+        return service.replaceTeacher(schoolId, classId, request.teacherId(), request.expectedTeacherId());
+    }
     @DeleteMapping("/{classId}/teachers/{teacherId}")
     @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void unassignTeacher(@PathVariable UUID schoolId, @PathVariable UUID classId, @PathVariable Integer teacherId) { service.unassignTeacher(schoolId, classId, teacherId); }

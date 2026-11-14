@@ -63,6 +63,24 @@ class SchoolClassGradeServiceTest {
         when(submissions.findByAssignmentIdIn(any())).thenReturn(List.of(submission)); submission.setScore(null);
         assertEquals("SUBMITTED", service.get(schoolId, classId).students().getFirst().cells().getFirst().state());
     }
+    @Test void transferredStudentStartsNewClassWithoutImportingOldGrades() {
+        UUID targetId = UUID.randomUUID();
+        SchoolClass target = new SchoolClass(); target.setId(targetId); target.setSchool(school); target.setName("10A2"); target.setSchoolYear("2026-2027");
+        Assignment newWork = new Assignment(); newWork.setId(UUID.randomUUID()); newWork.setSchoolClass(target); newWork.setTeacher(teacher);
+        newWork.setTitle("New class work"); newWork.getAssignedStudentIds().add(student.getId());
+        ClassEnrollment joined = new ClassEnrollment(); joined.setStudent(student); joined.setSchoolClass(target); joined.setStatus(ClassEnrollment.EnrollmentStatus.ACTIVE);
+        when(classes.findById(targetId)).thenReturn(Optional.of(target));
+        when(assignments.findBySchoolClassIdOrderByAssignedAtDesc(targetId)).thenReturn(List.of(newWork));
+        when(enrollments.findByClassId(targetId)).thenReturn(List.of(joined));
+        when(submissions.findByAssignmentIdIn(List.of(newWork.getId()))).thenReturn(List.of());
+        var newRow = service.get(schoolId, targetId).students().getFirst();
+        assertTrue(newRow.current()); assertNull(newRow.cells().getFirst().score());
+        assertEquals("NOT_STARTED", newRow.cells().getFirst().state());
+        assertEquals(newWork.getId(), newRow.cells().getFirst().assignmentId());
+        var oldRow = service.get(schoolId, classId).students().getFirst();
+        assertFalse(oldRow.current()); assertEquals(BigDecimal.ZERO, oldRow.cells().getFirst().score());
+        assertEquals(assignment.getId(), oldRow.cells().getFirst().assignmentId());
+    }
     @Test void currentStudentNotAssignedToOldWorkIsExplicitlyUnassigned() {
         enrollment.setStatus(ClassEnrollment.EnrollmentStatus.ACTIVE); assignment.getAssignedStudentIds().clear();
         when(submissions.findByAssignmentIdIn(any())).thenReturn(List.of());

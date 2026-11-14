@@ -15,6 +15,12 @@ public interface ClassTeacherAssignmentRepository extends JpaRepository<ClassTea
         UUID getClassId();
         long getTotal();
     }
+    interface ClassTeacherName {
+        UUID getClassId();
+        String getFullName();
+    }
+    @Query("SELECT a.schoolClass.id AS classId, t.fullName AS fullName FROM ClassTeacherAssignment a JOIN a.teacher t WHERE a.schoolClass.id IN :classIds AND a.isActive = true ORDER BY t.id")
+    List<ClassTeacherName> activeTeacherNames(@Param("classIds") java.util.Collection<UUID> classIds);
 
     @Query("SELECT a.schoolClass.id AS classId, COUNT(a) AS total FROM ClassTeacherAssignment a WHERE a.schoolClass.id IN :classIds AND a.isActive = true GROUP BY a.schoolClass.id")
     List<ClassCount> countActiveByClasses(@Param("classIds") java.util.Collection<UUID> classIds);

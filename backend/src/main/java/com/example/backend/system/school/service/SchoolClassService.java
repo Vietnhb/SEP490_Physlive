@@ -115,13 +115,14 @@ public class SchoolClassService {
     private List<ClassSummary> summaries(List<SchoolClass> rows) {
         if (rows.isEmpty()) return List.of();
         var ids = rows.stream().map(SchoolClass::getId).toList();
-        var teachers = teacherAssignments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
-                ClassTeacherAssignmentRepository.ClassCount::getClassId, ClassTeacherAssignmentRepository.ClassCount::getTotal));
+        var teachers = teacherAssignments.activeTeacherNames(ids).stream().collect(java.util.stream.Collectors.groupingBy(
+                ClassTeacherAssignmentRepository.ClassTeacherName::getClassId, java.util.stream.Collectors.mapping(
+                        ClassTeacherAssignmentRepository.ClassTeacherName::getFullName, java.util.stream.Collectors.toList())));
         var students = enrollments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
                 ClassEnrollmentRepository.ClassCount::getClassId, ClassEnrollmentRepository.ClassCount::getTotal));
         return rows.stream().map(row -> new ClassSummary(row.getId(), row.getName(), row.getGradeLevel(), row.getSchoolYear(),
-                row.getSubject(), Boolean.TRUE.equals(row.getIsActive()), teachers.getOrDefault(row.getId(), 0L),
-                students.getOrDefault(row.getId(), 0L))).toList();
+                row.getSubject(), Boolean.TRUE.equals(row.getIsActive()), teachers.getOrDefault(row.getId(), List.of()).size(),
+                students.getOrDefault(row.getId(), 0L), teachers.getOrDefault(row.getId(), List.of()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -228,8 +229,29 @@ public class SchoolClassService {
     }
 
     @Transactional
+    public TeacherAssignment replaceTeacher(UUID schoolId, UUID classId, Integer teacherId, Integer expectedTeacherId) {
+        requireWriteAccess(schoolId);
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+        SchoolClass schoolClass = activeClassInSchool(schoolId, classId);
+        var current = teacherAssignments.findByClassIdAndIsActiveTrue(classId);
+        if (current.size() != 1 || !current.getFirst().getTeacher().getId().equals(expectedTeacherId))
+            throw ApiException.conflict("Phân công giáo viên đã thay đổi. Vui lòng tải lại lớp trước khi thay giáo viên.");
+        if (teacherId.equals(expectedTeacherId)) throw ApiException.badRequest("Hãy chọn giáo viên khác người đang phụ trách.");
+        User teacher = userInSchool(schoolId, teacherId, RoleName.STAFF.name());
+        if (!accountAccess.canTeach(teacher)) throw ApiException.badRequest("Giáo viên mới chưa có quyền giảng dạy.");
+        current.getFirst().setIsActive(false);
+        teacherAssignments.saveAndFlush(current.getFirst());
+        var next = teacherAssignments.findBySchoolClassIdAndTeacherId(classId, teacherId).orElseGet(ClassTeacherAssignment::new);
+        next.setSchoolClass(schoolClass); next.setTeacher(teacher); next.setIsActive(true);
+        next = teacherAssignments.save(next);
+        return new TeacherAssignment(next.getId(), teacher.getId(), teacher.getFullName(), true);
+    }
+
+    @Transactional
     public void unassignTeacher(UUID schoolId, UUID classId, Integer teacherId) {
-        requireWriteAccess(schoolId); activeClassInSchool(schoolId, classId);
+        requireWriteAccess(schoolId);
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+        activeClassInSchool(schoolId, classId);
         ClassTeacherAssignment assignment = teacherAssignments.findBySchoolClassIdAndTeacherId(classId, teacherId)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy phân công giáo viên."));
         assignment.setIsActive(false); teacherAssignments.save(assignment);
@@ -289,10 +311,11 @@ public class SchoolClassService {
     }
 
     private ClassSummary summary(SchoolClass schoolClass) {
+        var names = teacherAssignments.activeTeacherNames(List.of(schoolClass.getId())).stream()
+                .map(ClassTeacherAssignmentRepository.ClassTeacherName::getFullName).toList();
         return new ClassSummary(schoolClass.getId(), schoolClass.getName(), schoolClass.getGradeLevel(), schoolClass.getSchoolYear(),
                 schoolClass.getSubject(), Boolean.TRUE.equals(schoolClass.getIsActive()),
-                teacherAssignments.countActiveByClass(schoolClass.getId()),
-                enrollments.countActiveByClass(schoolClass.getId()));
+                names.size(), enrollments.countActiveByClass(schoolClass.getId()), names);
     }
 
     private User requireWriteAccess(UUID schoolId) {

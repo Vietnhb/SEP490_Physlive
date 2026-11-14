@@ -67,7 +67,8 @@ public class SchoolClassGradeService {
                 submission == null || submission.getMaxScore() == null ? assignment.getMaxScore() : submission.getMaxScore(),
                 submission == null ? null : submission.getFeedback(),
                 submission == null || submission.getGradedBy() == null ? null : submission.getGradedBy().getFullName(),
-                submission == null ? null : submission.getGradedAt(), submission == null ? null : submission.getCompletedAt());
+                submission == null ? null : submission.getGradedAt(), submission == null ? null : submission.getCompletedAt(),
+                submission == null ? null : submission.getId());
     }
 
     public byte[] csv(UUID schoolId, UUID classId) {

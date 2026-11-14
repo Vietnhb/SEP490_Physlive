@@ -46,6 +46,19 @@ class SchoolClassRestoreTest {
     }
 
     @Test
+    void classListIncludesTeacherNamesInOneBatchedRead() {
+        classroom.setIsActive(true);
+        when(classes.findBySchoolIdAndIsActiveTrue(schoolId)).thenReturn(List.of(classroom));
+        var name = mock(ClassTeacherAssignmentRepository.ClassTeacherName.class);
+        when(name.getClassId()).thenReturn(classId); when(name.getFullName()).thenReturn("Nguyễn Văn An");
+        when(assignments.activeTeacherNames(List.of(classId))).thenReturn(List.of(name));
+        var result = service.list(schoolId).getFirst();
+        assertEquals(List.of("Nguyễn Văn An"), result.teacherNames()); assertEquals(1, result.teacherCount());
+        verify(assignments).activeTeacherNames(List.of(classId));
+        verify(assignments, never()).findByClassIdAndIsActiveTrue(any());
+    }
+
+    @Test
     void restoresSameClassWithoutReactivatingOldTeacherOrStudentMemberships() {
         var restored = service.restore(schoolId, classId);
         assertTrue(restored.active()); assertEquals(classId, restored.id());

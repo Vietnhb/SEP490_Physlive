@@ -22,6 +22,7 @@ public final class SchoolClassContracts {
 
     public record AssignTeacherRequest(@NotNull Integer teacherId) {
     }
+    public record ReplaceTeacherRequest(@NotNull Integer teacherId, @NotNull Integer expectedTeacherId) { }
 
     public record EnrollStudentRequest(@NotNull Integer studentId) {
     }
@@ -31,7 +32,7 @@ public final class SchoolClassContracts {
 
     public record Person(Integer id, String fullName, String email) { }
     public record ClassSummary(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
-                               boolean active, long teacherCount, long studentCount) { }
+                               boolean active, long teacherCount, long studentCount, List<String> teacherNames) { }
     public record ClassOverview(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
                                 boolean active, List<Person> teachers, long studentCount) { }
     public record ClassDetail(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
