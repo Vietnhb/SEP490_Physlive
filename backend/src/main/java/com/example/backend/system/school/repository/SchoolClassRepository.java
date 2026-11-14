@@ -27,4 +27,22 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, UUID>,
     List<StateCount> classStateCounts(@Param("schoolId") UUID schoolId);
 
     boolean existsBySchoolIdAndNameIgnoreCaseAndSchoolYear(UUID schoolId, String name, String schoolYear);
+
+    interface ProfileClass {
+        UUID getId();
+        String getName();
+        int getGradeLevel();
+        String getSchoolYear();
+        String getSubject();
+    }
+
+    @Query("SELECT DISTINCT c.id AS id, c.name AS name, c.gradeLevel AS gradeLevel, c.schoolYear AS schoolYear, c.subject AS subject "
+            + "FROM ClassTeacherAssignment a JOIN a.schoolClass c WHERE a.teacher.id = :userId "
+            + "AND c.school.id = :schoolId AND c.isActive = true AND a.isActive = true ORDER BY c.schoolYear DESC, c.name, c.id")
+    List<ProfileClass> profileTeacherClasses(@Param("schoolId") UUID schoolId, @Param("userId") Integer userId);
+
+    @Query("SELECT DISTINCT c.id AS id, c.name AS name, c.gradeLevel AS gradeLevel, c.schoolYear AS schoolYear, c.subject AS subject "
+            + "FROM ClassEnrollment e JOIN e.schoolClass c WHERE e.student.id = :userId "
+            + "AND c.school.id = :schoolId AND c.isActive = true AND e.status = 'ACTIVE' ORDER BY c.schoolYear DESC, c.name, c.id")
+    List<ProfileClass> profileStudentClasses(@Param("schoolId") UUID schoolId, @Param("userId") Integer userId);
 }

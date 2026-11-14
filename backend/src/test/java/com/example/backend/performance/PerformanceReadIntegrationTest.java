@@ -83,7 +83,7 @@ class PerformanceReadIntegrationTest {
     AdminService admin() { return new AdminService(users, roles, mock(org.springframework.security.crypto.password.PasswordEncoder.class), current,
             validation, mock(AccountAccessService.class), mock(LicenseCheckService.class), schools, em); }
     SupportInboxService inbox() {
-        var account = new AccountAppealService(appeals, users, current, admin());
+        var account = new AccountAppealService(appeals, users, current, admin(), mock(com.example.backend.system.realtime.controller.RealtimeChangePublisher.class));
         var help = new SupportService(support, current, mock(AccountAccessService.class));
         return new SupportInboxService(em, current, help, account);
     }
@@ -110,12 +110,38 @@ class PerformanceReadIntegrationTest {
         System.out.println("PERFORMANCE_CLASS_LIST_QUERIES=" + stats.getPrepareStatementCount() + " for 25 classes");
         assertTrue(stats.getPrepareStatementCount() <= 6, "Query count grew with the number of classes: " + stats.getPrepareStatementCount());
     }
+
+    @Test void profileClassesAreScopedAndExcludeInactiveClassesAndFormerMemberships() {
+        User teacher = user("profileTeacher", "STAFF", school), student = user("profileStudent", "STUDENT", school);
+        var active = classroom(school, "10A1");
+        var second = classroom(school, "11A1");
+        var archived = classroom(school, "Archived"); archived.setIsActive(false);
+        var former = classroom(school, "Former");
+        var foreign = classroom(other, "Foreign");
+        for (var classroom : List.of(active, second, archived, former, foreign)) {
+            var assignment = new ClassTeacherAssignment(); assignment.setSchoolClass(classroom); assignment.setTeacher(teacher);
+            assignment.setIsActive(classroom != former); teachers.save(assignment);
+            var enrollment = new ClassEnrollment(); enrollment.setSchoolClass(classroom); enrollment.setStudent(student);
+            enrollment.setSchoolYear("2026-2027");
+            if (classroom == former) enrollment.setStatus(ClassEnrollment.EnrollmentStatus.TRANSFERRED);
+            enrollments.save(enrollment);
+        }
+        em.flush();
+        var profileService = new SchoolAccountProfileService(current, users, classes);
+        assertEquals(List.of("10A1", "11A1"), profileService.profile(school.getId(), teacher.getId()).classes().stream().map(item -> item.name()).toList());
+        assertEquals(List.of("10A1", "11A1"), profileService.profile(school.getId(), student.getId()).classes().stream().map(item -> item.name()).toList());
+    }
     @Test void accountFilteringAndCountsAreAppliedBeforePaging() {
         for (int i = 0; i < 16; i++) user("student" + i, "STUDENT", school);
         user("outside", "STUDENT", other); user("teacher", "STAFF", school);
         em.flush();
         var result = admin().usersPage(school.getId(), 1, 10, "", "STUDENT", "ALL", "");
-        assertEquals(16, result.totalElements()); assertEquals(6, result.items().size()); assertEquals(17, result.counts().get("total"));
+        assertEquals(16, result.totalElements()); assertEquals(6, result.items().size()); assertEquals(18, result.counts().get("total"));
+        var schoolAccount = admin().usersPage(school.getId(), 0, 10, "", "SCHOOL", "ALL", "");
+        assertEquals(1, schoolAccount.totalElements()); assertEquals(actor.getId(), schoolAccount.items().getFirst().id());
+        var firstPage = admin().usersPage(school.getId(), 0, 10, "", "ALL", "ALL", "");
+        assertEquals(actor.getId(), firstPage.items().getFirst().id());
+        assertTrue(admin().usersPage(school.getId(), 1, 10, "", "ALL", "ALL", "").items().stream().noneMatch(item -> item.id().equals(actor.getId())));
         var searched = admin().usersPage(school.getId(), 0, 10, "student15", "STUDENT", "ALL", "");
         assertEquals(1, searched.totalElements());
         assertEquals(0, admin().usersPage(school.getId(), 0, 10, "outside", "ALL", "ALL", "").totalElements());

@@ -39,11 +39,18 @@ public class AdminService {
     public UserPage usersPage(java.util.UUID schoolId, int page, int size, String query, String role, String tier, String status) {
         if (schoolId != null) requireSchoolAccess(schoolId);
         if (query != null && query.length() > 200) throw ApiException.badRequest("Search is too long.");
+        User actor = schoolId == null ? null : currentUserService.requireCurrentUser();
+        Integer firstUserId = actor != null && actor.getRole() != null && RoleName.SCHOOL.matches(actor.getRole().getName())
+                ? actor.getId() : null;
         org.springframework.data.jpa.domain.Specification<User> scope = (root, cq, cb) -> {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
             if (schoolId != null) {
                 predicates.add(cb.equal(root.get("school").get("id"), schoolId));
-                predicates.add(root.get("role").get("name").in(java.util.List.of("STAFF", "STUDENT")));
+                predicates.add(root.get("role").get("name").in(java.util.List.of("SCHOOL", "STAFF", "STUDENT")));
+            }
+            if (firstUserId != null && cq != null && cq.getResultType() != Long.class && cq.getResultType() != long.class) {
+                cq.orderBy(cb.asc(cb.<Integer>selectCase().when(cb.equal(root.get("id"), firstUserId), 0).otherwise(1)),
+                        cb.asc(root.get("fullName")), cb.asc(root.get("id")));
             }
             return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
@@ -68,13 +75,15 @@ public class AdminService {
             }
             return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
-        var request = com.example.backend.common.dto.PageResponse.request(page, size, org.springframework.data.domain.Sort.by("fullName").and(org.springframework.data.domain.Sort.by("id")));
+        var request = com.example.backend.common.dto.PageResponse.request(page, size, firstUserId != null
+                ? org.springframework.data.domain.Sort.unsorted()
+                : org.springframework.data.domain.Sort.by("fullName").and(org.springframework.data.domain.Sort.by("id")));
         var result = userRepository.findAll(scope.and(filters), request);
         if (page > 0 && result.isEmpty() && result.getTotalElements() > 0)
             result = userRepository.findAll(scope.and(filters), request.withPage(Math.max(0, result.getTotalPages() - 1)));
         java.util.Map<String, Long> counts = new java.util.HashMap<>();
         for (var count : userRepository.accountCounts(schoolId)) {
-            if (schoolId != null && !java.util.Set.of("STAFF", "STUDENT").contains(count.getRole())) continue;
+            if (schoolId != null && !java.util.Set.of("SCHOOL", "STAFF", "STUDENT").contains(count.getRole())) continue;
             counts.merge(count.getRole() == null ? "UNKNOWN" : count.getRole(), count.getTotal(), Long::sum);
             counts.merge("total", count.getTotal(), Long::sum);
             if (Boolean.FALSE.equals(count.getActive())) counts.merge("suspended", count.getTotal(), Long::sum);

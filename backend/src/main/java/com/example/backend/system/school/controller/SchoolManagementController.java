@@ -22,6 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class SchoolManagementController {
     private final AdminService adminService;
+    private final com.example.backend.system.school.service.SchoolAccountProfileService profileService;
+
+    @GetMapping("/{userId}/profile")
+    public com.example.backend.system.school.dto.SchoolAccountProfile profile(@PathVariable UUID schoolId,
+            @PathVariable Integer userId) {
+        return profileService.profile(schoolId, userId);
+    }
 
     @GetMapping("/page")
     public AdminService.UserPage page(@PathVariable UUID schoolId,
