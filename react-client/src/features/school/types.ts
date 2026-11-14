@@ -30,6 +30,7 @@ export interface SchoolClassSummary {
   subject: string | null;
   active: boolean;
   teacherCount: number;
+  teacherNames?: string[];
   studentCount: number;
 }
 export interface SchoolClassDetail extends SchoolClassSummary {

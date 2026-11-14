@@ -1,7 +1,7 @@
 import api from "../../../shared/api/client";
 
 export type GradeAssignment = { id: string; title: string; status: string; maxScore: number; assignedBy: string; dueAt?: string | null };
-export type GradeCell = { assignmentId: string; state: string; score: number | null; maxScore: number; feedback?: string | null; gradedBy?: string | null; gradedAt?: string | null; completedAt?: string | null };
+export type GradeCell = { submissionId?: string | null; assignmentId: string; state: string; score: number | null; maxScore: number; feedback?: string | null; gradedBy?: string | null; gradedAt?: string | null; completedAt?: string | null };
 export type GradeStudent = { id: number; fullName: string; email: string; current: boolean; cells: GradeCell[] };
 export type ClassGradebook = { classId: string; className: string; schoolYear: string; assignments: GradeAssignment[]; students: GradeStudent[] };
 

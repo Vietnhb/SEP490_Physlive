@@ -1,8 +1,9 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
+import { useMemo, useState } from "react";
 import { Badge, Button, Callout, Card, Progress, Select, Table, TextField } from "@radix-ui/themes";
 import { Link } from "react-router-dom";
-import { downloadSchoolClassesCsv, schoolReportClasses, schoolReportSummary, schoolReportTokenOptions, schoolReportTokenPage, type SchoolReportClass, type SchoolReportSummary, type SchoolTokenOptions, type SchoolTokenPage } from "../api/schoolApi";
+import { downloadSchoolClassesCsv, type SchoolReportClass, type SchoolReportSummary, type SchoolTokenOptions, type SchoolTokenPage } from "../api/schoolApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -22,11 +23,7 @@ function SummaryCard({ label, value, detail, icon }: Readonly<{ label: string; v
 
 export default function SchoolReports() {
   const schoolId = useSessionStore(state => state.user?.schoolId);
-  const [summary, setSummary] = useState<SchoolReportSummary | null>(null);
-  const [classes, setClasses] = useState<SchoolReportClass[]>([]);
-  const [options, setOptions] = useState<SchoolTokenOptions>({ operations: [], months: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState(false);
   const [classQuery, setClassQuery] = useState("");
@@ -38,36 +35,27 @@ export default function SchoolReports() {
   const [tokenMonth, setTokenMonth] = useState("ALL");
   const [tokenPage, setTokenPage] = useState(0);
   const [tokenSize, setTokenSize] = useState(10);
-  const [tokenResult, setTokenResult] = useState<SchoolTokenPage | null>(null);
-  const [tokenLoading, setTokenLoading] = useState(true);
-  const [tokenError, setTokenError] = useState("");
-  const [tokenRefresh, setTokenRefresh] = useState(0);
 
-  const load = useCallback(async () => {
-    if (!schoolId) return;
-    setLoading(true); setError("");
-    try {
-      const [nextSummary, nextClasses, nextOptions] = await Promise.all([schoolReportSummary(schoolId), schoolReportClasses(schoolId), schoolReportTokenOptions(schoolId)]);
-      setSummary(nextSummary); setClasses(nextClasses); setOptions(nextOptions);
-    } catch (cause) { setError(apiMessage(cause, "Không thể tải báo cáo trường.")); }
-    finally { setLoading(false); }
-  }, [schoolId]);
-  useApiRefresh(["/schools/reports"], load);
-  useEffect(() => { void load(); }, [load]);
-
-  useEffect(() => {
-    if (!schoolId) return;
-    const controller = new AbortController();
-    setTokenLoading(true); setTokenError("");
-    const timer = window.setTimeout(() => {
-      void schoolReportTokenPage(schoolId, { page: tokenPage, size: tokenSize, query: tokenQuery.trim() || undefined,
-        operation: tokenOperation === "ALL" ? undefined : tokenOperation, month: tokenMonth === "ALL" ? undefined : tokenMonth }, controller.signal)
-        .then(result => { if (!controller.signal.aborted) setTokenResult(result); })
-        .catch(cause => { if (!controller.signal.aborted) setTokenError(apiMessage(cause, "Không thể tải lịch sử token.")); })
-        .finally(() => { if (!controller.signal.aborted) setTokenLoading(false); });
-    }, 250);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [schoolId, tokenPage, tokenSize, tokenQuery, tokenOperation, tokenMonth, tokenRefresh]);
+  const base = "/schools/" + schoolId + "/reports";
+  const summaryResource = useResource<SchoolReportSummary>(base + "/summary", Boolean(schoolId));
+  const classesResource = useResource<SchoolReportClass[]>(base + "/classes", Boolean(schoolId));
+  const optionsResource = useResource<SchoolTokenOptions>(base + "/token-audit/options", Boolean(schoolId));
+  const search = useDebouncedValue(tokenQuery.trim());
+  const params = new URLSearchParams({ page: String(tokenPage), size: String(tokenSize) });
+  if (search) params.set("query", search);
+  if (tokenOperation !== "ALL") params.set("operation", tokenOperation);
+  if (tokenMonth !== "ALL") params.set("month", tokenMonth);
+  const tokensResource = useResource<SchoolTokenPage>(base + "/token-audit/page?" + params, Boolean(schoolId));
+  const summary = summaryResource.data;
+  const classes = useMemo(() => classesResource.data ?? [], [classesResource.data]);
+  const options = optionsResource.data ?? { operations: [], months: [] };
+  const tokenResult = tokensResource.data;
+  const loading = summaryResource.loading || classesResource.loading || optionsResource.loading;
+  const tokenLoading = tokensResource.loading;
+  const error = actionError || summaryResource.error || classesResource.error || optionsResource.error || "";
+  const tokenError = tokensResource.error;
+  const refreshing = summaryResource.refreshing || classesResource.refreshing || optionsResource.refreshing || tokensResource.refreshing;
+  const load = () => { setError(""); return Promise.all([summaryResource.refresh(), classesResource.refresh(), optionsResource.refresh()]); };
 
   const years = useMemo(() => [...new Set(classes.map(item => item.schoolYear))].sort().reverse(), [classes]);
   const filteredClasses = useMemo(() => classes.filter(item => item.name.toLocaleLowerCase("vi").includes(classQuery.trim().toLocaleLowerCase("vi"))
@@ -88,7 +76,7 @@ export default function SchoolReports() {
 
   if (!schoolId) return null;
   return <div className={`admin-content ${s.reports}`}>
-    <div className={s.reportToolbar}><span>Số liệu tài khoản và lớp đang hoạt động</span><Button variant="outline" disabled={loading || tokenLoading} onClick={() => { void load(); setTokenRefresh(value => value + 1); }}><LearningIcon name="refresh" />Làm mới</Button></div>
+    <div className={s.reportToolbar}><span>Số liệu tài khoản và lớp đang hoạt động</span><Button variant="outline" disabled={refreshing} onClick={() => { void load(); void tokensResource.refresh(); }}><LearningIcon name="refresh" />Làm mới</Button></div>
     {error && <Callout.Root color="red" role="alert"><Callout.Text>{error}</Callout.Text><Button variant="soft" onClick={() => void load()}>Thử lại</Button></Callout.Root>}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {loading && !summary ? <DashboardLoadingSkeleton cards={4} label="Đang tải báo cáo…" /> : summary && <>
@@ -127,9 +115,9 @@ export default function SchoolReports() {
           <Select.Root size="3" value={tokenMonth} onValueChange={value => { setTokenMonth(value); setTokenPage(0); }}><Select.Trigger aria-label="Lọc theo tháng" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả tháng</Select.Item>{options.months.map(month => <Select.Item key={month} value={month.slice(0, 7)}>{monthLabel(month)}</Select.Item>)}</Select.Content></Select.Root>
           <Button size="3" variant="soft" color="gray" disabled={!hasTokenFilters} onClick={() => { setTokenQuery(""); setTokenOperation("ALL"); setTokenMonth("ALL"); setTokenPage(0); }}>Xóa bộ lọc</Button>
         </div>
-        {tokenError && <Callout.Root color="red" role="alert"><Callout.Text>{tokenError}</Callout.Text><Button variant="soft" onClick={() => setTokenRefresh(value => value + 1)}>Thử lại lịch sử</Button></Callout.Root>}
-        {tokenLoading && !tokenResult ? <TableLoadingSkeleton headers={["Thời điểm", "Tài khoản", "Hoạt động", "Tháng", "Token"]} label="Đang tải lịch sử sử dụng AI…" /> : !tokenError && <>
-          <p className={s.loadingStatus} role="status">{tokenLoading ? "Đang cập nhật lịch sử…" : `${number(tokenResult?.totalElements ?? 0)} lượt sử dụng${tokenMonth !== "ALL" ? ` · ${monthLabel(tokenMonth)}` : " · Tất cả tháng"}`}</p>
+        {tokenError && <Callout.Root color="red" role="alert"><Callout.Text>{tokenError}</Callout.Text><Button variant="soft" onClick={() => void tokensResource.refresh()}>Thử lại lịch sử</Button></Callout.Root>}
+        {tokenLoading && !tokenResult ? <TableLoadingSkeleton headers={["Thời điểm", "Tài khoản", "Hoạt động", "Tháng", "Token"]} label="Đang tải lịch sử sử dụng AI…" /> : (!tokenError || tokenResult) && <>
+          <p className={s.loadingStatus} role="status">{tokensResource.refreshing ? "Đang cập nhật lịch sử…" : `${number(tokenResult?.totalElements ?? 0)} lượt sử dụng${tokenMonth !== "ALL" ? ` · ${monthLabel(tokenMonth)}` : " · Tất cả tháng"}`}</p>
           <div className={s.tableScroll} role="region" aria-labelledby="report-token-history" tabIndex={0} aria-busy={tokenLoading}><Table.Root size="2" variant="surface"><Table.Header><Table.Row>{["Thời điểm", "Tài khoản", "Hoạt động", "Tháng", "Token"].map(label => <Table.ColumnHeaderCell key={label}>{label}</Table.ColumnHeaderCell>)}</Table.Row></Table.Header><Table.Body>{tokenResult?.items.length ? tokenResult.items.map((item, index) => <Table.Row key={`${item.recordedAt}-${item.userEmail}-${index}`}><Table.Cell>{new Date(item.recordedAt).toLocaleString("vi-VN")}</Table.Cell><Table.Cell>{item.userEmail}</Table.Cell><Table.Cell>{operationLabel(item.operation)}</Table.Cell><Table.Cell>{monthLabel(item.usageMonth)}</Table.Cell><Table.Cell>{number(item.tokens)}</Table.Cell></Table.Row>) : <Table.Row><Table.Cell colSpan={5}>Không có lượt sử dụng phù hợp với bộ lọc.</Table.Cell></Table.Row>}</Table.Body></Table.Root></div>
           <div className={s.tokenFooter}><Select.Root value={String(tokenSize)} onValueChange={value => { setTokenSize(Number(value)); setTokenPage(0); }}><Select.Trigger aria-label="Số lượt sử dụng trên mỗi trang" /><Select.Content position="popper">{[10, 25, 50, 100].map(size => <Select.Item key={size} value={String(size)}>{size} dòng/trang</Select.Item>)}</Select.Content></Select.Root><Paging page={tokenResult?.page ?? 0} size={tokenSize} total={tokenResult?.totalElements ?? 0} onPage={setTokenPage} disabled={tokenLoading} /></div>
         </>}

@@ -30,6 +30,8 @@ export const archiveSchoolClass = (schoolId: string, classId: string) => axiosCl
 export const restoreSchoolClass = (schoolId: string, classId: string) => axiosClient.post<SchoolClassSummary>(`${classesPath(schoolId)}/${classId}/restore`).then(r => r.data);
 
 export const assignClassTeacher = (schoolId: string, classId: string, teacherId: number) => axiosClient.post(`${classesPath(schoolId)}/${classId}/teachers`, { teacherId }).then(r => r.data);
+export const replaceClassTeacher = (schoolId: string, classId: string, teacherId: number, expectedTeacherId: number) =>
+  axiosClient.put(`${classesPath(schoolId)}/${classId}/teacher`, { teacherId, expectedTeacherId }).then(r => r.data);
 
 export const removeClassTeacher = (schoolId: string, classId: string, teacherId: number) => axiosClient.delete(`${classesPath(schoolId)}/${classId}/teachers/${teacherId}`).then(r => r.data);
 

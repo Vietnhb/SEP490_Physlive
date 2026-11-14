@@ -38,11 +38,11 @@ export const adjustAssignedSimulation = (
 export const assignmentSubmissions = (assignmentId: string) => 
   axiosClient.get<AssignmentSubmission[]>(`/assignments/${assignmentId}/submissions`).then(r => r.data);
 
-export const gradeAssignmentSubmission = (assignmentId: string, submissionId: string, score: number, feedback: string, confirm = true) =>
-  axiosClient.put<AssignmentSubmission>(`/assignments/${assignmentId}/submissions/${submissionId}/grade`, { score, feedback, confirm }).then(r => r.data);
+export const gradeAssignmentSubmission = (assignmentId: string, submissionId: string, score: number, feedback: string, confirm = true, reason?: string) =>
+  axiosClient.put<AssignmentSubmission>(`/assignments/${assignmentId}/submissions/${submissionId}/grade`, { score, feedback, confirm, reason }).then(r => r.data);
 
-export const reopenAssignmentSubmission = (assignmentId: string, submissionId: string) =>
-  axiosClient.post<AssignmentSubmission>(`/assignments/${assignmentId}/submissions/${submissionId}/reopen`).then(r => r.data);
+export const reopenAssignmentSubmission = (assignmentId: string, submissionId: string, reason?: string) =>
+  axiosClient.post<AssignmentSubmission>(`/assignments/${assignmentId}/submissions/${submissionId}/reopen`, { reason }).then(r => r.data);
 
 /** Closing stops students from handing in; reopening accepts work again. */
 export const setAssignmentOpen = (assignmentId: string, open: boolean) =>

@@ -479,3 +479,26 @@
     padding: 14px;
   }
 }
+button.profileName,
+button.profileName:hover:not(:disabled),
+button.profileName:active {
+  appearance: none;
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  line-height: inherit;
+  cursor: pointer;
+  transform: none;
+  border-radius: 3px;
+  vertical-align: baseline;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+button.profileName:hover:not(:disabled) { color: var(--accent-11); text-decoration: underline; text-decoration-color: var(--accent-7); text-underline-offset: 4px; }
+button.profileName:focus-visible { outline: 2px solid var(--accent-8); outline-offset: 3px; }
