@@ -1,5 +1,4 @@
-import { affectedBy, type DataChange } from "../../../shared/api/queryClient";
-import api from "../../../shared/api/client";
+import { usePendingSupport } from "../../../shared/hooks/usePendingSupport";
 import { useEffect, useState } from "react";
 import { DropdownMenu, IconButton } from "@radix-ui/themes";
 import { useNavigate } from "react-router-dom";
@@ -12,29 +11,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [notificationError, setNotificationError] = useState(false);
-  const [pendingSupport, setPendingSupport] = useState(0);
-  useEffect(() => {
-    let active = true;
-    let revision = 0;
-    const load = () => {
-      const request = ++revision;
-      void api.get<{ count: number }>("/support/inbox/pending-count").then(({ data }) => {
-        if (active && request === revision) setPendingSupport(data.count);
-      }).catch(() => { /* Keep the previous count if a refresh fails. */ });
-    };
-    load();
-    const timer = window.setInterval(load, 30000);
-    window.addEventListener("physlive:support-updated", load);
-    const changed = (event: Event) => { if (affectedBy("/support/inbox/pending-count", (event as CustomEvent<DataChange>).detail?.path)) load(); };
-    window.addEventListener("physlive:data-change", changed);
-    window.addEventListener("focus", load);
-    return () => {
-      active = false; window.clearInterval(timer);
-      window.removeEventListener("physlive:support-updated", load);
-      window.removeEventListener("physlive:data-change", changed);
-      window.removeEventListener("focus", load);
-    };
-  }, []);
+  const pendingSupport = usePendingSupport();
   useEffect(() => {
     let active = true;
     const load = () => void paymentNotifications().then(items => { if (active) { setNotifications(items); setNotificationError(false); } }).catch(() => { if (active) setNotificationError(true); });

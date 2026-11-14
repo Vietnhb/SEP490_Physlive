@@ -1,7 +1,8 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { AppealEvidenceGallery } from "../components/AppealEvidence";
+import { useRef, useState } from "react";
 import { Badge, Button, Dialog, Flex, Select, TextArea, TextField } from "@radix-ui/themes";
-import { getAdminAppeals, resolveAppeal, type Appeal } from "../api/appealApi";
+import { resolveAppeal, type Appeal } from "../api/appealApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import modal from "../../../shared/ui/ModalScroll.module.css";
@@ -10,9 +11,7 @@ import "../../support/styles/support-pages.css";
 const APPEAL_STATUS = { PENDING: "Chờ xử lý", APPROVED: "Đã duyệt mở khóa", REJECTED: "Đã từ chối" };
 
 export default function AccountAppeals() {
-  const [items, setItems] = useState<Appeal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("PENDING");
@@ -21,14 +20,12 @@ export default function AccountAppeals() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { setItems(await getAdminAppeals()); }
-    catch (err) { setError(apiMessage(err, "Không thể tải khiếu nại.")); }
-    finally { setLoading(false); }
-  }, []);
-  useApiRefresh(["/appeals", "/support/mine"], load);
-  useEffect(() => { void load(); }, [load]);
+  const appealsResource = useResource<Appeal[]>("/admin/appeals", true);
+  const items = appealsResource.data ?? [];
+  const setItems = appealsResource.setData;
+  const loading = appealsResource.loading;
+  const error = actionError || appealsResource.error || "";
+  const load = () => { setError(""); return appealsResource.refresh(); };
   const filtered = items.filter(item => (filter === "ALL" || item.status === filter)
     && `${item.userName} ${item.userEmail} ${item.reason}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")));
   const pages = Math.max(1, Math.ceil(filtered.length / 10));
@@ -59,6 +56,7 @@ export default function AccountAppeals() {
     <Dialog.Root open={!!selected} onOpenChange={open => { if (!open && !lock.current) setSelected(null); }}><Dialog.Content maxWidth="620px" className={modal.dialog}><div className={modal.body}>
       <Dialog.Title>{selected?.reason}</Dialog.Title><Dialog.Description>{selected?.userName} · {selected?.userEmail}</Dialog.Description>
       <p className="support-body">{selected?.content}</p>
+      {selected && <AppealEvidenceGallery key={selected.id} appealId={selected.id} />}
       {error && <p role="alert" className="admin-error-banner">{error}</p>}
       {selected?.status === "PENDING" ? <><label className="support-field">Kết quả / lý do xử lý<TextArea rows={4} maxLength={10000} disabled={busy} value={note} onChange={e => setNote(e.target.value)} /></label><p>Duyệt đơn sẽ mở khóa tài khoản. Từ chối sẽ giữ trạng thái tài khoản hiện tại.</p><Flex justify="end" gap="3" wrap="wrap"><Button color="gray" variant="soft" disabled={busy} onClick={() => setSelected(null)}>Đóng</Button><Button color="red" variant="outline" disabled={busy || !note.trim()} onClick={() => void save("REJECTED")}>Từ chối</Button><Button loading={busy} disabled={busy || !note.trim()} onClick={() => void save("APPROVED")}>Duyệt & mở khóa</Button></Flex></> : <><Badge>{selected ? APPEAL_STATUS[selected.status] : ""}</Badge><p className="support-body">{selected?.resolutionNote}</p><Dialog.Close><Button variant="soft">Đóng</Button></Dialog.Close></>}
     </div></Dialog.Content></Dialog.Root>

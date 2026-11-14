@@ -1,4 +1,5 @@
 import { useResource } from "../../../shared/hooks/operationsData";
+import { AppealEvidenceGallery } from "../../account/components/AppealEvidence";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -80,6 +81,7 @@ export default function SupportInbox({ schoolOnly = false }: { schoolOnly?: bool
       <Dialog.Title>{selected?.subject}</Dialog.Title><Dialog.Description>{selected?.sender} · {selected?.email}</Dialog.Description><p><Badge>{selected ? KINDS[selected.kind] : ""}</Badge> {selected ? STATUS[selected.status] : ""}</p><p className="support-body">{selected?.content}</p>
       {selected && !canProcess && <p>Chỉ xem. {selected.kind === "COMPLAINT" ? "Reviewer tiếp nhận và xử lý trực tiếp báo lỗi mô phỏng." : selected.appeal?.authority === "SCHOOL" ? "School chịu trách nhiệm xem xét quyết định khóa này." : "Yêu cầu không thuộc quyền xử lý hoặc quyết định khóa đã thay đổi."}</p>}
       {selected?.response && <div className="support-panel"><strong>Phản hồi{selected.support?.responderName ? ` (${selected.support.responderName})` : ""}</strong><p className="support-body">{selected.response}</p></div>}
+      {selected?.appeal && <AppealEvidenceGallery key={selected.appeal.id} appealId={selected.appeal.id} />}
       {error && <p role="alert" className="admin-error-banner">{error}</p>}
       {selected && canProcess && (!selected.appeal || selected.status === "PENDING") && <label className="support-field">Phản hồi / lý do xử lý<TextArea rows={4} maxLength={10000} disabled={busy} value={response} onChange={e => setResponse(e.target.value)} /></label>}
       <Flex justify="end" gap="3" wrap="wrap"><Button variant="soft" color="gray" disabled={busy} onClick={() => setSelectedKey("")}>Đóng</Button>

@@ -3,15 +3,18 @@ import { Link } from "react-router-dom";
 import { Badge, Button, Callout, Dialog, Flex, IconButton, TextArea, TextField } from "@radix-ui/themes";
 import { Cross2Icon, ExclamationTriangleIcon, LockClosedIcon } from "@radix-ui/react-icons";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
-import { createAppeal } from "../api/appealApi";
-import { apiMessage } from "../../../shared/lib/apiError";
+import { createAppeal, appealErrorMessage } from "../api/appealApi";
+import { AppealEvidencePicker } from "./AppealEvidence";
+import modal from "../../../shared/ui/ModalScroll.module.css";
 
 export default function AccountSuspendedBanner() {
   const user = useSessionStore(state => state.user);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("Yêu cầu xem xét mở khóa tài khoản");
   const [content, setContent] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -25,11 +28,12 @@ export default function AccountSuspendedBanner() {
     setError("");
     setNotice("");
     try {
-      await createAppeal({ reason: reason.trim(), content: content.trim() });
+      await createAppeal({ reason: reason.trim(), content: content.trim() }, files, setProgress);
       setNotice("Đã gửi đơn khiếu nại thành công! Quản trị viên sẽ xem xét và phản hồi sớm.");
       setContent("");
+      setFiles([]);
     } catch (err) {
-      setError(apiMessage(err, "Không thể gửi khiếu nại lúc này. Vui lòng thử lại."));
+      setError(appealErrorMessage(err, "Không thể gửi khiếu nại lúc này. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }
@@ -83,7 +87,7 @@ export default function AccountSuspendedBanner() {
       </div>
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Content maxWidth="520px">
+        <Dialog.Content maxWidth="600px" className={modal.dialog}><div className={modal.body}>
           <Flex justify="between" align="center" mb="3">
             <Dialog.Title mb="0">Khiếu nại tài khoản tạm khóa</Dialog.Title>
             <Dialog.Close>
@@ -132,6 +136,8 @@ export default function AccountSuspendedBanner() {
               />
             </label>
 
+            <AppealEvidencePicker files={files} onChange={setFiles} disabled={submitting} />
+            {submitting && <p role="status" style={{ margin: 0, fontSize: 13 }}>{progress}</p>}
             <Flex justify="end" gap="3" mt="2">
               <Dialog.Close>
                 <Button variant="soft" color="gray" disabled={submitting}>Hủy</Button>
@@ -141,7 +147,7 @@ export default function AccountSuspendedBanner() {
               </Button>
             </Flex>
           </form>
-        </Dialog.Content>
+        </div></Dialog.Content>
       </Dialog.Root>
     </>
   );

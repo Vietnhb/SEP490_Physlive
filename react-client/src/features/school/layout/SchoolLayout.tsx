@@ -1,10 +1,12 @@
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppSidebar";
+import { usePendingSupport } from "../../../shared/hooks/usePendingSupport";
 
 /** SCHOOL area. While the licence is unpaid only the billing page is reachable. */
 export default function SchoolLayout() {
   const user = useSessionStore(state => state.user);
   const billingOnly = user?.billingRequired === true;
+  const pending = usePendingSupport(!billingOnly && !!user && user.active !== false && user.accountStatus !== "SUSPENDED_READ_ONLY");
   const groups: SidebarGroup[] = billingOnly
     ? [{ items: [{ to: "/school/billing", label: "Mua & gia hạn gói", icon: "activity" }] }]
     : [
@@ -13,7 +15,7 @@ export default function SchoolLayout() {
         { to: "/school/users", label: "Tài khoản", icon: "users" },
         { to: "/school/classes", label: "Quản lý lớp học", icon: "book", childTitle: "Chi tiết lớp học" },
         { to: "/school/import", label: "Nhập dữ liệu", icon: "upload" },
-        { to: "/school/appeals", label: "Yêu cầu mở khóa", icon: "message" },
+        { to: "/school/appeals", label: "Yêu cầu mở khóa", icon: "message", badge: pending },
         { to: "/school/reports", label: "Báo cáo", icon: "chart" },
       ] },
       { label: "Gói dịch vụ", items: [{ to: "/school/billing", label: "Mua & gia hạn gói", icon: "activity" }] },

@@ -1,14 +1,14 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Badge, Button, Dialog, IconButton, Select, TextArea, TextField } from "@radix-ui/themes";
 import { Cross2Icon, ExitIcon, EyeOpenIcon, MagnifyingGlassIcon, PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
-import { createAppeal, getMyAppeals, type Appeal } from "../../account/api/appealApi";
-import { mySupportItems, submitSupportRequest, type SupportItem } from "../api/supportApi";
+import { createAppeal, appealErrorMessage, type Appeal } from "../../account/api/appealApi";
+import { AppealEvidencePicker, AppealEvidenceGallery } from "../../account/components/AppealEvidence";
+import { submitSupportRequest, type SupportItem } from "../api/supportApi";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { isAccountSuspended, userHome } from "../../../shared/auth/permissions";
 import { getRoleLabel } from "../../../shared/auth/roles";
-import { apiMessage } from "../../../shared/lib/apiError";
 import { clearToken } from "../../../shared/lib/token";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import LearningIcon from "../../../shared/ui/LearningIcon";
@@ -33,16 +33,14 @@ export default function MySupport() {
     useSessionStore.getState().setUser(null);
     navigate("/login", { replace: true });
   };
-  const [items, setItems] = useState<SupportItem[]>([]);
-  const [appeals, setAppeals] = useState<Appeal[]>([]);
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
   const [kind, setKind] = useState<"MESSAGE" | "FEEDBACK">("MESSAGE");
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedKey, setSelectedKey] = useState("");
   const [category, setCategory] = useState<Category>("ALL");
@@ -51,14 +49,15 @@ export default function MySupport() {
   const [applied, setApplied] = useState({ query: "", phase: "ALL" as Phase });
   const [page, setPage] = useState(1);
   const lock = useRef(false);
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
-    try { const [support, account] = await Promise.all([mySupportItems(), getMyAppeals()]); setItems(support); setAppeals(account); }
-    catch (err) { setError(apiMessage(err, "Không thể tải lịch sử yêu cầu. Vui lòng thử lại.")); }
-    finally { setLoading(false); }
-  }, []);
-  useApiRefresh(["/support/mine", "/appeals"], load);
-  useEffect(() => { void load(); }, [load]);
+  const supportResource = useResource<SupportItem[]>("/support/mine");
+  const appealsResource = useResource<Appeal[]>("/appeals/my");
+  const items = supportResource.data ?? [];
+  const appeals = appealsResource.data ?? [];
+  const setItems = supportResource.setData;
+  const setAppeals = appealsResource.setData;
+  const loading = supportResource.loading || appealsResource.loading;
+  const error = supportResource.error || appealsResource.error || "";
+  const load = () => Promise.all([supportResource.refresh(), appealsResource.refresh()]);
   const suspended = isAccountSuspended(user);
   const internalAdmin = suspended && ["MANAGER", "ADMIN"].includes(user?.role ?? "");
   const pendingAppeal = appeals.some(item => item.status === "PENDING" && item.currentSuspension !== false);
@@ -89,13 +88,13 @@ export default function MySupport() {
     lock.current = true; setBusy(true); setFormError(""); setNotice("");
     try {
       if (suspended) {
-        const item = await createAppeal({ reason: subject.trim(), content: content.trim() }); setAppeals(current => [item, ...current]);
+        const item = await createAppeal({ reason: subject.trim(), content: content.trim() }, files, setUploadProgress); setAppeals(current => [item, ...current.filter(value => value.id !== item.id)]);
       } else {
-        const item = await submitSupportRequest(kind, subject.trim(), content.trim()); setItems(current => [item, ...current]);
+        const item = await submitSupportRequest(kind, subject.trim(), content.trim()); setItems(current => [item, ...current.filter(value => value.id !== item.id)]);
       }
-      setSubject(""); setContent(""); setCreateOpen(false); resetFilters();
+      setSubject(""); setContent(""); setFiles([]); setCreateOpen(false); resetFilters();
       setNotice("Đã gửi yêu cầu. Bạn có thể theo dõi trạng thái và phản hồi trong danh sách bên dưới.");
-    } catch (err) { setFormError(apiMessage(err, "Không thể gửi yêu cầu. Vui lòng thử lại.")); }
+    } catch (err) { setFormError(appealErrorMessage(err, "Không thể gửi yêu cầu. Vui lòng thử lại.")); }
     finally { lock.current = false; setBusy(false); }
   };
   return <main className={s.page}>
@@ -137,6 +136,7 @@ export default function MySupport() {
         <h3 className={s.detailSubject}>{selected?.subject}</h3>
         <dl className={s.detailMeta}><div><dt>Thời gian gửi</dt><dd>{selected && timestamp(selected.createdAt)}</dd></div><div><dt>Trạng thái</dt><dd>{selected && <Badge color={selected.color}>{selected.statusLabel}</Badge>}</dd></div></dl>
         <section className={s.detailSection}><h3>Nội dung yêu cầu</h3><p>{selected?.content}</p></section>
+        {selected?.category === "ACCOUNT" && <AppealEvidenceGallery key={selected.key} appealId={selected.key.slice("account:".length)} />}
         {selected?.referred && <p className={s.info}>Reviewer tiếp nhận trực tiếp báo lỗi mô phỏng để kiểm tra chuyên môn.</p>}
         <section className={`${s.detailSection} ${s.reply}`}><h3>Phản hồi từ bộ phận hỗ trợ</h3>{selected?.response ? <><div className={s.replyMeta}>{selected.responder && <strong>{selected.responder}</strong>}{selected.respondedAt && <time dateTime={selected.respondedAt}>{timestamp(selected.respondedAt)}</time>}</div><p>{selected.response}</p></> : <p>Yêu cầu đang chờ phản hồi. Bạn có thể quay lại trang này để theo dõi kết quả xử lý.</p>}</section>
       </div>
@@ -149,6 +149,8 @@ export default function MySupport() {
         {!suspended && <label className={s.formField}>Loại yêu cầu<Select.Root size="3" value={kind} onValueChange={value => setKind(value as "MESSAGE" | "FEEDBACK")} disabled={busy}><Select.Trigger /><Select.Content position="popper"><Select.Item value="MESSAGE">Hỗ trợ sử dụng, gói dịch vụ, thanh toán</Select.Item><Select.Item value="FEEDBACK">Góp ý / phản hồi</Select.Item></Select.Content></Select.Root></label>}
         <label className={s.formField}>Tiêu đề<TextField.Root size="3" required maxLength={suspended ? 200 : 180} value={subject} disabled={busy} onChange={e => setSubject(e.target.value)} placeholder="Tóm tắt vấn đề cần hỗ trợ" /></label>
         <label className={s.formField}>Nội dung<TextArea size="3" required rows={7} maxLength={10000} value={content} disabled={busy} onChange={e => setContent(e.target.value)} placeholder="Mô tả vấn đề, thời điểm xảy ra và thông tin cần kiểm tra…" /></label><span className={s.characterCount}>{content.length.toLocaleString("vi-VN")} / 10.000 ký tự</span>
+        {suspended && <AppealEvidencePicker files={files} onChange={setFiles} disabled={busy} />}
+        {suspended && busy && <p role="status">{uploadProgress}</p>}
       </div><div className={s.dialogFooter}><Dialog.Close><Button type="button" variant="outline" color="gray" disabled={busy}>Hủy</Button></Dialog.Close><Button type="submit" loading={busy} disabled={busy || !subject.trim() || !content.trim()}>Gửi yêu cầu</Button></div></form>
     </Dialog.Content></Dialog.Root>
   </main>;

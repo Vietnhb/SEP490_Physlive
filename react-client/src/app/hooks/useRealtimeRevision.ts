@@ -1,4 +1,4 @@
-import { invalidateServerData } from "../../shared/api/queryClient";
+import { invalidateServerData, queryClient } from "../../shared/api/queryClient";
 import { realtimeClientId as clientId } from "../../shared/api/client";
 import { useEffect, useRef, useState } from "react";
 import { API_URL } from "../../config/api";
@@ -51,7 +51,13 @@ export function useRealtimeRevision(enabled: boolean) {
                 .map(line => line.slice(5).trimStart()).join("\n");
               if (event === "ready") {
                 const serverRevision = Number(data);
-                if (lastServerRevision.current !== null && serverRevision !== lastServerRevision.current) refresh();
+                // Catch inbox changes made before the first stream was ready, without reloading unrelated pages.
+                if (lastServerRevision.current === null) {
+                  void queryClient.invalidateQueries({ predicate: query => {
+                    const path = String(query.queryKey[2]).split("?")[0];
+                    return query.queryKey[0] === "api" && (path.startsWith("/support/inbox") || path === "/appeals/my" || path === "/admin/appeals");
+                  } });
+                } else if (serverRevision !== lastServerRevision.current) refresh();
                 lastServerRevision.current = serverRevision;
               } else if (event === "change") {
                 const change = JSON.parse(data) as ChangeEvent;

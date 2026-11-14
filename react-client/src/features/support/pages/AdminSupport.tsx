@@ -1,35 +1,22 @@
-import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { adminSupportItems, updateSupportItem, type SupportItem, type SupportKind, type SupportStatus } from "../api/supportApi";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { useRef, useState } from "react";
+import { updateSupportItem, type SupportItem, type SupportKind, type SupportStatus } from "../api/supportApi";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 
 export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) {
-  const [items, setItems] = useState<SupportItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [selected, setSelected] = useState<SupportItem | null>(null);
   const [response, setResponse] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const lock = useRef(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      setItems(await adminSupportItems(kind));
-    } catch {
-      setError("Không thể tải dữ liệu hỗ trợ.");
-    } finally {
-      setLoading(false);
-    }
-  }, [kind]);
-
-  useApiRefresh(["/support"], load);
-  useEffect(() => {
-    const timer = window.setTimeout(() => { void load(); }, 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
+  const resource = useResource<SupportItem[]>("/support/admin?kind=" + kind);
+  const items = resource.data ?? [];
+  const setItems = resource.setData;
+  const loading = resource.loading;
+  const error = actionError || resource.error || "";
+  const load = () => { setError(""); return resource.refresh(); };
 
   const save = async (status: SupportStatus) => {
     if (!selected || lock.current) return;
