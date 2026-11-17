@@ -107,4 +107,14 @@ public class SchemaService {
         schema.setName(request.name().trim()); schema.setTopic(request.topic().trim()); schema.setDefinition(request.definition());
         return schemaRepository.save(schema);
     }
+
+    @Transactional
+    public void deleteDraft(java.util.UUID id) {
+        SchemaVersion schema = schemaRepository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên bản mô hình"));
+        if (schema.getLifecycleStatus() != LifecycleStatus.DRAFT) {
+            throw ApiException.conflict("Chỉ có thể xóa phiên bản ở trạng thái bản nháp");
+        }
+        schemaRepository.delete(schema);
+    }
 }

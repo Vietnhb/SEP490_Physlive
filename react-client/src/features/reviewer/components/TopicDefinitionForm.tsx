@@ -14,7 +14,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 /** Visual editor for the parts of a topic pack a physics expert edits most;
  *  everything else stays reachable through the advanced JSON view. */
-export function TopicDefinitionForm({ value, onChange }: Readonly<{ value: Definition; onChange: (next: Definition) => void }>) {
+export function TopicDefinitionForm({ value, sharedCatalogue, onChange }: Readonly<{ value: Definition; sharedCatalogue?: Definition; onChange: (next: Definition) => void }>) {
   const set = (key: string, next: unknown) => onChange({ ...value, [key]: next });
   const limitations = Array.isArray(value.limitations) ? (value.limitations as unknown[]).map(String).join("\n") : "";
   const others = Object.keys(SECTION_LABELS).filter(key => value[key] !== undefined).map(key => {
@@ -25,7 +25,7 @@ export function TopicDefinitionForm({ value, onChange }: Readonly<{ value: Defin
     <label className="reviewer-field"><span>Mô tả chủ đề</span><TextArea size="2" rows={3} placeholder="Chủ đề này bao gồm những hiện tượng nào?" value={typeof value.description === "string" ? value.description : ""} onChange={event => set("description", event.target.value)} /></label>
     <section className="reviewer-law-section"><Heading as="h3" size="4">Định luật dùng để xác minh mô phỏng</Heading>
       <Text as="p" size="2" color="gray" mb="3">AI viết mô hình theo mô tả của giáo viên; hệ thống tính rồi đối chiếu kết quả với từng định luật dưới đây. Khi mục “Định luật còn thiếu” báo có đại lượng chưa được kiểm, hãy thêm định luật tương ứng ở đây.</Text>
-      <LawBook value={value.lawCatalogue && typeof value.lawCatalogue === "object" && !Array.isArray(value.lawCatalogue) ? value.lawCatalogue as Definition : {}} onChange={next => set("lawCatalogue", next)} />
+      <LawBook value={value.lawCatalogue && typeof value.lawCatalogue === "object" && !Array.isArray(value.lawCatalogue) ? value.lawCatalogue as Definition : {}} shared={sharedCatalogue} onChange={next => set("lawCatalogue", next)} />
     </section>
     <details className="reviewer-disclosure"><summary>Vật và đại lượng thường gặp trong đề bài (gợi ý cho AI)</summary>
     <section className="reviewer-form-section"><Text as="div" size="2" weight="bold">Đối tượng vật lý</Text><Text as="p" size="1" color="gray" mb="2">Những vật/hệ thường gặp trong đề bài của chủ đề (xe, lò xo, điện tích…).</Text>

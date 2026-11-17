@@ -31,7 +31,24 @@ export function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("vi-VN");
 }
 
+/** Strips Vietnamese tone/diacritic marks and normalizes đ/Đ → d so partial Telex typing ("đinh" → "Định") still matches. */
+export function foldSearchText(value?: unknown): string {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+}
+
 export function matches(query: string, ...values: (string | null | undefined)[]) {
-  const needle = query.trim().toLowerCase();
-  return !needle || values.some(value => value?.toLowerCase().includes(needle));
+  const raw = query.trim().toLowerCase();
+  if (!raw) return true;
+  const folded = foldSearchText(raw);
+  const words = folded.split(/\s+/).filter(Boolean);
+  return values.some(value => {
+    if (!value) return false;
+    if (value.toLowerCase().includes(raw)) return true;
+    const target = foldSearchText(value);
+    return target.includes(folded) || (words.length > 1 && words.every(word => target.includes(word)));
+  });
 }

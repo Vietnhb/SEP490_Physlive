@@ -3,6 +3,7 @@ import { Button, Card, Heading, Text, TextField } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
 import { useAction } from "../../../shared/hooks/operationsData";
 import type { Version } from "../model/reviewerTypes";
+import { ReviewerDialog } from "./ReviewerDialog";
 import { TopicDefinitionForm } from "./TopicDefinitionForm";
 
 type Definition = Record<string, unknown>;
@@ -21,8 +22,11 @@ function nextVersion(version?: string) {
   return parts.join(".");
 }
 
-export function VersionEditorModal({ initial, clone, onClose, onSaved }: Readonly<{ initial?: Version; clone: boolean; onClose: () => void; onSaved: () => void }>) {
+export type VersionSaveOutcome = { saved?: Version; deletedId?: string };
+
+export function VersionEditorModal({ initial, clone, sharedCatalogue, onClose, onSaved }: Readonly<{ initial?: Version; clone: boolean; sharedCatalogue?: Definition; onClose: () => void; onSaved: (outcome?: VersionSaveOutcome) => void }>) {
   const [definition, setDefinition] = useState<Definition>(() => plainObject(initial?.definition));
+  const [confirmAction, setConfirmAction] = useState<"leave" | "delete" | null>(null);
   const action = useAction();
   const [original] = useState(() => JSON.stringify(plainObject(initial?.definition)));
   const dirty = JSON.stringify(definition) !== original;
@@ -33,18 +37,27 @@ export function VersionEditorModal({ initial, clone, onClose, onSaved }: Readonl
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-  const leave = () => { if (!dirty || window.confirm("Bạn có thay đổi chưa lưu. Rời khỏi trang sửa và bỏ các thay đổi này?")) onClose(); };
+  const leave = () => { if (!dirty) onClose(); else setConfirmAction("leave"); };
   const isEdit = Boolean(initial && !clone);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const fields = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
+    let savedVersion: Version | undefined;
     const ok = await action.run(async () => {
       const body = { schemaId: fields.schemaId, version: fields.version, name: fields.name, topic: fields.topic, definition };
       const endpoint = isEdit ? `/reviewer/schema-versions/${initial?.id}` : "/schemas";
-      await (isEdit ? api.put(endpoint, body) : api.post(endpoint, body));
+      const response = await (isEdit ? api.put<Version>(endpoint, body) : api.post<Version>(endpoint, body));
+      savedVersion = response.data;
     }, "Đã lưu bản nháp. Bản nháp cần được phê duyệt trước khi hệ thống sử dụng.");
-    if (ok) onSaved();
+    if (ok) onSaved({ saved: savedVersion });
+  };
+
+  const deleteDraft = async () => {
+    if (!isEdit || !initial?.id) return;
+    const deletedId = initial.id;
+    const ok = await action.run(() => api.delete(`/reviewer/schema-versions/${deletedId}`), "Đã xoá bản nháp.");
+    if (ok) { setConfirmAction(null); onSaved({ deletedId }); }
   };
 
   const title = isEdit ? "Chỉnh sửa bản nháp" : clone ? "Tạo phiên bản mới" : "Thêm chủ đề mới";
@@ -65,8 +78,31 @@ export function VersionEditorModal({ initial, clone, onClose, onSaved }: Readonl
       <label className="reviewer-field"><span>Phiên bản *</span><TextField.Root size="3" name="version" required maxLength={16} readOnly={isEdit} defaultValue={clone ? nextVersion(initial?.version) : initial?.version ?? "1.0"} placeholder="1.0" /></label>
     </div>
       <div className="reviewer-form-row"><label className="reviewer-field"><span>Tên chủ đề *</span><TextField.Root size="3" name="name" required defaultValue={initial?.name ?? ""} placeholder="Động học" /></label><label className="reviewer-field"><span>Nhóm chủ đề *</span><TextField.Root size="3" name="topic" required defaultValue={initial?.topic ?? ""} placeholder="KINEMATICS" /></label></div>
-      <TopicDefinitionForm value={definition} onChange={setDefinition} />
+      <TopicDefinitionForm value={definition} sharedCatalogue={sharedCatalogue} onChange={setDefinition} />
     {action.feedback}
-    <div className="reviewer-form-footer" style={{ position: "sticky", bottom: 0, background: "var(--color-panel-solid, var(--color-background))", paddingBottom: 12, zIndex: 2 }}><Button type="button" variant="soft" color="gray" size="2" onClick={leave}>Hủy</Button><Button type="submit" size="3" disabled={action.busy}>{action.busy ? "Đang lưu…" : "Lưu bản nháp"}</Button></div>
+    <div className="reviewer-form-footer" style={{ position: "sticky", bottom: 0, background: "var(--color-panel-solid, var(--color-background))", paddingBottom: 12, zIndex: 2 }}>
+      {isEdit && initial?.id && <Button type="button" variant="soft" color="red" size="3" disabled={action.busy} onClick={() => setConfirmAction("delete")} style={{ marginRight: "auto" }}>Xoá bản nháp</Button>}
+      <Button type="button" variant="soft" color="gray" size="3" onClick={leave}>Hủy</Button>
+      <Button type="submit" size="3" disabled={action.busy}>{action.busy ? "Đang lưu…" : "Lưu bản nháp"}</Button>
+    </div>
+    {confirmAction === "delete" && initial && <ReviewerDialog title="Xoá bản nháp?" onClose={() => setConfirmAction(null)}>
+      <Text as="p" size="3"><strong>{initial.name || initial.schemaId}</strong> · v{initial.version}</Text>
+      <ul className="reviewer-consequences">
+        <li>Bản nháp này sẽ bị <strong>xoá vĩnh viễn</strong> và không thể khôi phục.</li>
+        <li>Các phiên bản đang dùng hoặc ngừng dùng của chủ đề không bị ảnh hưởng.</li>
+      </ul>
+      {action.feedback}
+      <div className="reviewer-form-footer">
+        <Button type="button" variant="soft" color="gray" size="2" onClick={() => setConfirmAction(null)}>Hủy</Button>
+        <Button type="button" color="red" size="2" disabled={action.busy} onClick={() => void deleteDraft()}>{action.busy ? "Đang xoá…" : "Xoá bản nháp"}</Button>
+      </div>
+    </ReviewerDialog>}
+    {confirmAction === "leave" && <ReviewerDialog title="Bỏ các thay đổi chưa lưu?" onClose={() => setConfirmAction(null)}>
+      <Text as="p" size="2" color="gray">Bạn có thay đổi chưa lưu. Nếu rời khỏi trang sửa, các thay đổi này sẽ bị mất.</Text>
+      <div className="reviewer-form-footer">
+        <Button type="button" variant="soft" color="gray" size="2" onClick={() => setConfirmAction(null)}>Ở lại tiếp tục sửa</Button>
+        <Button type="button" color="red" size="2" onClick={() => { setConfirmAction(null); onClose(); }}>Rời khỏi trang</Button>
+      </div>
+    </ReviewerDialog>}
   </form></Card>;
 }

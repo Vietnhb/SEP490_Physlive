@@ -49,6 +49,15 @@ export function symbols(ast: unknown, into: string[] = []): string[] {
   return into;
 }
 
+/** Every letter that appears inside Σ(...) / sum(...), so the form knows it stands for a group of quantities. */
+export function summedSymbols(ast: unknown, into: string[] = []): string[] {
+  if (Array.isArray(ast)) {
+    if (ast[0] === "sum") symbols(ast.slice(1), into);
+    else ast.slice(1).forEach(item => summedSymbols(item, into));
+  }
+  return into;
+}
+
 class Unreadable extends Error {}
 
 /** Reads one side of a law. Throws Unreadable with a sentence the reviewer can act on. */

@@ -24,6 +24,10 @@ public class ReviewerVersionService {
         return schemaService.updateDraft(id, request);
     }
 
+    public void deleteSchema(UUID id) {
+        schemaService.deleteDraft(id);
+    }
+
     public SchemaVersion schemaLifecycle(UUID id, LifecycleStatus status) {
         return schemaService.changeVersionLifecycle(id, status);
     }

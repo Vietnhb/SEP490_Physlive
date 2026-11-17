@@ -40,7 +40,8 @@ export function ContentModeration() {
     const index = rows.findIndex(item => item.id === id);
     const next = rows[index + 1] ?? rows[index - 1];
     setSelectedId(next?.id ?? "");
-    resource.refresh();
+    resource.setData(prev => (prev ?? []).filter(item => item.id !== id));
+    void resource.refresh();
   };
 
   return <div className="reviewer-stack">
