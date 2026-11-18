@@ -224,7 +224,7 @@ export default function SimulationInspector({ experiment, explanation, save, lib
                   onChange={(event) => setRevision(event.target.value)}
                   placeholder="Ví dụ: Thay đổi vận tốc hoặc góc ném..."
                 />
-                <button disabled={busy || !revision.trim()}>Cập nhật giải thích</button>
+                <button type="submit" disabled={busy || !revision.trim()}>Cập nhật giải thích</button>
               </form>
             )}
           </div>

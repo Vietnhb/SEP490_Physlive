@@ -51,7 +51,7 @@ export function hashStudentAssignmentSeed(studentId: number, assignmentId?: stri
   let hash = (studentId * 2654435761) >>> 0;
   if (assignmentId) {
     for (let i = 0; i < assignmentId.length; i++) {
-      hash = ((hash << 5) - hash + assignmentId.charCodeAt(i)) >>> 0;
+      hash = ((hash << 5) - hash + (assignmentId.codePointAt(i) ?? 0)) >>> 0;
     }
   }
   return hash;

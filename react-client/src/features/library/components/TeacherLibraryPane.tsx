@@ -57,7 +57,7 @@ export default function TeacherLibraryPane({ folders, items, currentSimulationId
       <label className="learn-library-search"><Icon name="search" /><span className="learn-sr-only">Tìm trong thư viện</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm trong thư viện" /></label>
       {creatorOpen && <form id="new-library-folder-form" className="learn-folder-popover" onSubmit={create}>
         <label htmlFor="new-library-folder">Tạo thư mục mới</label>
-        <input id="new-library-folder" autoFocus value={name} maxLength={120} onChange={event => setName(event.target.value)} placeholder="Ví dụ: Chuyển động lớp 10" disabled={creating} />
+        <input id="new-library-folder" value={name} maxLength={120} onChange={event => setName(event.target.value)} placeholder="Ví dụ: Chuyển động lớp 10" disabled={creating} />
         <div><button type="button" onClick={() => { setCreatorOpen(false); setName(""); }} disabled={creating}>Hủy</button><button className="primary" type="submit" disabled={!name.trim() || creating}>{creating ? "Đang tạo…" : "Tạo thư mục"}</button></div>
       </form>}
     </div>

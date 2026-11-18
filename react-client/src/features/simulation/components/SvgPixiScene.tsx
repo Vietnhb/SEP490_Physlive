@@ -175,7 +175,7 @@ export default function SvgPixiScene({ program, timeline, parameters, parameterI
         {SPEEDS.map(value => <option key={value} value={value}>Phát {value}×</option>)}
       </select>
       <label className="sim-toggle" title="Lặp lại khi hết thời gian">
-        <input type="checkbox" checked={loop} onChange={event => { setLoop(event.target.checked); send({ type: "loop", loop: event.target.checked }); }} />
+        <input type="checkbox" checked={loop} onChange={event => { setLoop(event.target.checked); send({ type: "loop", loop: event.target.checked }); }} />{" "}
         Lặp
       </label>
       {rateNote && <span className="sim-rate-note">{rateNote}</span>}

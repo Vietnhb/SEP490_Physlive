@@ -26,7 +26,7 @@ export default function ClarifyQuestion({ question, choices, answer, onAnswerCha
     <textarea id="simulation-answer" rows={choices.length ? 2 : 3} value={own} disabled={busy}
       onChange={event => onAnswerChange(event.target.value)} />
     <div className="clarify__actions">
-      <button className="simulation-primary-button" disabled={busy || !answer.trim()}>
+      <button type="submit" className="simulation-primary-button" disabled={busy || !answer.trim()}>
         {busy ? <><span className="sim-spinner" aria-hidden="true" /> Đang phân tích câu trả lời…</> : "Trả lời"}
       </button>
       {busy && <span className="clarify__wait" role="status">AI đang đọc câu trả lời và dựng lại tình huống, thường mất 10–40 giây.</span>}

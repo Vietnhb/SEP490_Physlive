@@ -96,9 +96,10 @@ export default function Assignments({
     }
   };
 
-  const handleOpenLibraryItem = async (item: LibraryItem) => {
+  const handleOpenLibraryItem = (item: LibraryItem) => {
     updateLibrarySelection(item.id);
     setView("create");
+    return Promise.resolve();
   };
 
   useEffect(() => {

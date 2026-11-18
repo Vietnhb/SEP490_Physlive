@@ -169,7 +169,7 @@ export default function SimulationCharts({ scene, timeline, time, theme, onSeek,
       <p className="sim-analysis__hint">Đồ thị {active.title.toLowerCase()} từ số liệu mô phỏng đã tính · kéo trên đồ thị để tua thời gian.</p>
     </> : <div className="sim-table-wrap">
       <label className="sim-analysis__hint" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        Xem giá trị tại thời điểm
+        Xem giá trị tại thời điểm{" "}
         <input type="number" inputMode="decimal" min={0} max={timeline.durationSeconds} step="any" aria-label="Thời điểm cần xem (giây)"
           value={draft ?? shownTime.toFixed(2)} onChange={event => seekTo(event.target.value)} onBlur={() => setDraft(null)}
           style={{ width: 96, padding: "4px 8px", font: "inherit" }} />

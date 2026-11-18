@@ -133,6 +133,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
                         />
                       </label>
                       <button
+                        type="submit"
                         className="simulation-primary-button simulation-composer__send"
                         disabled={busy || (!sourceFile && !text.trim())}
                       >
@@ -231,6 +232,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
                       />
                       <div className="simulation-actions">
                         <button
+                          type="submit"
                           className="simulation-primary-button"
                           disabled={busy || !revision.trim()}
                         >
@@ -269,7 +271,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
                         value={revision}
                         onChange={(event) => setRevision(event.target.value)}
                       />
-                      <button disabled={busy || !revision.trim()}>Cập nhật</button>
+                      <button type="submit" disabled={busy || !revision.trim()}>Cập nhật</button>
                     </form>
                   </>
                 )}
