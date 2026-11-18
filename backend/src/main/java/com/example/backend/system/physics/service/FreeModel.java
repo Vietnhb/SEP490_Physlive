@@ -11,6 +11,35 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static com.example.backend.system.physics.model.SpecKeys.ALONG;
+import static com.example.backend.system.physics.model.SpecKeys.ASSUMPTIONS;
+import static com.example.backend.system.physics.model.SpecKeys.BINDINGS;
+import static com.example.backend.system.physics.model.SpecKeys.CANONICAL;
+import static com.example.backend.system.physics.model.SpecKeys.CAPABILITY_ID;
+import static com.example.backend.system.physics.model.SpecKeys.CONSTANTS;
+import static com.example.backend.system.physics.model.SpecKeys.COUNT;
+import static com.example.backend.system.physics.model.SpecKeys.DURATION;
+import static com.example.backend.system.physics.model.SpecKeys.DURATION_PARAMETER;
+import static com.example.backend.system.physics.model.SpecKeys.DURATION_SECONDS;
+import static com.example.backend.system.physics.model.SpecKeys.EXPECTED;
+import static com.example.backend.system.physics.model.SpecKeys.FRAMES;
+import static com.example.backend.system.physics.model.SpecKeys.INITIAL;
+import static com.example.backend.system.physics.model.SpecKeys.JUMPS;
+import static com.example.backend.system.physics.model.SpecKeys.LABEL;
+import static com.example.backend.system.physics.model.SpecKeys.MEMBERS;
+import static com.example.backend.system.physics.model.SpecKeys.MODEL;
+import static com.example.backend.system.physics.model.SpecKeys.OBJECTS;
+import static com.example.backend.system.physics.model.SpecKeys.OBSERVABLES;
+import static com.example.backend.system.physics.model.SpecKeys.PARAMETERS;
+import static com.example.backend.system.physics.model.SpecKeys.PRESENT;
+import static com.example.backend.system.physics.model.SpecKeys.QUANTITIES;
+import static com.example.backend.system.physics.model.SpecKeys.QUANTITY;
+import static com.example.backend.system.physics.model.SpecKeys.SOLVER_TIMELINE;
+import static com.example.backend.system.physics.model.SpecKeys.SOURCE;
+import static com.example.backend.system.physics.model.SpecKeys.STATUS;
+import static com.example.backend.system.physics.model.SpecKeys.UNTIL;
+import static com.example.backend.system.physics.model.SpecKeys.VALUE;
+import static com.example.backend.system.physics.model.SpecKeys.VALUES;
 
 /**
  * A model written for one description: its quantities, each with a unit, a role and an equation. The equation
@@ -18,6 +47,18 @@ import java.util.Set;
  * Nothing here knows any particular situation.
  */
 public final class FreeModel {
+    private static final String AXIS_MESSAGE = "Trục ";
+    private static final String BOOKKEEPING = "bookkeeping";
+    private static final String INDEX_NAME = "index";
+    private static final String OP_LARGEST = "largest";
+    private static final String OP_MEMBER = "member";
+    private static final String OP_SMALLEST = "smallest";
+    private static final String OTHER_ROLE = "other";
+    private static final String QUANTITY_MESSAGE = "Đại lượng ";
+    private static final String RISING = "rising";
+    private static final String SHARED_LABEL = "Chung";
+    private static final String STOPPED_PREFIX = "stopped_";
+    private static final String UNSAMPLED = "unsampled";
     /** The participant id under which the model's quantities appear in the timeline ("model.x"). */
     public static final String ID = "model";
     private static final List<String> ATTRIBUTES = List.of("role", "of", "axis", "kind", "by");
@@ -30,17 +71,25 @@ public final class FreeModel {
         this.equations = equations;
     }
 
+    /** The operator that folds a group quantity across its members. */
+    private static String foldOperator(String op) {
+        if (op.equals(OP_LARGEST)) return "max";
+        if (op.equals(OP_SMALLEST)) return "min";
+        return "add";
+    }
+
     /** Solves the model of a plan and checks the run against the catalogue's laws. */
     public ObjectNode compute(JsonNode catalogue, JsonNode authored, JsonNode overrides) {
-        require(authored.path("model").path("quantities").isArray() && !authored.path("model").path("quantities").isEmpty(), "Mô hình chưa có đại lượng nào: simulationSpec.model.quantities phải là một danh sách, mỗi phần tử có id, label, unit, role và value (hoặc initial và rate)");
-        for (JsonNode object : authored.path("objects"))
-            require(object.path("id").asText().matches("[A-Za-z_][A-Za-z0-9_]{0,31}") && !object.path("id").asText().equals(ID),
+        require(authored.path(MODEL).path(QUANTITIES).isArray() && !authored.path(MODEL).path(QUANTITIES).isEmpty(), "Mô hình chưa có đại lượng nào: simulationSpec.model.quantities phải là một danh sách, mỗi phần tử có id, label, unit, role và value (hoặc initial và rate)");
+        for (JsonNode object : authored.path(OBJECTS))
+            require(object.path("id").asText().matches("[A-Za-z_]\\w{0,31}") && !object.path("id").asText().equals(ID),
                     "Mỗi đối tượng cần một id riêng gồm chữ, số, gạch dưới (không dùng \"" + ID + "\"): " + object.path("id").asText());
         boolean[] random = {false};
         Run run = solve(catalogue, plain(authored, 0, random), overrides);
-        Map<String, double[]> noise = new LinkedHashMap<>(), means = new LinkedHashMap<>();
+        Map<String, double[]> noise = new LinkedHashMap<>();
+        Map<String, double[]> means = new LinkedHashMap<>();
         boolean expects = false;
-        for (JsonNode quantity : authored.path("model").path("quantities")) expects |= quantity.hasNonNull("expected");
+        for (JsonNode quantity : authored.path(MODEL).path(QUANTITIES)) expects |= quantity.hasNonNull(EXPECTED);
         if (random[0] && expects) {
             // a model that draws random numbers is run again with other draws: what differs between the runs is chance
             List<Run> others = java.util.stream.IntStream.rangeClosed(1, EXTRA_DRAWS).parallel()
@@ -50,17 +99,23 @@ public final class FreeModel {
                 if (!run.chancy.contains(symbol.id())) continue;
                 // the mean over the draws, and how far a mean of that many draws can be off by chance (four standard
                 // errors, the spread pooled over neighbouring instants: few draws tell the spread of one instant poorly)
-                int count = others.size() + 1, length = run.time.length, reach = Math.max(1, length / 10);
-                double[] mean = new double[length], variance = new double[length], chance = new double[length];
+                int count = others.size() + 1;
+                int length = run.time.length;
+                int reach = Math.max(1, length / 10);
+                double[] mean = new double[length];
+                double[] variance = new double[length];
+                double[] chance = new double[length];
                 for (int i = 0; i < length; i++) {
-                    double sum = symbol.values()[i], squares = sum * sum;
+                    double sum = symbol.values()[i];
+                    double squares = sum * sum;
                     for (Run other : others) { double value = at(other.time, other.symbols.get(index).values(), run.time[i]); sum += value; squares += value * value; }
                     mean[i] = sum / count;
                     variance[i] = Math.max(0, (squares - sum * sum / count) / (count - 1));
                 }
                 for (int i = 0; i < length; i++) {
                     double pooled = 0;
-                    int from = Math.max(0, i - reach), to = Math.min(length - 1, i + reach);
+                    int from = Math.max(0, i - reach);
+                    int to = Math.min(length - 1, i + reach);
                     for (int k = from; k <= to; k++) pooled += variance[k];
                     chance[i] = 4 * Math.sqrt(pooled / (to - from + 1) / count);
                 }
@@ -71,10 +126,40 @@ public final class FreeModel {
         return verdict(catalogue, run, noise, means);
     }
 
-    private static final int EXTRA_DRAWS = 5, MAX_MEMBERS = 400, MAX_EXPANDED = 1200, SAMPLED_MEMBERS = 4, MAX_FIELD_CELLS = 2500, MAX_FIELD_VALUES = 150_000, MAX_REPORTED_VALUES = 120_000;
-    private static final Set<String> OVER_GROUP = Set.of("total", "mean", "largest", "smallest");
+    private static final int EXTRA_DRAWS = 5;
+    private static final int MAX_MEMBERS = 400;
+    private static final int MAX_EXPANDED = 1200;
+    private static final int SAMPLED_MEMBERS = 4;
+    private static final int MAX_FIELD_CELLS = 2500;
+    private static final int MAX_FIELD_VALUES = 150_000;
+    private static final int MAX_REPORTED_VALUES = 120_000;
+    private static final Set<String> OVER_GROUP = Set.of("total", "mean", OP_LARGEST, OP_SMALLEST);
 
-    private record Run(JsonNode model, ObjectNode computed, List<LawChecks.Symbol> symbols, double[] time, Map<String, boolean[]> active, Set<String> stopping, Set<String> chancy, Map<Double, Set<String>> impacts) { }
+    /** What one solve of a model gave: held together while its draws are compared and its laws checked, never compared itself. */
+    private static final class Run {
+        final JsonNode model;
+        final ObjectNode computed;
+        final List<LawChecks.Symbol> symbols;
+        final double[] time;
+        final Map<String, boolean[]> active;
+        final Set<String> stopping;
+        final Set<String> chancy;
+        final Map<Double, Set<String>> impacts;
+
+        Run(JsonNode model, ObjectNode computed, List<LawChecks.Symbol> symbols, double[] time, Map<String, boolean[]> active, Marks marks) {
+            this.model = model;
+            this.computed = computed;
+            this.symbols = symbols;
+            this.time = time;
+            this.active = active;
+            this.stopping = marks.stopping();
+            this.chancy = marks.chancy();
+            this.impacts = marks.impacts();
+        }
+    }
+
+    /** What a run marks about its quantities: those that end it, those that depend on a draw, and who jumps together when. */
+    private record Marks(Set<String> stopping, Set<String> chancy, Map<Double, Set<String>> impacts) {}
 
     private static double at(double[] time, double[] values, double t) {
         if (time.length == 0) return 0;
@@ -96,31 +181,31 @@ public final class FreeModel {
      */
     private ObjectNode plain(JsonNode authored, int draw, boolean[] random) {
         ObjectNode spec = (ObjectNode) authored.deepCopy();
-        ObjectNode model = (ObjectNode) spec.path("model");
+        ObjectNode model = (ObjectNode) spec.path(MODEL);
         Map<String, Integer> groups = new LinkedHashMap<>();
-        for (JsonNode object : authored.path("objects")) if (object.path("members").asInt(1) > 1) {
-            require(object.path("members").asInt() <= MAX_MEMBERS, "Nhóm " + object.path("id").asText() + " có quá nhiều phần tử (tối đa " + MAX_MEMBERS + ")");
-            groups.put(object.path("id").asText(), object.path("members").asInt());
+        for (JsonNode object : authored.path(OBJECTS)) if (object.path(MEMBERS).asInt(1) > 1) {
+            require(object.path(MEMBERS).asInt() <= MAX_MEMBERS, "Nhóm " + object.path("id").asText() + " có quá nhiều phần tử (tối đa " + MAX_MEMBERS + ")");
+            groups.put(object.path("id").asText(), object.path(MEMBERS).asInt());
         }
         Map<String, String> memberOf = new LinkedHashMap<>();
         int expanded = 0;
-        for (JsonNode quantity : authored.path("model").path("quantities")) if (groups.containsKey(quantity.path("of").asText(""))) {
+        for (JsonNode quantity : authored.path(MODEL).path(QUANTITIES)) if (groups.containsKey(quantity.path("of").asText(""))) {
             memberOf.put(quantity.path("id").asText(), quantity.path("of").asText());
             expanded += groups.get(quantity.path("of").asText());
         }
         require(expanded <= MAX_EXPANDED, "Các nhóm có quá nhiều đại lượng theo từng phần tử (" + expanded + ", tối đa " + MAX_EXPANDED + "): hãy giảm số phần tử hoặc số đại lượng của mỗi phần tử");
-        long seed = authored.path("model").path("seed").asLong(1);
+        long seed = authored.path(MODEL).path("seed").asLong(1);
         Map<String, Double> draws = new LinkedHashMap<>();
         class Writer {
             JsonNode write(JsonNode ast, String group, int index) {
                 if (ast.isTextual()) {
                     String name = ast.asText();
-                    if (name.equals("index") || name.equals("members")) {
+                    if (name.equals(INDEX_NAME) || name.equals(MEMBERS)) {
                         require(group != null, "\"" + name + "\" chỉ dùng được trong đại lượng của một nhóm (đối tượng có members)");
-                        return json.getNodeFactory().numberNode(name.equals("index") ? index : groups.get(group));
+                        return json.getNodeFactory().numberNode(name.equals(INDEX_NAME) ? index : groups.get(group));
                     }
                     if (!memberOf.containsKey(name)) return ast;
-                    require(memberOf.get(name).equals(group), "Đại lượng " + name + " thuộc từng phần tử của nhóm " + memberOf.get(name)
+                    require(memberOf.get(name).equals(group), QUANTITY_MESSAGE + name + " thuộc từng phần tử của nhóm " + memberOf.get(name)
                             + ": từ bên ngoài nhóm hãy đọc nó bằng total, mean, largest, smallest hoặc [\"member\", \"" + name + "\", số thứ tự]");
                     return json.getNodeFactory().textNode(name + "__" + index);
                 }
@@ -139,16 +224,16 @@ public final class FreeModel {
                     });
                     return json.getNodeFactory().textNode(name);
                 }
-                if (OVER_GROUP.contains(op) || op.equals("member")) {
+                if (OVER_GROUP.contains(op) || op.equals(OP_MEMBER)) {
                     require(ast.size() >= 2 && ast.get(1).isTextual() && memberOf.containsKey(ast.get(1).asText()), op + " cần tên một đại lượng của nhóm (đối tượng có members)");
                     String name = ast.get(1).asText();
                     int size = groups.get(memberOf.get(name));
-                    if (op.equals("member")) {
+                    if (op.equals(OP_MEMBER)) {
                         require(ast.size() == 3 && ast.get(2).isInt() && ast.get(2).asInt() >= 0 && ast.get(2).asInt() < size, "member cần số thứ tự nguyên từ 0 đến " + (size - 1));
                         return json.getNodeFactory().textNode(name + "__" + ast.get(2).asInt());
                     }
                     require(ast.size() == 2, op + " cần đúng một tên đại lượng");
-                    JsonNode all = fold(op.equals("largest") ? "max" : op.equals("smallest") ? "min" : "add", name, 0, size);
+                    JsonNode all = fold(foldOperator(op), name, 0, size);
                     return op.equals("mean") ? json.createArrayNode().add("div").add(all).add(size) : all;
                 }
                 ArrayNode copy = json.createArrayNode().add(op);
@@ -161,159 +246,171 @@ public final class FreeModel {
                 return json.createArrayNode().add(op).add(fold(op, name, from, middle)).add(fold(op, name, middle, to));
             }
             void parts(ObjectNode quantity, String group, int index) {
-                for (String part : List.of("value", "initial", "rate")) if (quantity.has(part)) quantity.set(part, write(quantity.get(part), group, index));
-                for (JsonNode jump : quantity.path("jumps")) for (String part : List.of("when", "to")) ((ObjectNode) jump).set(part, write(jump.path(part), group, index));
+                for (String part : List.of(VALUE, INITIAL, "rate")) if (quantity.has(part)) quantity.set(part, write(quantity.get(part), group, index));
+                for (JsonNode jump : quantity.path(JUMPS)) for (String part : List.of("when", "to")) ((ObjectNode) jump).set(part, write(jump.path(part), group, index));
             }
         }
         Writer writer = new Writer();
-        ArrayNode objects = spec.putArray("objects"), quantities = model.putArray("quantities"), untils = json.createArrayNode();
+        ArrayNode objects = spec.putArray(OBJECTS);
+        ArrayNode quantities = model.putArray(QUANTITIES);
+        ArrayNode untils = json.createArrayNode();
         List<ObjectNode> presence = new ArrayList<>();
-        for (JsonNode object : authored.path("objects")) {
+        for (JsonNode object : authored.path(OBJECTS)) {
             String id = object.path("id").asText();
             for (int i = 0; i < groups.getOrDefault(id, 1); i++) {
                 boolean member = groups.containsKey(id);
-                ObjectNode one = objects.addObject().put("id", member ? id + "[" + i + "]" : id).put("label", object.path("label").asText(id) + (member ? " " + (i + 1) : ""));
-                if (!object.has("present")) continue;
-                ObjectNode there = json.createObjectNode().put("id", "present_" + safe(one.path("id").asText())).put("label", "có mặt").put("unit", "1").put("role", "other")
-                        .put("of", one.path("id").asText()).put("key", one.path("id").asText() + ".present").put("bookkeeping", true);
-                there.set("value", json.createArrayNode().add("if").add(writer.write(object.path("present"), member ? id : null, i)).add(1).add(0));
+                ObjectNode one = objects.addObject().put("id", member ? id + "[" + i + "]" : id).put(LABEL, object.path(LABEL).asText(id) + (member ? " " + (i + 1) : ""));
+                if (!object.has(PRESENT)) continue;
+                ObjectNode there = json.createObjectNode().put("id", "present_" + safe(one.path("id").asText())).put(LABEL, "có mặt").put("unit", "1").put("role", OTHER_ROLE)
+                        .put("of", one.path("id").asText()).put("key", one.path("id").asText() + ".present").put(BOOKKEEPING, true);
+                there.set(VALUE, json.createArrayNode().add("if").add(writer.write(object.path(PRESENT), member ? id : null, i)).add(1).add(0));
                 presence.add(there);
             }
         }
-        for (JsonNode quantity : authored.path("model").path("quantities")) {
+        for (JsonNode quantity : authored.path(MODEL).path(QUANTITIES)) {
             String group = memberOf.get(quantity.path("id").asText());
             for (int i = 0; i < (group == null ? 1 : groups.get(group)); i++) {
                 ObjectNode one = (ObjectNode) quantity.deepCopy();
                 if (group != null) {
                     one.put("id", quantity.path("id").asText() + "__" + i).put("of", group + "[" + i + "]").put("key", group + "[" + i + "]." + quantity.path("id").asText())
-                            .put("source", quantity.path("id").asText());
-                    if (i >= SAMPLED_MEMBERS) one.put("unsampled", true);
+                            .put(SOURCE, quantity.path("id").asText());
+                    if (i >= SAMPLED_MEMBERS) one.put(UNSAMPLED, true);
                 }
                 writer.parts(one, group, i);
                 quantities.add(one);
             }
         }
         presence.forEach(quantities::add);
-        JsonNode ends = authored.path("model").path("until");
+        JsonNode ends = authored.path(MODEL).path(UNTIL);
         for (JsonNode until : ends.isArray() ? ends : ends.isObject() ? json.createArrayNode().add(ends) : json.createArrayNode()) {
-            String group = memberOf.get(until.path("quantity").asText());
+            String group = memberOf.get(until.path(QUANTITY).asText());
             if (group == null && groups.containsKey(until.path("of").asText(""))) group = until.path("of").asText();
             for (int i = 0; i < (group == null ? 1 : groups.get(group)); i++) {
                 ObjectNode one = (ObjectNode) until.deepCopy();
                 if (group != null) {
-                    if (memberOf.containsKey(until.path("quantity").asText())) one.put("quantity", until.path("quantity").asText() + "__" + i);
+                    if (memberOf.containsKey(until.path(QUANTITY).asText())) one.put(QUANTITY, until.path(QUANTITY).asText() + "__" + i);
                     one.put("of", group + "[" + i + "]");
                 }
                 untils.add(one);
             }
         }
-        if (!untils.isEmpty()) model.set("until", untils);
-        if (model.has("duration")) model.set("duration", writer.write(model.get("duration"), null, 0));
-        ArrayNode constants = model.withArray("constants");
-        draws.forEach((name, value) -> constants.addObject().put("id", name).put("label", name).put("value", value).put("unit", "1"));
+        if (!untils.isEmpty()) model.set(UNTIL, untils);
+        if (model.has(DURATION)) model.set(DURATION, writer.write(model.get(DURATION), null, 0));
+        ArrayNode constants = model.withArray(CONSTANTS);
+        draws.forEach((name, value) -> constants.addObject().put("id", name).put(LABEL, name).put(VALUE, value).put("unit", "1"));
         return spec;
     }
 
     private Run solve(JsonNode catalogue, JsonNode spec, JsonNode overrides) {
-        JsonNode model = spec.path("model");
+        JsonNode model = spec.path(MODEL);
         Set<String> names = new LinkedHashSet<>();
         Map<String, String> objects = new LinkedHashMap<>();
-        for (JsonNode object : spec.path("objects")) {
+        for (JsonNode object : spec.path(OBJECTS)) {
             String id = object.path("id").asText();
-            require(objects.put(id, object.path("label").asText(id)) == null, "Mỗi đối tượng cần một id riêng: " + id);
+            require(objects.put(id, object.path(LABEL).asText(id)) == null, "Mỗi đối tượng cần một id riêng: " + id);
         }
         Map<String, Double> fixed = new LinkedHashMap<>();
-        Map<String, JsonNode> axes = new LinkedHashMap<>(), fields = new LinkedHashMap<>();
-        for (JsonNode quantity : model.path("quantities")) if (quantity.has("along")) fields.put(quantity.path("id").asText(), quantity);
-        ObjectNode capability = json.createObjectNode().put("capabilityId", ID).put("title", "model").put("version", "1.0");
-        ArrayNode inputs = capability.putArray("canonicalInputs"), outputs = capability.putArray("outputs");
+        Map<String, JsonNode> axes = new LinkedHashMap<>();
+        Map<String, JsonNode> fields = new LinkedHashMap<>();
+        for (JsonNode quantity : model.path(QUANTITIES)) if (quantity.has(ALONG)) fields.put(quantity.path("id").asText(), quantity);
+        ObjectNode capability = json.createObjectNode().put(CAPABILITY_ID, ID).put("title", ID).put("version", "1.0");
+        ArrayNode inputs = capability.putArray("canonicalInputs");
+        ArrayNode outputs = capability.putArray("outputs");
         ObjectNode math = capability.putObject("execution").putObject("math");
-        ObjectNode initial = math.putObject("initial"), rates = math.putObject("rates"), results = math.putObject("outputs"), jumps = json.createObjectNode();
+        ObjectNode initial = math.putObject(INITIAL);
+        ObjectNode rates = math.putObject("rates");
+        ObjectNode results = math.putObject("outputs");
+        ObjectNode jumps = json.createObjectNode();
         // No reference solution exists for a model written for one description: the solver checks it by step refinement.
         capability.putObject("validation").put("absoluteTolerance", 0).put("relativeTolerance", 1e-3).put("strategy", "step_refinement").putArray("invariants").add("finite_output");
         ObjectNode bindings = json.createObjectNode();
-        for (JsonNode parameter : spec.path("parameters")) {
-            String name = name(parameter.path("name").asText(), names), unit = parameter.path("unit").asText();
+        for (JsonNode parameter : spec.path(PARAMETERS)) {
+            String name = name(parameter.path("name").asText(), names);
+            String unit = parameter.path("unit").asText();
             String canonical = equations.canonical(unit);
             require(canonical != null, "Đơn vị của thanh trượt " + name + " không có trong danh mục: " + unit);
             inputs.addObject().put("key", name).put("unit", canonical);
             bindings.put(name, name);
-            fixed.put(name, equations.convert(overrides != null && overrides.has(name) ? overrides.path(name).asDouble() : parameter.path("value").asDouble(), unit, canonical));
+            fixed.put(name, equations.convert(overrides != null && overrides.has(name) ? overrides.path(name).asDouble() : parameter.path(VALUE).asDouble(), unit, canonical));
         }
-        for (JsonNode constant : model.path("constants")) {
-            String name = name(constant.path("id").asText(), names), unit = constant.path("unit").asText();
+        for (JsonNode constant : model.path(CONSTANTS)) {
+            String name = name(constant.path("id").asText(), names);
+            String unit = constant.path("unit").asText();
             String canonical = equations.canonical(unit);
             require(canonical != null, "Đơn vị của hằng số " + name + " không có trong danh mục: " + unit);
-            require(constant.path("value").isNumber(), "Hằng số " + name + " thiếu giá trị");
+            require(constant.path(VALUE).isNumber(), "Hằng số " + name + " thiếu giá trị");
             inputs.addObject().put("key", name).put("unit", canonical);
-            bindings.put(name, equations.convert(constant.path("value").asDouble(), unit, canonical));
-            fixed.put(name, equations.convert(constant.path("value").asDouble(), unit, canonical));
+            bindings.put(name, equations.convert(constant.path(VALUE).asDouble(), unit, canonical));
+            fixed.put(name, equations.convert(constant.path(VALUE).asDouble(), unit, canonical));
         }
         // a universal constant of the laws (G, R, h, c…) can be used by its name without declaring it, unless the model uses that name itself
-        Set<String> own = new LinkedHashSet<>(names), used = new LinkedHashSet<>();
-        model.path("quantities").forEach(quantity -> {
+        Set<String> own = new LinkedHashSet<>(names);
+        Set<String> used = new LinkedHashSet<>();
+        model.path(QUANTITIES).forEach(quantity -> {
             own.add(quantity.path("id").asText());
-            for (String part : List.of("value", "initial", "rate")) mentioned(quantity.path(part), used);
-            for (JsonNode jump : quantity.path("jumps")) { mentioned(jump.path("when"), used); mentioned(jump.path("to"), used); }
-            for (JsonNode axis : quantity.path("along")) own.add(axis.path("name").asText());
+            for (String part : List.of(VALUE, INITIAL, "rate")) mentioned(quantity.path(part), used);
+            for (JsonNode jump : quantity.path(JUMPS)) { mentioned(jump.path("when"), used); mentioned(jump.path("to"), used); }
+            for (JsonNode axis : quantity.path(ALONG)) own.add(axis.path("name").asText());
         });
-        mentioned(model.path("duration"), used);
-        catalogue.path("constants").fields().forEachRemaining(constant -> {
+        mentioned(model.path(DURATION), used);
+        catalogue.path(CONSTANTS).fields().forEachRemaining(constant -> {
             if (!used.contains(constant.getKey()) || own.contains(constant.getKey())) return;
             String canonical = equations.canonical(constant.getValue().path("unit").asText());
             require(canonical != null, "Hằng số " + constant.getKey() + " của danh mục định luật có đơn vị không có trong danh mục đơn vị");
             names.add(constant.getKey());
             inputs.addObject().put("key", constant.getKey()).put("unit", canonical);
-            bindings.put(constant.getKey(), equations.convert(constant.getValue().path("value").asDouble(), constant.getValue().path("unit").asText(), canonical));
+            bindings.put(constant.getKey(), equations.convert(constant.getValue().path(VALUE).asDouble(), constant.getValue().path("unit").asText(), canonical));
             fixed.put(constant.getKey(), bindings.path(constant.getKey()).asDouble());
         });
         // a quantity over space is worked out at every point of its axes; to the solver an axis is one more given value
         for (JsonNode field : fields.values()) {
-            require(field.has("value") && field.path("along").isArray() && !field.path("along").isEmpty() && field.path("along").size() <= 2,
+            require(field.has(VALUE) && field.path(ALONG).isArray() && !field.path(ALONG).isEmpty() && field.path(ALONG).size() <= 2,
                     "Đại lượng theo không gian " + field.path("id").asText() + " cần value và một hoặc hai trục trong along");
             int cells = 1;
-            for (JsonNode axis : field.path("along")) {
-                String name = axis.path("name").asText(), unit = axis.path("unit").asText();
-                require(equations.canonical(unit) != null && isBase(unit), "Trục " + name + " phải dùng đơn vị SI có trong danh mục");
+            for (JsonNode axis : field.path(ALONG)) {
+                String name = axis.path("name").asText();
+                String unit = axis.path("unit").asText();
+                require(equations.canonical(unit) != null && isBase(unit), AXIS_MESSAGE + name + " phải dùng đơn vị SI có trong danh mục");
                 int points = axis.path("points").asInt();
-                require(points >= 2 && points <= 400, "Trục " + name + " cần từ 2 đến 400 điểm");
+                require(points >= 2 && points <= 400, AXIS_MESSAGE + name + " cần từ 2 đến 400 điểm");
                 cells *= points;
-                for (String end : List.of("from", "to")) require(axis.path(end).isNumber() || fixed.containsKey(axis.path(end).asText()), "Trục " + name + " cần " + end + " là một số hoặc tên thanh trượt, hằng số");
-                if (axes.containsKey(name)) { require(axes.get(name).equals(axis), "Trục " + name + " được khai báo khác nhau ở hai đại lượng"); continue; }
+                for (String end : List.of("from", "to")) require(axis.path(end).isNumber() || fixed.containsKey(axis.path(end).asText()), AXIS_MESSAGE + name + " cần " + end + " là một số hoặc tên thanh trượt, hằng số");
+                if (axes.containsKey(name)) { require(axes.get(name).equals(axis), AXIS_MESSAGE + name + " được khai báo khác nhau ở hai đại lượng"); continue; }
                 axes.put(name(name, names), axis);
                 inputs.addObject().put("key", name).put("unit", unit);
                 bindings.put(name, axis.path("from").isNumber() ? axis.path("from").asDouble() : fixed.get(axis.path("from").asText()));
             }
             require(cells <= MAX_FIELD_CELLS, "Lưới của " + field.path("id").asText() + " có quá nhiều điểm (" + cells + ", tối đa " + MAX_FIELD_CELLS + ")");
         }
-        for (JsonNode quantity : model.path("quantities")) {
-            String id = name(quantity.path("id").asText(), names), unit = quantity.path("unit").asText();
-            require(equations.canonical(unit) != null && isBase(unit), "Đại lượng " + id + " phải dùng đơn vị SI có trong danh mục, không phải " + unit);
+        for (JsonNode quantity : model.path(QUANTITIES)) {
+            String id = name(quantity.path("id").asText(), names);
+            String unit = quantity.path("unit").asText();
+            require(equations.canonical(unit) != null && isBase(unit), QUANTITY_MESSAGE + id + " phải dùng đơn vị SI có trong danh mục, không phải " + unit);
             outputs.addObject().put("key", id).put("unit", unit);
             boolean state = quantity.has("rate");
-            require(state == quantity.has("initial") && state != quantity.has("value"), "Đại lượng " + id
+            require(state == quantity.has(INITIAL) && state != quantity.has(VALUE), QUANTITY_MESSAGE + id
                     + " phải có hoặc cả initial và rate (đại lượng biến đổi theo phương trình vi phân), hoặc chỉ value (tính trực tiếp)");
-            if (state) { initial.set(id, quantity.path("initial")); rates.set(id, quantity.path("rate")); results.put(id, id); }
-            else results.set(id, quantity.path("value"));
-            require(!quantity.has("jumps") || state, "Chỉ đại lượng có initial và rate mới có bước nhảy (jumps): " + id);
-            for (JsonNode jump : quantity.path("jumps")) {
+            if (state) { initial.set(id, quantity.path(INITIAL)); rates.set(id, quantity.path("rate")); results.put(id, id); }
+            else results.set(id, quantity.path(VALUE));
+            require(!quantity.has(JUMPS) || state, "Chỉ đại lượng có initial và rate mới có bước nhảy (jumps): " + id);
+            for (JsonNode jump : quantity.path(JUMPS)) {
                 require(jump.has("when") && jump.has("to"), "Mỗi bước nhảy của " + id + " cần when và to");
                 jumps.withArray(id).addArray().add(json.createArrayNode().add("if").add(jump.path("when")).add(1).add(0)).add(jump.path("to"));
             }
-            if (!quantity.has("along")) {
+            if (!quantity.has(ALONG)) {
                 Set<String> uses = new LinkedHashSet<>();
-                for (String part : List.of("value", "initial", "rate")) mentioned(quantity.path(part), uses);
-                for (String use : uses) require(!fields.containsKey(use) && !axes.containsKey(use), "Đại lượng " + id + " dùng " + use
+                for (String part : List.of(VALUE, INITIAL, "rate")) mentioned(quantity.path(part), uses);
+                for (String use : uses) require(!fields.containsKey(use) && !axes.containsKey(use), QUANTITY_MESSAGE + id + " dùng " + use
                         + ", vốn chỉ có nghĩa tại từng điểm trong không gian; chỉ đại lượng có along mới dùng được toạ độ và đại lượng theo không gian");
             }
             // "by" may name something outside the model (the room, the mains); what a quantity belongs to must be an object of it
-            require(!quantity.hasNonNull("of") || objects.containsKey(quantity.path("of").asText()), "Đại lượng " + id + " có of = \""
+            require(!quantity.hasNonNull("of") || objects.containsKey(quantity.path("of").asText()), QUANTITY_MESSAGE + id + " có of = \""
                     + quantity.path("of").asText() + "\" không phải id của đối tượng nào trong objects (" + String.join(", ", objects.keySet()) + ")");
             String role = quantity.path("role").asText();
-            require(!role.isBlank() && catalogue.path("roles").has(role), "Đại lượng " + id + " có vai trò không thuộc danh mục: " + role);
+            require(!role.isBlank() && catalogue.path("roles").has(role), QUANTITY_MESSAGE + id + " có vai trò không thuộc danh mục: " + role);
             if (role.equals("force")) require(catalogue.path("forceKinds").has(quantity.path("kind").asText()), "Lực " + id + " cần kind thuộc danh mục lực");
         }
-        if (!jumps.isEmpty()) math.set("jumps", jumps);
+        if (!jumps.isEmpty()) math.set(JUMPS, jumps);
         if (initial.isEmpty()) {
             // a model given entirely by direct formulas still runs on the solver's clock
             String clock = name("elapsed", names);
@@ -323,55 +420,56 @@ public final class FreeModel {
         ObjectNode definition = json.createObjectNode();
         definition.putArray("capabilities").add(capability);
         ObjectNode solverSpec = json.createObjectNode();
-        solverSpec.set("parameters", spec.path("parameters"));
-        solverSpec.set("durationSeconds", spec.path("durationSeconds"));
-        if (spec.has("durationParameter")) solverSpec.set("durationParameter", spec.path("durationParameter"));
+        solverSpec.set(PARAMETERS, spec.path(PARAMETERS));
+        solverSpec.set(DURATION_SECONDS, spec.path(DURATION_SECONDS));
+        if (spec.has(DURATION_PARAMETER)) solverSpec.set(DURATION_PARAMETER, spec.path(DURATION_PARAMETER));
         solverSpec.put("physicsCoverage", "COMPLETE");
-        ObjectNode participant = solverSpec.putArray("physicsModels").addObject().put("id", ID).put("capabilityId", ID);
+        ObjectNode participant = solverSpec.putArray("physicsModels").addObject().put("id", ID).put(CAPABILITY_ID, ID);
         participant.set("inputs", bindings);
         // Every way the run or one object can end is a condition that, once met, stays met.
         List<JsonNode> ends = new ArrayList<>();
         Map<String, List<JsonNode>> stops = new LinkedHashMap<>();
-        JsonNode untils = model.path("until");
+        JsonNode untils = model.path(UNTIL);
         for (JsonNode until : untils.isArray() ? untils : untils.isObject() ? json.createArrayNode().add(untils) : json.createArrayNode()) {
-            String watched = until.path("quantity").asText(), direction = until.path("direction").asText();
+            String watched = until.path(QUANTITY).asText();
+            String direction = until.path("direction").asText();
             require(names.contains(watched), "Điều kiện dừng dùng đại lượng không có trong mô hình: " + watched);
-            require(direction.equals("rising") || direction.equals("falling"), "Điều kiện dừng của " + watched + " cần direction là rising hoặc falling");
-            JsonNode value = until.path("value");
+            require(direction.equals(RISING) || direction.equals("falling"), "Điều kiện dừng của " + watched + " cần direction là rising hoặc falling");
+            JsonNode value = until.path(VALUE);
             require(value.isNumber() || value.isTextual() && names.contains(value.asText()), "Điều kiện dừng của " + watched + " cần value là một số hoặc tên thanh trượt, hằng số");
             if (value.isNumber() && value.asDouble() != 0) {
                 // a bare number here is a value of the watched quantity, in its unit
                 String target = name("target_" + ends.size() + "_" + stops.values().stream().mapToInt(List::size).sum() + "_" + watched, names);
                 String unit = "1";
-                for (JsonNode quantity : model.path("quantities")) if (quantity.path("id").asText().equals(watched)) unit = quantity.path("unit").asText();
+                for (JsonNode quantity : model.path(QUANTITIES)) if (quantity.path("id").asText().equals(watched)) unit = quantity.path("unit").asText();
                 inputs.addObject().put("key", target).put("unit", unit);
                 bindings.set(target, value);
                 fixed.put(target, value.asDouble());
                 value = json.getNodeFactory().textNode(target);
             }
             ArrayNode reached = json.createArrayNode().add("latched");
-            reached.add(direction.equals("rising") ? json.createArrayNode().add("sub").add(watched).add(value) : json.createArrayNode().add("sub").add(value).add(watched));
+            reached.add(direction.equals(RISING) ? json.createArrayNode().add("sub").add(watched).add(value) : json.createArrayNode().add("sub").add(value).add(watched));
             require(!until.hasNonNull("of") || objects.containsKey(until.path("of").asText()), "Điều kiện dừng có of không phải id của đối tượng nào: " + until.path("of").asText());
             if (until.hasNonNull("of")) stops.computeIfAbsent(until.path("of").asText(), of -> new ArrayList<>()).add(reached); else ends.add(reached);
         }
-        if (model.has("duration")) ends.add(json.createArrayNode().add("latched").add(json.createArrayNode().add("sub").add("t").add(model.path("duration"))));
+        if (model.has(DURATION)) ends.add(json.createArrayNode().add("latched").add(json.createArrayNode().add("sub").add("t").add(model.path(DURATION))));
         Set<String> moving = new LinkedHashSet<>();
-        for (JsonNode quantity : model.path("quantities")) if (quantity.has("rate")) moving.add(quantity.path("of").asText(""));
+        for (JsonNode quantity : model.path(QUANTITIES)) if (quantity.has("rate")) moving.add(quantity.path("of").asText(""));
         for (var stop : stops.entrySet()) {
             // an object that has reached its end keeps the values it had there
-            String flag = name("stopped_" + safe(stop.getKey()), names);
+            String flag = name(STOPPED_PREFIX + safe(stop.getKey()), names);
             JsonNode any = stop.getValue().get(0);
             for (JsonNode more : stop.getValue().subList(1, stop.getValue().size())) any = json.createArrayNode().add("max").add(any).add(more);
             outputs.addObject().put("key", flag).put("unit", "1");
             results.set(flag, any);
-            for (JsonNode quantity : model.path("quantities"))
+            for (JsonNode quantity : model.path(QUANTITIES))
                 if (quantity.has("rate") && quantity.path("of").asText("").equals(stop.getKey()))
                     rates.set(quantity.path("id").asText(), json.createArrayNode().add("if").add(flag).add(0).add(quantity.path("rate")));
         }
         if (!stops.isEmpty() && stops.keySet().containsAll(moving)) {
             // the run is over when every moving object has reached its end
             JsonNode all = null;
-            for (String object : stops.keySet()) all = all == null ? json.getNodeFactory().textNode("stopped_" + safe(object)) : json.createArrayNode().add("min").add(all).add("stopped_" + safe(object));
+            for (String object : stops.keySet()) all = all == null ? json.getNodeFactory().textNode(STOPPED_PREFIX + safe(object)) : json.createArrayNode().add("min").add(all).add(STOPPED_PREFIX + safe(object));
             ends.add(all);
         }
         if (!ends.isEmpty()) {
@@ -380,66 +478,97 @@ public final class FreeModel {
             for (JsonNode more : ends.subList(1, ends.size())) any = json.createArrayNode().add("max").add(any).add(more);
             outputs.addObject().put("key", over).put("unit", "1");
             results.set(over, any);
-            participant.putObject("until").put("field", ID + "." + over).put("direction", "rising").put("value", 0.5);
+            participant.putObject(UNTIL).put("field", ID + "." + over).put("direction", RISING).put(VALUE, 0.5);
         }
         ObjectNode computed = equations.compute(definition, solverSpec, overrides == null ? json.createObjectNode() : overrides);
 
-        JsonNode frames = computed.path("solverTimeline").path("frames");
+        JsonNode frames = computed.path(SOLVER_TIMELINE).path(FRAMES);
         double[] time = new double[frames.size()];
         for (int i = 0; i < time.length; i++) time[i] = frames.get(i).path("t").asDouble();
         List<LawChecks.Symbol> symbols = new ArrayList<>();
-        for (JsonNode quantity : model.path("quantities")) {
-            if (quantity.has("along") || quantity.has("bookkeeping") || quantity.has("unsampled")) continue;
+        for (JsonNode quantity : model.path(QUANTITIES)) {
+            if (quantity.has(ALONG) || quantity.has(BOOKKEEPING) || quantity.has(UNSAMPLED)) continue;
             double[] values = new double[time.length];
-            for (int i = 0; i < time.length; i++) values[i] = frames.get(i).path("values").path(ID + "." + quantity.path("id").asText()).asDouble();
-            symbols.add(new LawChecks.Symbol(quantity.path("id").asText(), quantity.path("label").asText(), equations.canonical(quantity.path("unit").asText()), attributes(quantity), values, false));
+            for (int i = 0; i < time.length; i++) values[i] = frames.get(i).path(VALUES).path(ID + "." + quantity.path("id").asText()).asDouble();
+            symbols.add(new LawChecks.Symbol(quantity.path("id").asText(), quantity.path(LABEL).asText(), equations.canonical(quantity.path("unit").asText()), attributes(quantity), values, false));
         }
-        for (JsonNode parameter : spec.path("parameters")) if (parameter.hasNonNull("role")) {
-            String name = parameter.path("name").asText(), unit = parameter.path("unit").asText();
-            double value = overrides != null && overrides.has(name) ? overrides.path(name).asDouble() : parameter.path("value").asDouble();
+        for (JsonNode parameter : spec.path(PARAMETERS)) if (parameter.hasNonNull("role")) {
+            String name = parameter.path("name").asText();
+            String unit = parameter.path("unit").asText();
+            double value = overrides != null && overrides.has(name) ? overrides.path(name).asDouble() : parameter.path(VALUE).asDouble();
             for (JsonNode owner : owners(parameter, objects)) symbols.add(constant(name, owner, equations.canonical(unit), equations.convert(value, unit, equations.canonical(unit)), time.length));
         }
-        for (JsonNode constant : model.path("constants")) if (constant.hasNonNull("role"))
-            for (JsonNode owner : owners(constant, objects)) symbols.add(constant(constant.path("id").asText(), owner, equations.canonical(constant.path("unit").asText()), equations.convert(constant.path("value").asDouble(),
+        for (JsonNode constant : model.path(CONSTANTS)) {
+            if (!constant.hasNonNull("role")) continue;
+            for (JsonNode owner : owners(constant, objects)) symbols.add(constant(constant.path("id").asText(), owner, equations.canonical(constant.path("unit").asText()), equations.convert(constant.path(VALUE).asDouble(),
                     constant.path("unit").asText(), equations.canonical(constant.path("unit").asText())), time.length));
+        }
         // laws hold for an object while it is there and under way
         Map<String, boolean[]> active = new LinkedHashMap<>();
         for (String object : objects.keySet()) {
-            boolean stops_ = stops.containsKey(object), comes = names.contains("present_" + safe(object));
-            if (!stops_ && !comes) continue;
+            boolean canStop = stops.containsKey(object);
+            boolean comes = names.contains("present_" + safe(object));
+            if (!canStop && !comes) continue;
             boolean[] running = new boolean[time.length];
-            for (int i = 0; i < time.length; i++) running[i] = !(stops_ && frames.get(i).path("values").path(ID + ".stopped_" + safe(object)).asDouble() > 0.5)
-                    && !(comes && !(frames.get(i).path("values").path(ID + ".present_" + safe(object)).asDouble() > 0.5));
+            for (int i = 0; i < time.length; i++) {
+                JsonNode values = frames.get(i).path(VALUES);
+                boolean stopped = canStop && values.path(ID + ".stopped_" + safe(object)).asDouble() > 0.5;
+                boolean present = !comes || values.path(ID + ".present_" + safe(object)).asDouble() > 0.5;
+                running[i] = !stopped && present;
+            }
             active.put(object, running);
         }
-        if (!fields.isEmpty()) spaces(computed.path("solverTimeline"), model, fields, axes, fixed);
-        // what depends on a random draw, directly or through other quantities
-        Set<String> chancy = new LinkedHashSet<>();
-        for (boolean grown = true; grown; ) {
-            grown = false;
-            for (JsonNode quantity : model.path("quantities")) {
-                if (chancy.contains(quantity.path("id").asText())) continue;
-                Set<String> uses = new LinkedHashSet<>();
-                for (String part : List.of("value", "initial", "rate")) mentioned(quantity.path(part), uses);
-                for (JsonNode jump : quantity.path("jumps")) { mentioned(jump.path("when"), uses); mentioned(jump.path("to"), uses); }
-                for (String use : uses) if (use.startsWith("rnd_") || chancy.contains(use)) { grown = chancy.add(quantity.path("id").asText()); break; }
+        if (!fields.isEmpty()) spaces(computed.path(SOLVER_TIMELINE), fields, fixed);
+        Set<String> chancy = chancy(model);
+        Map<Double, Set<String>> impacts = new LinkedHashMap<>();
+        for (JsonNode jump : computed.path(SOLVER_TIMELINE).path(JUMPS)) {
+            for (JsonNode name : jump.path(QUANTITIES)) {
+                for (JsonNode quantity : model.path(QUANTITIES)) {
+                    if (quantity.path("id").asText().equals(name.asText()) && quantity.hasNonNull("of")) impacts.computeIfAbsent(jump.path("t").asDouble(), at -> new LinkedHashSet<>()).add(quantity.path("of").asText());
+                }
             }
         }
-        Map<Double, Set<String>> impacts = new LinkedHashMap<>();
-        for (JsonNode jump : computed.path("solverTimeline").path("jumps")) for (JsonNode name : jump.path("quantities")) for (JsonNode quantity : model.path("quantities"))
-            if (quantity.path("id").asText().equals(name.asText()) && quantity.hasNonNull("of")) impacts.computeIfAbsent(jump.path("t").asDouble(), at -> new LinkedHashSet<>()).add(quantity.path("of").asText());
-        return new Run(model, computed, symbols, time, active, stops.keySet(), chancy, impacts);
+        return new Run(model, computed, symbols, time, active, new Marks(stops.keySet(), chancy, impacts));
+    }
+
+    /** What depends on a random draw, directly or through other quantities. */
+    private static Set<String> chancy(JsonNode model) {
+        Set<String> chancy = new LinkedHashSet<>();
+        boolean grown;
+        do {
+            grown = false;
+            for (JsonNode quantity : model.path(QUANTITIES)) {
+                if (chancy.contains(quantity.path("id").asText())) continue;
+                if (usedBy(quantity).stream().anyMatch(use -> use.startsWith("rnd_") || chancy.contains(use))) grown |= chancy.add(quantity.path("id").asText());
+            }
+        } while (grown);
+        return chancy;
+    }
+
+    /** The names a quantity's value, start, rate and jumps are written with. */
+    private static Set<String> usedBy(JsonNode quantity) {
+        Set<String> uses = new LinkedHashSet<>();
+        for (String part : List.of(VALUE, INITIAL, "rate")) mentioned(quantity.path(part), uses);
+        for (JsonNode jump : quantity.path(JUMPS)) {
+            mentioned(jump.path("when"), uses);
+            mentioned(jump.path("to"), uses);
+        }
+        return uses;
     }
 
     /** A run of very many values is reported at fewer instants; the checks have already seen every one. */
     private void thin(JsonNode timeline, int quantities) {
-        ArrayNode frames = (ArrayNode) timeline.path("frames");
+        ArrayNode frames = (ArrayNode) timeline.path(FRAMES);
         int keep = Math.max(120, MAX_REPORTED_VALUES / Math.max(1, quantities));
         if (frames.size() <= keep) return;
         ArrayNode fewer = json.createArrayNode();
         int last = -1;
-        for (int k = 0; k < keep; k++) { int index = (int) Math.round(k * (frames.size() - 1) / (double) (keep - 1)); if (index != last) fewer.add(frames.get(index)); last = index; }
-        ((ObjectNode) timeline).set("frames", fewer);
+        for (int k = 0; k < keep; k++) {
+            int index = (int) Math.round(k * (frames.size() - 1) / (double) (keep - 1));
+            if (index != last) fewer.add(frames.get(index));
+            last = index;
+        }
+        ((ObjectNode) timeline).set(FRAMES, fewer);
     }
 
     /** The objects a slider or constant belongs to: its own, or the members of its group that the laws look at. */
@@ -452,81 +581,129 @@ public final class FreeModel {
     }
 
     /** Every quantity over space, worked out at each point of its axes at an even selection of instants. */
-    private void spaces(JsonNode timeline, JsonNode model, Map<String, JsonNode> fields, Map<String, JsonNode> axes, Map<String, Double> fixed) {
-        JsonNode frames = timeline.path("frames");
+    private void spaces(JsonNode timeline, Map<String, JsonNode> fields, Map<String, Double> fixed) {
+        JsonNode frames = timeline.path(FRAMES);
         ObjectNode all = ((ObjectNode) timeline).putObject("fields");
         for (JsonNode field : fields.values()) {
-            if (field.has("source")) continue;
-            List<String> order = new ArrayList<>();
-            List<double[]> grid = new ArrayList<>();
-            ObjectNode report = all.putObject(key(field)).put("label", field.path("label").asText()).put("unit", field.path("unit").asText());
-            int cells = 1;
-            for (JsonNode axis : field.path("along")) {
-                double from = axis.path("from").isNumber() ? axis.path("from").asDouble() : fixed.get(axis.path("from").asText());
-                double to = axis.path("to").isNumber() ? axis.path("to").asDouble() : fixed.get(axis.path("to").asText());
-                double[] points = new double[axis.path("points").asInt()];
-                ArrayNode values = report.withArray("axes").addObject().put("name", axis.path("name").asText()).put("unit", axis.path("unit").asText()).putArray("values");
-                for (int i = 0; i < points.length; i++) { points[i] = from + (to - from) * i / (points.length - 1); values.add(points[i]); }
-                order.add(axis.path("name").asText());
-                grid.add(points);
-                cells *= points.length;
-            }
-            int instants = Math.max(1, Math.min(Math.min(frames.size(), 60), MAX_FIELD_VALUES / cells));
-            ArrayNode times = report.putArray("times"), samples = report.putArray("frames");
-            double least = Double.POSITIVE_INFINITY, most = Double.NEGATIVE_INFINITY;
-            ArrayNode before = null;
-            boolean still = true;
-            for (int k = 0; k < instants; k++) {
-                JsonNode frame = frames.get(instants == 1 ? 0 : (int) Math.round(k * (frames.size() - 1) / (double) (instants - 1)));
-                Map<String, Double> point = new LinkedHashMap<>();
-                java.util.function.ToDoubleFunction<String>[] lookup = new java.util.function.ToDoubleFunction[1];
-                lookup[0] = name -> {
-                    if (point.containsKey(name)) return point.get(name);
-                    if (name.equals("t")) return frame.path("t").asDouble();
-                    if (fields.containsKey(name)) return equations.value(fields.get(name).path("value"), lookup[0]);
-                    JsonNode value = frame.path("values").path(ID + "." + name);
-                    if (value.isNumber()) return value.asDouble();
-                    require(fixed.containsKey(name), "Đại lượng trong phương trình không xác định: " + name);
-                    return fixed.get(name);
-                };
-                ArrayNode sample = json.createArrayNode();
-                for (int cell = 0; cell < cells; cell++) {
-                    int rest = cell;
-                    for (int axis = 0; axis < order.size(); axis++) { point.put(order.get(axis), grid.get(axis)[rest % grid.get(axis).length]); rest /= grid.get(axis).length; }
-                    double value;
-                    try { value = equations.value(field.path("value"), lookup[0]); } catch (ApiException undefined) { value = Double.NaN; }
-                    if (Double.isFinite(value)) { sample.add(Double.parseDouble(String.format(java.util.Locale.ROOT, "%.5g", value))); least = Math.min(least, value); most = Math.max(most, value); }
-                    else sample.addNull();
-                }
-                still &= before == null || before.equals(sample);
-                before = sample;
-                times.add(frame.path("t").asDouble());
-                samples.add(sample);
-            }
-            require(Double.isFinite(least), "Đại lượng theo không gian " + field.path("id").asText() + " không xác định tại mọi điểm của lưới");
-            report.put("min", least).put("max", most).put("unchanging", still);
-            if (still) { while (samples.size() > 1) samples.remove(1); while (times.size() > 1) times.remove(1); }
+            if (!field.has(SOURCE)) space(field, all.putObject(key(field)), frames, fields, fixed);
         }
+    }
+
+    /** The points of a field's axes, in the order their names are listed. */
+    private record Grid(List<String> order, List<double[]> axes, int cells) {}
+
+    /** One quantity over space: its axes, then its values over the grid at each chosen instant. */
+    private void space(JsonNode field, ObjectNode report, JsonNode frames, Map<String, JsonNode> fields, Map<String, Double> fixed) {
+        report.put(LABEL, field.path(LABEL).asText()).put("unit", field.path("unit").asText());
+        Grid grid = grid(field, fixed, report);
+        int instants = Math.clamp(MAX_FIELD_VALUES / grid.cells(), 1, Math.clamp(frames.size(), 1, 60));
+        ArrayNode times = report.putArray("times");
+        ArrayNode samples = report.putArray(FRAMES);
+        double[] range = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY};
+        ArrayNode before = null;
+        boolean still = true;
+        for (int k = 0; k < instants; k++) {
+            JsonNode frame = frames.get(instants == 1 ? 0 : (int) Math.round(k * (frames.size() - 1) / (double) (instants - 1)));
+            ArrayNode sample = sample(field, frame, fields, fixed, grid, range);
+            still &= before == null || before.equals(sample);
+            before = sample;
+            times.add(frame.path("t").asDouble());
+            samples.add(sample);
+        }
+        require(Double.isFinite(range[0]), "Đại lượng theo không gian " + field.path("id").asText() + " không xác định tại mọi điểm của lưới");
+        report.put("min", range[0]).put("max", range[1]).put("unchanging", still);
+        if (still) {
+            while (samples.size() > 1) samples.remove(1);
+            while (times.size() > 1) times.remove(1);
+        }
+    }
+
+    /** A field's axes, each reported with its evenly spaced points. */
+    private static Grid grid(JsonNode field, Map<String, Double> fixed, ObjectNode report) {
+        List<String> order = new ArrayList<>();
+        List<double[]> axes = new ArrayList<>();
+        int cells = 1;
+        for (JsonNode axis : field.path(ALONG)) {
+            double from = axis.path("from").isNumber() ? axis.path("from").asDouble() : fixed.get(axis.path("from").asText());
+            double to = axis.path("to").isNumber() ? axis.path("to").asDouble() : fixed.get(axis.path("to").asText());
+            double[] points = new double[axis.path("points").asInt()];
+            ArrayNode values = report.withArray("axes").addObject().put("name", axis.path("name").asText()).put("unit", axis.path("unit").asText()).putArray(VALUES);
+            for (int i = 0; i < points.length; i++) {
+                points[i] = from + (to - from) * i / (points.length - 1);
+                values.add(points[i]);
+            }
+            order.add(axis.path("name").asText());
+            axes.add(points);
+            cells *= points.length;
+        }
+        return new Grid(order, axes, cells);
+    }
+
+    /** A field's values at every point of its grid at one instant; range keeps the least and most finite value seen. */
+    private ArrayNode sample(JsonNode field, JsonNode frame, Map<String, JsonNode> fields, Map<String, Double> fixed, Grid grid, double[] range) {
+        Map<String, Double> point = new LinkedHashMap<>();
+        ArrayNode sample = json.createArrayNode();
+        for (int cell = 0; cell < grid.cells(); cell++) {
+            int rest = cell;
+            for (int axis = 0; axis < grid.order().size(); axis++) {
+                double[] points = grid.axes().get(axis);
+                point.put(grid.order().get(axis), points[rest % points.length]);
+                rest /= points.length;
+            }
+            double value = fieldValue(field, point, frame, fields, fixed);
+            if (Double.isFinite(value)) {
+                sample.add(Double.parseDouble(String.format(java.util.Locale.ROOT, "%.5g", value)));
+                range[0] = Math.min(range[0], value);
+                range[1] = Math.max(range[1], value);
+            } else {
+                sample.addNull();
+            }
+        }
+        return sample;
+    }
+
+    /** A field's value at one point and instant, or NaN where it is undefined there. */
+    private double fieldValue(JsonNode field, Map<String, Double> point, JsonNode frame, Map<String, JsonNode> fields, Map<String, Double> fixed) {
+        try {
+            return equations.value(field.path(VALUE), name -> lookUp(name, point, frame, fields, fixed));
+        } catch (ApiException undefined) {
+            return Double.NaN;
+        }
+    }
+
+    /** A name in a field's formula: a coordinate, the time, another field, a quantity of the run, or a fixed value. */
+    private double lookUp(String name, Map<String, Double> point, JsonNode frame, Map<String, JsonNode> fields, Map<String, Double> fixed) {
+        if (point.containsKey(name)) return point.get(name);
+        if (name.equals("t")) return frame.path("t").asDouble();
+        if (fields.containsKey(name)) return equations.value(fields.get(name).path(VALUE), other -> lookUp(other, point, frame, fields, fixed));
+        JsonNode value = frame.path(VALUES).path(ID + "." + name);
+        if (value.isNumber()) return value.asDouble();
+        require(fixed.containsKey(name), "Đại lượng trong phương trình không xác định: " + name);
+        return fixed.get(name);
     }
 
     private ObjectNode verdict(JsonNode catalogue, Run run, Map<String, double[]> noise, Map<String, double[]> means) {
         JsonNode model = run.model;
         ObjectNode computed = run.computed;
         double[] time = run.time;
-        JsonNode breakTimes = computed.path("solverTimeline").path("breaks");
+        JsonNode breakTimes = computed.path(SOLVER_TIMELINE).path("breaks");
         double[] breaks = new double[breakTimes.size()];
         for (int i = 0; i < breaks.length; i++) breaks[i] = breakTimes.get(i).asDouble();
         Map<String, LawChecks.Symbol> byId = new LinkedHashMap<>();
         for (LawChecks.Symbol symbol : run.symbols) byId.putIfAbsent(symbol.id(), symbol);
         ArrayNode checks = new LawChecks(json).impacts(run.impacts).check(catalogue, run.symbols, time, breaks, run.active);
         // a count of random events follows its law only on average: it is held to the quantity it is expected to follow
-        for (JsonNode quantity : model.path("quantities")) {
-            if (!quantity.hasNonNull("expected")) continue;
-            String id = quantity.path("id").asText(), other = quantity.path("expected").asText();
+        for (JsonNode quantity : model.path(QUANTITIES)) {
+            if (!quantity.hasNonNull(EXPECTED)) continue;
+            String id = quantity.path("id").asText();
+            String other = quantity.path(EXPECTED).asText();
             require(byId.containsKey(id) && byId.containsKey(other) && !run.chancy.contains(other) && byId.get(id).unit().equals(byId.get(other).unit()),
                     "expected của " + id + " phải là id của một đại lượng cùng đơn vị, không phụ thuộc số ngẫu nhiên, không thuộc từng phần tử của nhóm: " + other);
-            double[] drawn = means.getOrDefault(id, byId.get(id).values()), mean = byId.get(other).values(), chance = noise.getOrDefault(id, new double[time.length]);
-            double scale = 0, worstBy = 0;
+            double[] drawn = means.getOrDefault(id, byId.get(id).values());
+            double[] mean = byId.get(other).values();
+            double[] chance = noise.getOrDefault(id, new double[time.length]);
+            double scale = 0;
+            double worstBy = 0;
             int worst = -1;
             for (int i = 0; i < time.length; i++) scale = Math.max(scale, Math.max(Math.abs(drawn[i]), Math.abs(mean[i])));
             for (int i = 0; i < time.length; i++) {
@@ -534,44 +711,52 @@ public final class FreeModel {
                 if (by > worstBy) { worstBy = by; worst = i; }
             }
             ObjectNode check = checks.addObject().put("law", "expected_value").put("title", "Giá trị ngẫu nhiên thăng giáng quanh giá trị kỳ vọng").put("curriculum", "")
-                    .put("status", worst < 0 ? "PASSED" : "FAILED").put("relativeDeviation", scale == 0 ? 0 : worstBy / scale);
-            check.putArray("quantities").add(id).add(other);
+                    .put(STATUS, worst < 0 ? "PASSED" : "FAILED").put("relativeDeviation", scale == 0 ? 0 : worstBy / scale);
+            check.putArray(QUANTITIES).add(id).add(other);
             // what the drawn quantity is built from is checked with it
             Set<String> built = new LinkedHashSet<>(List.of(id));
-            for (boolean grown = true; grown; ) {
+            boolean grown;
+            do {
                 grown = false;
-                for (JsonNode part : model.path("quantities")) if (built.contains(part.path("id").asText())) {
+                for (JsonNode part : model.path(QUANTITIES)) {
+                    if (!built.contains(part.path("id").asText())) continue;
                     Set<String> uses = new LinkedHashSet<>();
-                    for (String side : List.of("value", "initial", "rate")) mentioned(part.path(side), uses);
-                    for (String use : uses) if (run.chancy.contains(use) && built.add(use)) { grown = true; check.withArray("quantities").add(use); }
+                    for (String side : List.of(VALUE, INITIAL, "rate")) mentioned(part.path(side), uses);
+                    for (String use : uses) {
+                        if (run.chancy.contains(use) && built.add(use)) {
+                            grown = true;
+                            check.withArray(QUANTITIES).add(use);
+                        }
+                    }
                 }
-            }
-            if (worst >= 0) check.put("at", time[worst]).put("left", drawn[worst]).put("right", mean[worst]).put("message", quantity.path("label").asText(id) + " (" + id
+            } while (grown);
+            if (worst >= 0) check.put("at", time[worst]).put("left", drawn[worst]).put("right", mean[worst]).put("message", quantity.path(LABEL).asText(id) + " (" + id
                     + ") lệch khỏi giá trị kỳ vọng " + other + " nhiều hơn thăng giáng thống kê cho phép: tại t = " + time[worst] + " s trung bình của " + (EXTRA_DRAWS + 1) + " lần gieo số là " + drawn[worst] + " trong khi kỳ vọng là "
                     + mean[worst] + " (thăng giáng cho phép ±" + chance[worst] + "). Đổi seed không sửa được điều này: hãy xem lại công thức gieo ngẫu nhiên hoặc công thức kỳ vọng.");
         }
         ObjectNode validation = (ObjectNode) computed.path("validation");
-        boolean solved = validation.path("status").asText().startsWith("VERIFIED");
+        boolean solved = validation.path(STATUS).asText().startsWith("VERIFIED");
         ArrayNode kept = json.createArrayNode();
         if (!solved) kept.add("Nghiệm số chưa ổn định khi chia nhỏ bước tính (sai lệch tương đối lớn nhất "
                 + validation.path("relativeError").asDouble() + "). Thường do một đại lượng nhảy bậc mà không viết bằng if hoặc sign, "
                 + "hoặc do một lực rất cứng so với thời lượng mô phỏng; hãy viết bước nhảy bằng if, hoặc làm mềm, hoặc rút ngắn thời lượng.");
         validation.set("flags", kept);
         validation.set("lawChecks", checks);
-        model.path("assumptions").forEach(((ArrayNode) validation.path("assumptions"))::add);
+        model.path(ASSUMPTIONS).forEach(((ArrayNode) validation.path(ASSUMPTIONS))::add);
         Set<String> checked = new LinkedHashSet<>();
         int failed = 0;
         for (JsonNode check : checks) {
-            check.path("quantities").forEach(id -> checked.add(id.asText()));
-            if (check.path("status").asText().equals("AMBIGUOUS")) { validation.withArray("ambiguousLaws").add(check); continue; }
-            if (check.path("status").asText().equals("FAILED")) { failed++; ((ArrayNode) validation.path("flags")).add(check.path("message").asText()); }
+            check.path(QUANTITIES).forEach(id -> checked.add(id.asText()));
+            if (check.path(STATUS).asText().equals("AMBIGUOUS")) { validation.withArray("ambiguousLaws").add(check); continue; }
+            if (check.path(STATUS).asText().equals("FAILED")) { failed++; ((ArrayNode) validation.path("flags")).add(check.path("message").asText()); }
         }
         ArrayNode unchecked = validation.putArray("uncheckedQuantities");
         // a quantity of a group is checked when the members the laws looked at are
-        Set<String> left = new LinkedHashSet<>(), done = new LinkedHashSet<>();
-        for (JsonNode quantity : model.path("quantities")) {
-            if (quantity.has("bookkeeping") || quantity.has("unsampled")) continue;
-            (checked.contains(quantity.path("id").asText()) ? done : left).add(quantity.path("source").asText(quantity.path("id").asText()));
+        Set<String> left = new LinkedHashSet<>();
+        Set<String> done = new LinkedHashSet<>();
+        for (JsonNode quantity : model.path(QUANTITIES)) {
+            if (quantity.has(BOOKKEEPING) || quantity.has(UNSAMPLED)) continue;
+            (checked.contains(quantity.path("id").asText()) ? done : left).add(quantity.path(SOURCE).asText(quantity.path("id").asText()));
         }
         left.removeAll(done);
         left.forEach(unchecked::add);
@@ -581,18 +766,33 @@ public final class FreeModel {
         validation.put("solverMethod", "RK4");
         validation.put("verificationMethod", "CURRICULUM_LAWS");
         int passed = 0;
-        for (JsonNode check : checks) if (check.path("status").asText().equals("PASSED")) passed++;
-        validation.put("status", failed > 0 || !solved ? FLAGGED : passed == 0 ? ILLUSTRATIVE : unchecked.isEmpty() ? VERIFIED : PARTLY_VERIFIED);
-        validation.put("verificationScope", failed > 0 || !solved ? "Mô hình vi phạm định luật hoặc chưa tính ổn định; xem các ghi chú"
-                : passed == 0 ? "Không có định luật nào của chương trình áp dụng cho các đại lượng này; hình chỉ mang tính minh hoạ"
-                : unchecked.isEmpty() ? "Mọi đại lượng của mô hình đều được đối chiếu với định luật của chương trình"
-                : "Các định luật áp dụng được đều thoả; " + unchecked.size() + " đại lượng chưa có định luật nào đối chiếu");
-        thin(computed.path("solverTimeline"), model.path("quantities").size());
-        relabel(computed.path("solverTimeline"), model, run.stopping);
+        for (JsonNode check : checks) if (check.path(STATUS).asText().equals("PASSED")) passed++;
+        String status;
+        String scope;
+        if (failed > 0 || !solved) {
+            status = FLAGGED;
+            scope = "Mô hình vi phạm định luật hoặc chưa tính ổn định; xem các ghi chú";
+        } else if (passed == 0) {
+            status = ILLUSTRATIVE;
+            scope = "Không có định luật nào của chương trình áp dụng cho các đại lượng này; hình chỉ mang tính minh hoạ";
+        } else if (unchecked.isEmpty()) {
+            status = VERIFIED;
+            scope = "Mọi đại lượng của mô hình đều được đối chiếu với định luật của chương trình";
+        } else {
+            status = PARTLY_VERIFIED;
+            scope = "Các định luật áp dụng được đều thoả; " + unchecked.size() + " đại lượng chưa có định luật nào đối chiếu";
+        }
+        validation.put(STATUS, status);
+        validation.put("verificationScope", scope);
+        thin(computed.path(SOLVER_TIMELINE), model.path(QUANTITIES).size());
+        relabel(computed.path(SOLVER_TIMELINE), model, run.stopping);
         return computed;
     }
 
-    public static final String VERIFIED = "VERIFIED_BY_LAWS", PARTLY_VERIFIED = "VERIFIED_PARTLY", ILLUSTRATIVE = "ILLUSTRATIVE", FLAGGED = "FLAGGED";
+    public static final String VERIFIED = "VERIFIED_BY_LAWS";
+    public static final String PARTLY_VERIFIED = "VERIFIED_PARTLY";
+    public static final String ILLUSTRATIVE = "ILLUSTRATIVE";
+    public static final String FLAGGED = "FLAGGED";
 
     /** The key under which a quantity is reported: the object it belongs to, a dot, its id ("box.v"); "model.g" when it belongs to none. */
     public static String key(JsonNode quantity) {
@@ -603,14 +803,14 @@ public final class FreeModel {
     /** Reports the run by object, drops the solver's own bookkeeping, and says when each object with an end of its own ended. */
     private void relabel(JsonNode timeline, JsonNode model, Set<String> stopping) {
         Map<String, String> keys = new LinkedHashMap<>();
-        for (JsonNode quantity : model.path("quantities")) if (!quantity.has("along")) keys.put(ID + "." + quantity.path("id").asText(), key(quantity));
+        for (JsonNode quantity : model.path(QUANTITIES)) if (!quantity.has(ALONG)) keys.put(ID + "." + quantity.path("id").asText(), key(quantity));
         Map<String, Double> ended = new LinkedHashMap<>();
-        for (JsonNode frame : timeline.path("frames")) {
+        for (JsonNode frame : timeline.path(FRAMES)) {
             ObjectNode values = json.createObjectNode();
             for (String object : stopping)
-                if (!ended.containsKey(object) && frame.path("values").path(ID + ".stopped_" + safe(object)).asDouble() > 0.5) ended.put(object, frame.path("t").asDouble());
-            frame.path("values").fields().forEachRemaining(value -> { if (keys.containsKey(value.getKey())) values.set(keys.get(value.getKey()), value.getValue()); });
-            ((ObjectNode) frame).set("values", values);
+                if (!ended.containsKey(object) && frame.path(VALUES).path(ID + ".stopped_" + safe(object)).asDouble() > 0.5) ended.put(object, frame.path("t").asDouble());
+            frame.path(VALUES).fields().forEachRemaining(value -> { if (keys.containsKey(value.getKey())) values.set(keys.get(value.getKey()), value.getValue()); });
+            ((ObjectNode) frame).set(VALUES, values);
         }
         ObjectNode phases = ((ObjectNode) timeline).putObject("phases");
         for (String object : stopping) {
@@ -624,26 +824,26 @@ public final class FreeModel {
     public ObjectNode fieldMeta(JsonNode spec) {
         ObjectNode meta = json.createObjectNode();
         Map<String, String> objects = new LinkedHashMap<>();
-        spec.path("objects").forEach(object -> objects.put(object.path("id").asText(), object.path("label").asText(object.path("id").asText())));
+        spec.path(OBJECTS).forEach(object -> objects.put(object.path("id").asText(), object.path(LABEL).asText(object.path("id").asText())));
         Map<String, Integer> groups = new LinkedHashMap<>();
-        for (JsonNode object : spec.path("objects")) {
+        for (JsonNode object : spec.path(OBJECTS)) {
             String id = object.path("id").asText();
-            if (object.path("members").asInt(1) > 1) groups.put(id, object.path("members").asInt());
-            if (object.has("present")) meta.putObject(id + (groups.containsKey(id) ? "[i]" : "") + ".present").put("participantId", id).put("participantLabel", objects.get(id))
-                    .put("quantity", "present").put("unit", "1").put("label", "1 khi đối tượng đang có mặt, 0 khi chưa xuất hiện hoặc đã biến mất");
+            if (object.path(MEMBERS).asInt(1) > 1) groups.put(id, object.path(MEMBERS).asInt());
+            if (object.has(PRESENT)) meta.putObject(id + (groups.containsKey(id) ? "[i]" : "") + ".present").put("participantId", id).put("participantLabel", objects.get(id))
+                    .put(QUANTITY, PRESENT).put("unit", "1").put(LABEL, "1 khi đối tượng đang có mặt, 0 khi chưa xuất hiện hoặc đã biến mất");
         }
-        for (JsonNode quantity : spec.path("model").path("quantities")) {
+        for (JsonNode quantity : spec.path(MODEL).path(QUANTITIES)) {
             Integer members = groups.get(quantity.path("of").asText(""));
-            if (members != null && quantity.has("along")) continue;
+            if (members != null && quantity.has(ALONG)) continue;
             ObjectNode field = meta.putObject(members == null ? key(quantity) : quantity.path("of").asText() + "[i]." + quantity.path("id").asText());
             describe(field, quantity, objects);
-            if (members != null) field.put("members", members).put("note", "một giá trị cho mỗi phần tử: thay i bằng 0 … " + (members - 1));
-            if (quantity.has("along")) { field.put("space", true).put("note", "đại lượng theo không gian: đọc ở api.timeline.fields, không có trong frame.fields"); field.set("along", quantity.path("along")); }
+            if (members != null) field.put(MEMBERS, members).put("note", "một giá trị cho mỗi phần tử: thay i bằng 0 … " + (members - 1));
+            if (quantity.has(ALONG)) { field.put("space", true).put("note", "đại lượng theo không gian: đọc ở api.timeline.fields, không có trong frame.fields"); field.set(ALONG, quantity.path(ALONG)); }
         }
-        for (JsonNode constant : spec.path("model").path("constants")) {
+        for (JsonNode constant : spec.path(MODEL).path(CONSTANTS)) {
             ObjectNode field = meta.putObject(key(constant));
             describe(field, constant, objects);
-            field.set("constant", constant.path("value"));
+            field.set("constant", constant.path(VALUE));
         }
         return meta;
     }
@@ -651,7 +851,7 @@ public final class FreeModel {
     private static void describe(ObjectNode field, JsonNode source, Map<String, String> objects) {
         String object = source.hasNonNull("of") ? source.path("of").asText() : ID;
         field.put("participantId", object).put("participantLabel", objects.getOrDefault(object, ""));
-        field.put("quantity", source.path("id").asText()).put("unit", source.path("unit").asText()).put("label", source.path("label").asText(source.path("id").asText()));
+        field.put(QUANTITY, source.path("id").asText()).put("unit", source.path("unit").asText()).put(LABEL, source.path(LABEL).asText(source.path("id").asText()));
         for (String attribute : List.of("role", "axis", "kind", "by")) if (source.hasNonNull(attribute)) field.put(attribute.equals("role") ? "rendererRole" : attribute, source.path(attribute).asText());
     }
 
@@ -665,68 +865,85 @@ public final class FreeModel {
         unset(spec);
         // the parts of the model written one level too high, or as a map by id instead of a list, are the same model
         boolean misplaced = false;
-        for (String part : List.of("quantities", "constants", "until", "duration", "assumptions", "seed")) misplaced |= spec.has(part);
-        if (!spec.path("model").isObject()) { if (!misplaced) return; spec.putObject("model"); }
-        ObjectNode model = (ObjectNode) spec.path("model");
-        for (String part : List.of("quantities", "constants", "until", "duration", "assumptions", "seed"))
-            if (spec.has(part)) { JsonNode moved = spec.remove(part); if (!model.has(part) || model.path(part).isEmpty() && !moved.isEmpty()) model.set(part, moved); }
-        listed(model, "quantities", "id");
-        listed(model, "constants", "id");
-        listed(spec, "parameters", "name");
-        listed(spec, "objects", "id");
-        // an equation may be written as an ordinary formula ("m*g*sin(a) - mu*N"); it is read into the same tree
-        for (JsonNode quantity : model.path("quantities")) {
-            for (String side : List.of("value", "initial", "rate")) if (quantity.has(side)) ((ObjectNode) quantity).set(side, formula(quantity.get(side)));
-            for (JsonNode jump : quantity.path("jumps")) for (String side : List.of("when", "to")) if (jump.has(side)) ((ObjectNode) jump).set(side, formula(jump.get(side)));
+        for (String part : List.of(QUANTITIES, CONSTANTS, UNTIL, DURATION, ASSUMPTIONS, "seed")) misplaced |= spec.has(part);
+        if (!spec.path(MODEL).isObject()) {
+            if (!misplaced) return;
+            spec.putObject(MODEL);
         }
-        if (model.has("duration")) model.set("duration", formula(model.get("duration")));
-        for (JsonNode object : spec.path("objects")) if (object.has("present")) ((ObjectNode) object).set("present", formula(object.get("present")));
+        ObjectNode model = (ObjectNode) spec.path(MODEL);
+        for (String part : List.of(QUANTITIES, CONSTANTS, UNTIL, DURATION, ASSUMPTIONS, "seed")) {
+            if (!spec.has(part)) continue;
+            JsonNode moved = spec.remove(part);
+            if (!model.has(part) || model.path(part).isEmpty() && !moved.isEmpty()) model.set(part, moved);
+        }
+        listed(model, QUANTITIES, "id");
+        listed(model, CONSTANTS, "id");
+        listed(spec, PARAMETERS, "name");
+        listed(spec, OBJECTS, "id");
+        // an equation may be written as an ordinary formula ("m*g*sin(a) - mu*N"); it is read into the same tree
+        for (JsonNode quantity : model.path(QUANTITIES)) {
+            for (String side : List.of(VALUE, INITIAL, "rate")) if (quantity.has(side)) ((ObjectNode) quantity).set(side, formula(quantity.get(side)));
+            for (JsonNode jump : quantity.path(JUMPS)) for (String side : List.of("when", "to")) if (jump.has(side)) ((ObjectNode) jump).set(side, formula(jump.get(side)));
+        }
+        if (model.has(DURATION)) model.set(DURATION, formula(model.get(DURATION)));
+        for (JsonNode object : spec.path(OBJECTS)) if (object.has(PRESENT)) ((ObjectNode) object).set(PRESENT, formula(object.get(PRESENT)));
         // Inside an equation a slider already has its SI value (30 độ is 0.5236 rad, 10 cm is 0.1 m). A formula that
         // converts it once more by hand (theta*pi/180, d*0.01) would make it wrong by that factor without any
         // dimension to show it; the second conversion is taken out.
-        Map<String, Double> factors = new LinkedHashMap<>(), plain = new LinkedHashMap<>();
-        for (JsonNode slider : spec.path("parameters")) {
+        Map<String, Double> factors = new LinkedHashMap<>();
+        Map<String, Double> plain = new LinkedHashMap<>();
+        for (JsonNode slider : spec.path(PARAMETERS)) {
             String canonical = equations.canonical(slider.path("unit").asText());
             if (canonical == null) continue;
             double factor = equations.convert(1, slider.path("unit").asText(), canonical);
             if (Math.abs(factor - 1) > 1e-9 && equations.convert(0, slider.path("unit").asText(), canonical) == 0) factors.put(slider.path("name").asText(), factor);
         }
-        for (JsonNode constant : model.path("constants")) if (constant.path("value").isNumber() && "1".equals(equations.canonical(constant.path("unit").asText("1"))) && !constant.hasNonNull("of"))
-            plain.put(constant.path("id").asText(), constant.path("value").asDouble());
-        if (!factors.isEmpty()) for (JsonNode quantity : model.path("quantities")) {
-            for (String side : List.of("value", "initial", "rate")) if (quantity.has(side)) ((ObjectNode) quantity).set(side, once(quantity.get(side), factors, plain));
-            for (JsonNode jump : quantity.path("jumps")) for (String side : List.of("when", "to")) if (jump.has(side)) ((ObjectNode) jump).set(side, once(jump.get(side), factors, plain));
+        for (JsonNode constant : model.path(CONSTANTS)) {
+            if (constant.path(VALUE).isNumber() && "1".equals(equations.canonical(constant.path("unit").asText("1"))) && !constant.hasNonNull("of"))
+                plain.put(constant.path("id").asText(), constant.path(VALUE).asDouble());
+        }
+        if (!factors.isEmpty()) for (JsonNode quantity : model.path(QUANTITIES)) {
+            for (String side : List.of(VALUE, INITIAL, "rate")) if (quantity.has(side)) ((ObjectNode) quantity).set(side, once(quantity.get(side), factors, plain));
+            for (JsonNode jump : quantity.path(JUMPS)) for (String side : List.of("when", "to")) if (jump.has(side)) ((ObjectNode) jump).set(side, once(jump.get(side), factors, plain));
         }
         apart(spec, model);
-        if (!(spec.path("durationSeconds").asDouble(0) > 0)) spec.put("durationSeconds", 10);
+        boolean timed = spec.path(DURATION_SECONDS).asDouble(0) > 0; // NaN compares false
+        if (!timed) spec.put(DURATION_SECONDS, 10);
         Set<String> objects = new LinkedHashSet<>();
-        spec.withArray("objects").forEach(object -> objects.add(object.path("id").asText()));
+        spec.withArray(OBJECTS).forEach(object -> objects.add(object.path("id").asText()));
         java.util.function.Consumer<JsonNode> owned = source -> {
             String of = source.path("of").asText("");
-            if (of.matches("[A-Za-z_][A-Za-z0-9_]{0,31}") && !of.equals(ID) && objects.add(of)) spec.withArray("objects").addObject().put("id", of).put("label", of);
+            if (of.matches("[A-Za-z_]\\w{0,31}") && !of.equals(ID) && objects.add(of)) spec.withArray(OBJECTS).addObject().put("id", of).put(LABEL, of);
             else if (!of.isEmpty() && !objects.contains(of)) ((ObjectNode) source).remove("of");
         };
-        for (JsonNode parameter : spec.withArray("parameters")) {
+        for (JsonNode parameter : spec.withArray(PARAMETERS)) {
             ObjectNode slider = (ObjectNode) parameter;
             slider.put("unit", spelled(slider.path("unit").asText()));
-            double value = slider.path("value").asDouble(), min = slider.path("min").asDouble(value), max = slider.path("max").asDouble(value);
+            double value = slider.path(VALUE).asDouble();
+            double min = slider.path("min").asDouble(value);
+            double max = slider.path("max").asDouble(value);
             if (min > max) { double swap = min; min = max; max = swap; }
             slider.put("min", Math.min(min, value)).put("max", Math.max(max, value));
-            if (!(slider.path("step").asDouble(0) > 0)) slider.put("step", max > min ? (max - min) / 100 : 1);
-            if (!slider.hasNonNull("label")) slider.put("label", slider.path("name").asText());
+            boolean stepped = slider.path("step").asDouble(0) > 0; // NaN compares false
+            if (!stepped) slider.put("step", max > min ? (max - min) / 100 : 1);
+            if (!slider.hasNonNull(LABEL)) slider.put(LABEL, slider.path("name").asText());
             owned.accept(slider);
         }
-        for (JsonNode constant : model.withArray("constants")) { ((ObjectNode) constant).put("unit", spelled(constant.path("unit").asText())); owned.accept(constant); }
-        for (JsonNode item : model.withArray("quantities")) {
+        for (JsonNode constant : model.withArray(CONSTANTS)) { ((ObjectNode) constant).put("unit", spelled(constant.path("unit").asText())); owned.accept(constant); }
+        for (JsonNode item : model.withArray(QUANTITIES)) {
             ObjectNode quantity = (ObjectNode) item;
             // a quantity is computed in SI whatever unit was written beside it
-            String unit = spelled(quantity.path("unit").asText()), canonical = equations.canonical(unit);
+            String unit = spelled(quantity.path("unit").asText());
+            String canonical = equations.canonical(unit);
             // … so a formula that turns its SI result into the unit written beside it (angle*180/pi for "deg") would
             // be shown under the SI unit with the wrong number: that last conversion is taken out
-            if (canonical != null && quantity.has("value") && equations.convert(0, unit, canonical) == 0) {
+            if (canonical != null && quantity.has(VALUE) && equations.convert(0, unit, canonical) == 0) {
                 double factor = equations.convert(1, unit, canonical);
-                List<JsonNode> above = new ArrayList<>(), below = new ArrayList<>(), keptAbove = new ArrayList<>(), keptBelow = new ArrayList<>();
-                chain(quantity.get("value"), false, above, below);
+                List<JsonNode> above = new ArrayList<>();
+                List<JsonNode> below = new ArrayList<>();
+                List<JsonNode> keptAbove = new ArrayList<>();
+                List<JsonNode> keptBelow = new ArrayList<>();
+                chain(quantity.get(VALUE), false, above, below);
                 double number = 1;
                 boolean constant = false;
                 for (JsonNode part : above) { Double value = part.isNumber() ? Double.valueOf(part.asDouble()) : part.isTextual() ? plain.get(part.asText()) : null; if (value != null) { number *= value; constant = true; } else keptAbove.add(part); }
@@ -735,18 +952,57 @@ public final class FreeModel {
                     JsonNode product = null;
                     for (JsonNode part : keptAbove) product = product == null ? part : json.createArrayNode().add("mul").add(product).add(part);
                     for (JsonNode part : keptBelow) product = json.createArrayNode().add("div").add(product).add(part);
-                    quantity.set("value", product);
+                    quantity.set(VALUE, product);
                 }
             }
             quantity.put("unit", canonical == null ? unit : canonical);
-            if (!catalogue.path("roles").has(quantity.path("role").asText())) quantity.put("role", "other");
+            if (!catalogue.path("roles").has(quantity.path("role").asText())) quantity.put("role", OTHER_ROLE);
             if (quantity.path("role").asText().equals("force") && !catalogue.path("forceKinds").has(quantity.path("kind").asText())) quantity.put("kind", "applied");
-            if (!quantity.hasNonNull("label")) quantity.put("label", quantity.path("id").asText());
+            if (!quantity.hasNonNull(LABEL)) quantity.put(LABEL, quantity.path("id").asText());
             owned.accept(quantity);
         }
-        JsonNode untils = model.path("until");
-        if (untils.isObject()) model.putArray("until").add(untils);
-        for (JsonNode until : model.path("until")) if (until.hasNonNull("of") && !objects.contains(until.path("of").asText())) ((ObjectNode) until).remove("of");
+        JsonNode untils = model.path(UNTIL);
+        if (untils.isObject()) model.putArray(UNTIL).add(untils);
+        for (JsonNode until : model.path(UNTIL)) if (until.hasNonNull("of") && !objects.contains(until.path("of").asText())) ((ObjectNode) until).remove("of");
+    }
+
+    /**
+     * The sliders, constants and quantities of a small group, which are copied for each member; empty where the group
+     * stays one: too large, appearing over time, an id too long for copies, nothing of its own written, or copy names
+     * already taken. With "count" the author wrote one representative, and only what belongs to it is copied.
+     */
+    private static Set<String> ownedApart(ObjectNode spec, ObjectNode model, JsonNode group, int size, String id) {
+        if (size < 2 || size >= SMALL_GROUP || group.has(PRESENT) || !id.matches("[A-Za-z_]\\w{0,24}")) return Set.of();
+        Set<String> own = ownedBy(spec, model, id);
+        if (own.isEmpty()) return own;
+        return copyNamesTaken(spec, model, own, size) ? Set.of() : own;
+    }
+
+    /** The sliders, constants and quantities written as belonging to an object. */
+    private static Set<String> ownedBy(ObjectNode spec, ObjectNode model, String id) {
+        Set<String> own = new LinkedHashSet<>();
+        for (JsonNode item : spec.path(PARAMETERS)) {
+            if (item.path("of").asText("").equals(id)) own.add(item.path("name").asText());
+        }
+        for (String part : List.of(CONSTANTS, QUANTITIES)) {
+            for (JsonNode item : model.path(part)) {
+                if (item.path("of").asText("").equals(id)) own.add(item.path("id").asText());
+            }
+        }
+        return own;
+    }
+
+    /** Whether a name the copies would take ("name_1" up to "name_size") is already used. */
+    private static boolean copyNamesTaken(ObjectNode spec, ObjectNode model, Set<String> own, int size) {
+        Set<String> names = new LinkedHashSet<>();
+        spec.path(PARAMETERS).forEach(item -> names.add(item.path("name").asText()));
+        for (String part : List.of(CONSTANTS, QUANTITIES)) model.path(part).forEach(item -> names.add(item.path("id").asText()));
+        for (String name : own) {
+            for (int i = 1; i <= size; i++) {
+                if (names.contains(name + "_" + i)) return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -756,37 +1012,26 @@ public final class FreeModel {
      */
     private void apart(ObjectNode spec, ObjectNode model) {
         if (model.toString().contains("\"random\"")) return;
-        for (JsonNode group : List.copyOf(toList(spec.path("objects")))) {
-            int size = group.path("members").asInt(group.path("count").asInt(1));
+        for (JsonNode group : List.copyOf(toList(spec.path(OBJECTS)))) {
+            int size = group.path(MEMBERS).asInt(group.path(COUNT).asInt(1));
             String id = group.path("id").asText();
-            if (size < 2 || size >= SMALL_GROUP || group.has("present") || !id.matches("[A-Za-z_][A-Za-z0-9_]{0,24}")) continue;
-            // with "count" the author wrote one representative: only what belongs to it is copied, and only if something does
-            Set<String> own = new LinkedHashSet<>();
-            for (String part : List.of("parameters")) for (JsonNode item : spec.path(part)) if (item.path("of").asText("").equals(id)) own.add(item.path("name").asText());
-            for (JsonNode item : model.path("constants")) if (item.path("of").asText("").equals(id)) own.add(item.path("id").asText());
-            for (JsonNode item : model.path("quantities")) if (item.path("of").asText("").equals(id)) own.add(item.path("id").asText());
+            Set<String> own = ownedApart(spec, model, group, size, id);
             if (own.isEmpty()) continue;
-            boolean taken = false;
-            Set<String> names = new LinkedHashSet<>();
-            spec.path("parameters").forEach(item -> names.add(item.path("name").asText()));
-            for (String part : List.of("constants", "quantities")) model.path(part).forEach(item -> names.add(item.path("id").asText()));
-            for (String name : own) for (int i = 1; i <= size; i++) taken |= names.contains(name + "_" + i);
-            if (taken) continue;
             class Copy {
                 JsonNode of(JsonNode ast, int i) {
                     if (ast.isTextual()) {
                         String name = ast.asText();
-                        if (name.equals("index")) return json.getNodeFactory().numberNode(i - 1);
-                        if (name.equals("members")) return json.getNodeFactory().numberNode(size);
+                        if (name.equals(INDEX_NAME)) return json.getNodeFactory().numberNode(i - 1);
+                        if (name.equals(MEMBERS)) return json.getNodeFactory().numberNode(size);
                         return own.contains(name) ? json.getNodeFactory().textNode(name + "_" + i) : ast;
                     }
                     if (!ast.isArray() || ast.isEmpty()) return ast;
                     String op = ast.get(0).asText();
-                    if ((OVER_GROUP.contains(op) || op.equals("member")) && ast.size() >= 2 && own.contains(ast.get(1).asText())) {
+                    if ((OVER_GROUP.contains(op) || op.equals(OP_MEMBER)) && ast.size() >= 2 && own.contains(ast.get(1).asText())) {
                         String name = ast.get(1).asText();
-                        if (op.equals("member")) return json.getNodeFactory().textNode(name + "_" + (ast.path(2).asInt() + 1));
+                        if (op.equals(OP_MEMBER)) return json.getNodeFactory().textNode(name + "_" + (ast.path(2).asInt() + 1));
                         JsonNode all = json.getNodeFactory().textNode(name + "_1");
-                        for (int k = 2; k <= size; k++) all = json.createArrayNode().add(op.equals("largest") ? "max" : op.equals("smallest") ? "min" : "add").add(all).add(name + "_" + k);
+                        for (int k = 2; k <= size; k++) all = json.createArrayNode().add(foldOperator(op)).add(all).add(name + "_" + k);
                         return op.equals("mean") ? json.createArrayNode().add("div").add(all).add(size) : all;
                     }
                     ArrayNode copy = json.createArrayNode().add(op);
@@ -801,11 +1046,11 @@ public final class FreeModel {
                             ObjectNode one = (ObjectNode) item.deepCopy();
                             if (mine) {
                                 one.put(key, item.path(key).asText() + "_" + i).put("of", id + "_" + i);
-                                if (one.hasNonNull("label")) one.put("label", one.path("label").asText() + " " + i);
+                                if (one.hasNonNull(LABEL)) one.put(LABEL, one.path(LABEL).asText() + " " + i);
                             }
                             if (equations) {
-                                for (String side : List.of("value", "initial", "rate")) if (one.has(side)) one.set(side, of(one.get(side), mine ? i : 1));
-                                for (JsonNode jump : one.path("jumps")) for (String side : List.of("when", "to")) ((ObjectNode) jump).set(side, of(jump.path(side), mine ? i : 1));
+                                for (String side : List.of(VALUE, INITIAL, "rate")) if (one.has(side)) one.set(side, of(one.get(side), mine ? i : 1));
+                                for (JsonNode jump : one.path(JUMPS)) for (String side : List.of("when", "to")) ((ObjectNode) jump).set(side, of(jump.path(side), mine ? i : 1));
                             }
                             out.add(one);
                         }
@@ -816,31 +1061,31 @@ public final class FreeModel {
             }
             Copy copy = new Copy();
             // a quantity outside the group that reads one of its sliders by name reads the first copy; totals read them all
-            copy.each(spec.withArray("parameters"), "name", false);
-            copy.each(model.withArray("constants"), "id", false);
-            copy.each(model.withArray("quantities"), "id", true);
+            copy.each(spec.withArray(PARAMETERS), "name", false);
+            copy.each(model.withArray(CONSTANTS), "id", false);
+            copy.each(model.withArray(QUANTITIES), "id", true);
             ArrayNode ends = json.createArrayNode();
-            for (JsonNode until : model.path("until")) {
-                boolean mine = own.contains(until.path("quantity").asText()) || until.path("of").asText("").equals(id);
+            for (JsonNode until : model.path(UNTIL)) {
+                boolean mine = own.contains(until.path(QUANTITY).asText()) || until.path("of").asText("").equals(id);
                 for (int i = 1; i <= (mine ? size : 1); i++) {
                     ObjectNode one = (ObjectNode) until.deepCopy();
                     if (mine) {
-                        if (own.contains(until.path("quantity").asText())) one.put("quantity", until.path("quantity").asText() + "_" + i);
-                        if (until.path("value").isTextual() && own.contains(until.path("value").asText())) one.put("value", until.path("value").asText() + "_" + i);
+                        if (own.contains(until.path(QUANTITY).asText())) one.put(QUANTITY, until.path(QUANTITY).asText() + "_" + i);
+                        if (until.path(VALUE).isTextual() && own.contains(until.path(VALUE).asText())) one.put(VALUE, until.path(VALUE).asText() + "_" + i);
                         one.put("of", id + "_" + i);
                     }
                     ends.add(one);
                 }
             }
-            if (model.has("until")) model.set("until", ends);
-            if (model.has("duration")) model.set("duration", copy.of(model.get("duration"), 1));
-            if (own.contains(spec.path("durationParameter").asText(""))) spec.remove("durationParameter");
+            if (model.has(UNTIL)) model.set(UNTIL, ends);
+            if (model.has(DURATION)) model.set(DURATION, copy.of(model.get(DURATION), 1));
+            if (own.contains(spec.path(DURATION_PARAMETER).asText(""))) spec.remove(DURATION_PARAMETER);
             ArrayNode objects = json.createArrayNode();
-            for (JsonNode object : spec.path("objects")) {
+            for (JsonNode object : spec.path(OBJECTS)) {
                 if (!object.path("id").asText().equals(id)) { objects.add(object); continue; }
-                for (int i = 1; i <= size; i++) objects.addObject().put("id", id + "_" + i).put("label", object.path("label").asText(id) + " " + i);
+                for (int i = 1; i <= size; i++) objects.addObject().put("id", id + "_" + i).put(LABEL, object.path(LABEL).asText(id) + " " + i);
             }
-            spec.set("objects", objects);
+            spec.set(OBJECTS, objects);
         }
     }
 
@@ -858,12 +1103,14 @@ public final class FreeModel {
         if (!ast.isArray() || ast.isEmpty()) return ast;
         String op = ast.get(0).asText();
         if ((op.equals("mul") || op.equals("div")) && ast.size() == 3) {
-            List<JsonNode> above = new ArrayList<>(), below = new ArrayList<>();
+            List<JsonNode> above = new ArrayList<>();
+            List<JsonNode> below = new ArrayList<>();
             chain(ast, false, above, below);
             double number = 1;
             String slider = null;
             int sliders = 0;
-            List<JsonNode> keptAbove = new ArrayList<>(), keptBelow = new ArrayList<>();
+            List<JsonNode> keptAbove = new ArrayList<>();
+            List<JsonNode> keptBelow = new ArrayList<>();
             for (JsonNode item : above) {
                 Double value = item.isNumber() ? Double.valueOf(item.asDouble()) : item.isTextual() ? plain.get(item.asText()) : null;
                 if (value != null) number *= value;
@@ -894,7 +1141,7 @@ public final class FreeModel {
 
     private static final int SMALL_GROUP = 10;
     private static final Set<String> FUNCTIONS = Set.of("add", "sub", "mul", "div", "pow", "min", "max", "mod", "atan2", "neg", "abs", "sqrt", "sin", "cos", "tan",
-            "exp", "log", "asin", "acos", "atan", "sign", "floor", "if", "random", "total", "mean", "largest", "smallest", "member");
+            "exp", "log", "asin", "acos", "atan", "sign", "floor", "if", "random", "total", "mean", OP_LARGEST, OP_SMALLEST, OP_MEMBER);
 
     /** An equation given as text, or a tree with text inside it, as a tree; a name, a number or a tree stays what it is. */
     private JsonNode formula(JsonNode written) {
@@ -903,12 +1150,17 @@ public final class FreeModel {
             for (int i = 0; i < written.size(); i++) copy.add(i == 0 ? written.get(i) : formula(written.get(i)));
             return copy;
         }
-        if (!written.isTextual() || written.asText().matches("\\s*[A-Za-z_][A-Za-z0-9_]*\\s*")) return written.isTextual() ? json.getNodeFactory().textNode(written.asText().trim()) : written;
+        if (!written.isTextual() || written.asText().matches("\\s*[A-Za-z_]\\w*\\s*")) return written.isTextual() ? json.getNodeFactory().textNode(written.asText().trim()) : written;
         String text = written.asText().replace("·", "*").replace("×", "*").replace("−", "-").replace("÷", "/").replace("²", "^2").replace("³", "^3").replace("π", "pi").replace("√", "sqrt");
         int[] at = {0};
         class Reader {
             void space() { while (at[0] < text.length() && Character.isWhitespace(text.charAt(at[0]))) at[0]++; }
-            boolean take(String token) { space(); if (!text.startsWith(token, at[0])) return false; at[0] += token.length(); return true; }
+            boolean take(String token) {
+                space();
+                if (!text.startsWith(token, at[0])) return false;
+                at[0] += token.length();
+                return true;
+            }
             JsonNode two(String op, JsonNode a, JsonNode b) { return json.createArrayNode().add(op).add(a).add(b); }
             JsonNode compared() {
                 JsonNode left = sum();
@@ -995,16 +1247,18 @@ public final class FreeModel {
         for (String candidate : List.of(plain, plain.replace(".", "*"), plain.replaceAll("([A-Za-zΩµ])(-?\\d)", "$1^$2"), plain.replace(".", "*").replaceAll("([A-Za-zΩµ])(-?\\d)", "$1^$2"), plain.toLowerCase(java.util.Locale.ROOT)))
             if (equations.canonical(candidate) != null) return candidate;
         // "kg m s-2": factors side by side, negative powers below the line
-        StringBuilder above = new StringBuilder(), below = new StringBuilder();
+        StringBuilder above = new StringBuilder();
+        StringBuilder below = new StringBuilder();
         for (String factor : unit.trim().replace("²", "^2").replace("³", "^3").split("[\\s.*·⋅×]+")) {
             java.util.regex.Matcher parts = java.util.regex.Pattern.compile("([A-Za-zΩµ°]+)\\^?(-?\\d+)?").matcher(factor);
             if (!parts.matches()) return unit;
             int power = parts.group(2) == null ? 1 : Integer.parseInt(parts.group(2));
             if (power == 0) continue;
             String written = parts.group(1) + (Math.abs(power) == 1 ? "" : "^" + Math.abs(power));
-            if (power > 0) above.append(above.length() == 0 ? "" : "*").append(written); else below.append("/").append(written);
+            if (power > 0) above.append(above.isEmpty() ? "" : "*").append(written);
+            else below.append("/").append(written);
         }
-        String rebuilt = (above.length() == 0 ? "1" : above.toString()) + below;
+        String rebuilt = (above.isEmpty() ? "1" : above.toString()) + below;
         return equations.canonical(rebuilt) != null ? rebuilt : unit;
     }
 
@@ -1014,44 +1268,45 @@ public final class FreeModel {
      */
     public void project(ObjectNode spec) {
         Map<String, String> objects = new LinkedHashMap<>();
-        ArrayNode required = spec.putArray("requiredObjects"), participants = spec.putArray("physicsModels");
+        ArrayNode required = spec.putArray("requiredObjects");
+        ArrayNode participants = spec.putArray("physicsModels");
         Map<String, ObjectNode> inputs = new LinkedHashMap<>();
-        for (JsonNode object : spec.path("objects")) {
+        for (JsonNode object : spec.path(OBJECTS)) {
             String id = object.path("id").asText();
-            objects.put(id, object.path("label").asText(id));
-            required.addObject().put("label", objects.get(id)).put("count", object.path("members").asInt(object.path("count").asInt(1)));
-            inputs.put(id, participants.addObject().put("id", id).put("label", objects.get(id)).put("capabilityId", ID).putObject("inputs"));
+            objects.put(id, object.path(LABEL).asText(id));
+            required.addObject().put(LABEL, objects.get(id)).put(COUNT, object.path(MEMBERS).asInt(object.path(COUNT).asInt(1)));
+            inputs.put(id, participants.addObject().put("id", id).put(LABEL, objects.get(id)).put(CAPABILITY_ID, ID).putObject("inputs"));
         }
-        for (JsonNode parameter : spec.path("parameters")) {
+        for (JsonNode parameter : spec.path(PARAMETERS)) {
             ObjectNode own = inputs.get(parameter.path("of").asText(""));
-            if (own != null) own.put(parameter.path("role").asText("other") + (parameter.hasNonNull("axis") ? "." + parameter.path("axis").asText() : "")
+            if (own != null) own.put(parameter.path("role").asText(OTHER_ROLE) + (parameter.hasNonNull("axis") ? "." + parameter.path("axis").asText() : "")
                     + (parameter.hasNonNull("kind") ? "." + parameter.path("kind").asText() : ""), parameter.path("name").asText());
         }
         Map<String, JsonNode> quantities = new LinkedHashMap<>();
-        spec.path("model").path("quantities").forEach(quantity -> quantities.put(quantity.path("id").asText(), quantity));
+        spec.path(MODEL).path(QUANTITIES).forEach(quantity -> quantities.put(quantity.path("id").asText(), quantity));
         // What the learner watches is presentation, not physics: a name that is the common stem of several objects'
         // quantities ("theta" for theta1, theta2, theta3) means each of them, and a name that matches nothing is left out.
         ArrayNode watched = json.createArrayNode();
-        for (JsonNode observable : spec.path("observables")) {
-            String name = observable.path("quantity").asText();
+        for (JsonNode observable : spec.path(OBSERVABLES)) {
+            String name = observable.path(QUANTITY).asText();
             if (quantities.containsKey(name)) { watched.add(observable); continue; }
             for (String id : quantities.keySet()) if (!name.isBlank() && id.startsWith(name) && id.substring(name.length()).matches("_?[A-Za-z0-9]{1,3}")) {
-                ObjectNode one = ((ObjectNode) observable.deepCopy()).put("quantity", id);
-                one.remove("label");
+                ObjectNode one = ((ObjectNode) observable.deepCopy()).put(QUANTITY, id);
+                one.remove(LABEL);
                 watched.add(one);
             }
         }
-        if (watched.isEmpty()) for (JsonNode quantity : quantities.values()) { if (watched.size() < 4 && quantity.has("rate")) watched.addObject().put("quantity", quantity.path("id").asText()); }
-        if (watched.isEmpty()) for (JsonNode quantity : quantities.values()) { if (watched.size() < 6 && !quantity.path("role").asText("other").equals("other")) watched.addObject().put("quantity", quantity.path("id").asText()); }
-        spec.set("observables", watched);
-        for (JsonNode observable : spec.path("observables")) {
-            JsonNode quantity = quantities.get(observable.path("quantity").asText());
+        if (watched.isEmpty()) for (JsonNode quantity : quantities.values()) { if (watched.size() < 4 && quantity.has("rate")) watched.addObject().put(QUANTITY, quantity.path("id").asText()); }
+        if (watched.isEmpty()) for (JsonNode quantity : quantities.values()) { if (watched.size() < 6 && !quantity.path("role").asText(OTHER_ROLE).equals(OTHER_ROLE)) watched.addObject().put(QUANTITY, quantity.path("id").asText()); }
+        spec.set(OBSERVABLES, watched);
+        for (JsonNode observable : spec.path(OBSERVABLES)) {
+            JsonNode quantity = quantities.get(observable.path(QUANTITY).asText());
             boolean member = false;
-            for (JsonNode object : spec.path("objects")) member |= object.path("members").asInt(1) > 1 && object.path("id").asText().equals(quantity.path("of").asText(""));
+            for (JsonNode object : spec.path(OBJECTS)) member |= object.path(MEMBERS).asInt(1) > 1 && object.path("id").asText().equals(quantity.path("of").asText(""));
             // a quantity of a group is watched through its first member
             ((ObjectNode) observable).put("field", member ? quantity.path("of").asText() + "[0]." + quantity.path("id").asText() : key(quantity));
             if (quantity.hasNonNull("of")) ((ObjectNode) observable).put("object", objects.getOrDefault(quantity.path("of").asText(), ""));
-            if (!observable.hasNonNull("label")) ((ObjectNode) observable).put("label", quantity.path("label").asText());
+            if (!observable.hasNonNull(LABEL)) ((ObjectNode) observable).put(LABEL, quantity.path(LABEL).asText());
         }
     }
 
@@ -1060,29 +1315,29 @@ public final class FreeModel {
         ArrayNode formulas = json.createArrayNode();
         Map<String, ObjectNode> byObject = new LinkedHashMap<>();
         java.util.function.BiFunction<String, String, ObjectNode> entry = (id, label) -> byObject.computeIfAbsent(id, key -> {
-            ObjectNode formula = formulas.addObject().put("modelId", key).put("label", label).put("capabilityId", ID);
-            formula.putArray("canonical"); formula.putArray("bindings");
+            ObjectNode formula = formulas.addObject().put("modelId", key).put(LABEL, label).put(CAPABILITY_ID, ID);
+            formula.putArray(CANONICAL); formula.putArray(BINDINGS);
             return formula;
         });
-        for (JsonNode object : spec.path("objects")) entry.apply(object.path("id").asText(), object.path("label").asText(object.path("id").asText()));
-        for (JsonNode quantity : spec.path("model").path("quantities")) {
-            ObjectNode formula = entry.apply(quantity.hasNonNull("of") ? quantity.path("of").asText() : ID, "Chung");
+        for (JsonNode object : spec.path(OBJECTS)) entry.apply(object.path("id").asText(), object.path(LABEL).asText(object.path("id").asText()));
+        for (JsonNode quantity : spec.path(MODEL).path(QUANTITIES)) {
+            ObjectNode formula = entry.apply(quantity.hasNonNull("of") ? quantity.path("of").asText() : ID, SHARED_LABEL);
             String id = quantity.path("id").asText();
-            if (quantity.has("rate")) formula.withArray("canonical").add("d" + id + "/dt = " + text(quantity.path("rate"))).add(id + "(0) = " + text(quantity.path("initial")));
-            else formula.withArray("canonical").add(id + " = " + text(quantity.path("value")));
-            for (JsonNode jump : quantity.path("jumps")) formula.withArray("canonical").add("khi " + text(jump.path("when")) + " > 0: " + id + " ← " + text(jump.path("to")));
+            if (quantity.has("rate")) formula.withArray(CANONICAL).add("d" + id + "/dt = " + text(quantity.path("rate"))).add(id + "(0) = " + text(quantity.path(INITIAL)));
+            else formula.withArray(CANONICAL).add(id + " = " + text(quantity.path(VALUE)));
+            for (JsonNode jump : quantity.path(JUMPS)) formula.withArray(CANONICAL).add("khi " + text(jump.path("when")) + " > 0: " + id + " ← " + text(jump.path("to")));
         }
-        for (JsonNode parameter : spec.path("parameters"))
-            entry.apply(parameter.hasNonNull("of") ? parameter.path("of").asText() : ID, "Chung").withArray("bindings").addObject()
-                    .put("quantity", parameter.path("name").asText()).put("label", parameter.path("label").asText(parameter.path("name").asText()))
-                    .put("unit", parameter.path("unit").asText()).put("source", "PARAMETER").put("parameter", parameter.path("name").asText())
-                    .put("parameterLabel", parameter.path("label").asText(parameter.path("name").asText())).set("value", parameter.path("value"));
-        for (JsonNode constant : spec.path("model").path("constants"))
-            entry.apply(constant.hasNonNull("of") ? constant.path("of").asText() : ID, "Chung").withArray("bindings").addObject()
-                    .put("quantity", constant.path("id").asText()).put("label", constant.path("label").asText(constant.path("id").asText()))
-                    .put("unit", constant.path("unit").asText()).put("source", "FIXED").set("value", constant.path("value"));
-        for (JsonNode assumption : spec.path("model").path("assumptions")) if (!formulas.isEmpty()) ((ObjectNode) formulas.get(0)).withArray("assumptions").add(assumption);
-        for (int i = formulas.size() - 1; i >= 0; i--) if (formulas.get(i).path("canonical").isEmpty() && formulas.get(i).path("bindings").isEmpty()) formulas.remove(i);
+        for (JsonNode parameter : spec.path(PARAMETERS))
+            entry.apply(parameter.hasNonNull("of") ? parameter.path("of").asText() : ID, SHARED_LABEL).withArray(BINDINGS).addObject()
+                    .put(QUANTITY, parameter.path("name").asText()).put(LABEL, parameter.path(LABEL).asText(parameter.path("name").asText()))
+                    .put("unit", parameter.path("unit").asText()).put(SOURCE, "PARAMETER").put("parameter", parameter.path("name").asText())
+                    .put("parameterLabel", parameter.path(LABEL).asText(parameter.path("name").asText())).set(VALUE, parameter.path(VALUE));
+        for (JsonNode constant : spec.path(MODEL).path(CONSTANTS))
+            entry.apply(constant.hasNonNull("of") ? constant.path("of").asText() : ID, SHARED_LABEL).withArray(BINDINGS).addObject()
+                    .put(QUANTITY, constant.path("id").asText()).put(LABEL, constant.path(LABEL).asText(constant.path("id").asText()))
+                    .put("unit", constant.path("unit").asText()).put(SOURCE, "FIXED").set(VALUE, constant.path(VALUE));
+        for (JsonNode assumption : spec.path(MODEL).path(ASSUMPTIONS)) if (!formulas.isEmpty()) ((ObjectNode) formulas.get(0)).withArray(ASSUMPTIONS).add(assumption);
+        for (int i = formulas.size() - 1; i >= 0; i--) if (formulas.get(i).path(CANONICAL).isEmpty() && formulas.get(i).path(BINDINGS).isEmpty()) formulas.remove(i);
         return formulas;
     }
 
@@ -1117,7 +1372,7 @@ public final class FreeModel {
     private static LawChecks.Symbol constant(String id, JsonNode source, String unit, double value, int count) {
         double[] values = new double[count];
         java.util.Arrays.fill(values, value);
-        return new LawChecks.Symbol(id, source.path("label").asText(), unit, attributes(source), values, true);
+        return new LawChecks.Symbol(id, source.path(LABEL).asText(), unit, attributes(source), values, true);
     }
 
     private static Map<String, String> attributes(JsonNode source) {
@@ -1125,12 +1380,12 @@ public final class FreeModel {
         for (String attribute : ATTRIBUTES) if (source.hasNonNull(attribute) && !source.path(attribute).asText().isBlank()) attributes.put(attribute, source.path(attribute).asText());
         // attributes a strand adds for its own laws (the branch of a circuit, the medium of a wave…)
         source.fields().forEachRemaining(field -> { if (field.getKey().startsWith("in") && field.getValue().isTextual() && !field.getValue().asText().isBlank()) attributes.putIfAbsent(field.getKey(), field.getValue().asText()); });
-        attributes.putIfAbsent("role", "other");
+        attributes.putIfAbsent("role", OTHER_ROLE);
         return attributes;
     }
 
     private static String name(String name, Set<String> names) {
-        require(name.matches("[A-Za-z_][A-Za-z0-9_]{0,63}") && !name.equals("t"), "Tên không hợp lệ (chữ, số, gạch dưới; không dùng t): " + name);
+        require(name.matches("[A-Za-z_]\\w{0,63}") && !name.equals("t"), "Tên không hợp lệ (chữ, số, gạch dưới; không dùng t): " + name);
         require(names.add(name), "Tên bị trùng giữa thanh trượt, hằng số và đại lượng: " + name);
         return name;
     }

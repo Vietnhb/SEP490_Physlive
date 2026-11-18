@@ -5,9 +5,10 @@ import { Link } from "react-router-dom";
 import { Button, Card, Heading, SegmentedControl, Text, TextArea } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
+import { useTopicName } from "../../../shared/hooks/useTopicName";
 
 type Gap = {
-  id: string; kind: "UNCHECKED" | "NO_ROLE" | "AMBIGUOUS"; schemaId?: string; topic?: string; role?: string; unit?: string; label?: string;
+  id: string; kind: "UNCHECKED" | "NO_ROLE" | "AMBIGUOUS" | "VIOLATION"; schemaId?: string; topic?: string; role?: string; unit?: string; label?: string;
   occurrences: number; exampleDescription?: string; exampleFormula?: string; status: "OPEN" | "RESOLVED" | "DISMISSED"; note?: string; updatedAt: string;
 };
 type Filter = "OPEN" | "RESOLVED" | "DISMISSED";
@@ -16,10 +17,14 @@ const KIND: Record<Gap["kind"], { title: string; todo: string }> = {
   UNCHECKED: { title: "Vai trò chưa có định luật kiểm", todo: "Thêm một định luật dùng vai trò này vào chủ đề liên quan." },
   NO_ROLE: { title: "Đại lượng chưa có vai trò phù hợp", todo: "Thêm vai trò mới cho loại đại lượng này, rồi thêm định luật dùng vai trò đó." },
   AMBIGUOUS: { title: "Định luật không xác định được đại lượng", todo: "Bổ sung điều kiện (where, scope) cho định luật để nó chọn đúng một đại lượng." },
+  VIOLATION: { title: "Định luật vẫn bác bỏ mô hình sau khi AI sửa", todo: "Xem mô hình AI viết sai hay định luật đang quá hẹp, rồi sửa định luật nếu cần." },
 };
+const DESCRIPTION_PREVIEW = 280;
+const lastSeen = (at: string) => new Date(at).toLocaleDateString("vi-VN");
 
 /** What teachers' simulations computed that no law could check, most frequent first. */
 export function LawGapsDesk() {
+  const topicName = useTopicName();
   const [filter, setFilter] = useState<Filter>("OPEN");
   const [actionError, setError] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -45,8 +50,8 @@ export function LawGapsDesk() {
 
   return <div className="reviewer-stack">
     <header className="reviewer-page-head"><div>
-      <Heading as="h1" size="6">Định luật còn thiếu</Heading>
-      <Text as="p" size="2" color="gray" mt="1">Khi giáo viên tạo mô phỏng, có đại lượng hệ thống tính được nhưng chưa định luật nào đối chiếu. Mỗi dòng là một loại như vậy, xếp theo số lần gặp. Giáo viên vẫn dùng được mô phỏng và đã được báo là phần này đang chờ bổ sung.</Text>
+      <Heading as="h1" className="admin-content-title" size="6">Định luật cần rà soát</Heading>
+      <Text as="p" size="2" color="gray" mt="1">Các trường hợp định luật chưa kiểm được mô phỏng, gộp theo loại. Đánh dấu khi đã xử lý; gặp lại thì mục tự mở lại.</Text>
     </div><Button variant="outline" disabled={resource.refreshing} onClick={() => void load()}>Làm mới</Button></header>
     <SegmentedControl.Root value={filter} onValueChange={value => setFilter(value as Filter)}>
       <SegmentedControl.Item value="OPEN">Cần xử lý</SegmentedControl.Item>
@@ -54,19 +59,24 @@ export function LawGapsDesk() {
       <SegmentedControl.Item value="DISMISSED">Không cần bổ sung</SegmentedControl.Item>
     </SegmentedControl.Root>
     {error && <div className="ops-alert" role="alert">{error}</div>}
-    {loading && items.length === 0 && <CardLoadingSkeleton cards={3} label="Đang tải danh sách định luật còn thiếu…" />}
+    {loading && items.length === 0 && <CardLoadingSkeleton cards={3} label="Đang tải danh sách định luật cần rà soát…" />}
     {!loading && items.length === 0 && <Card size="3"><Text as="p" color="gray">{filter === "OPEN" ? "Không có mục nào cần xử lý. Các mục mới sẽ xuất hiện khi giáo viên tạo mô phỏng có đại lượng chưa được kiểm." : "Chưa có mục nào."}</Text></Card>}
     {items.map(gap => <Card key={gap.id} size="3">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ minWidth: 0 }}>
-          <Text as="div" size="1" color="gray">{KIND[gap.kind].title}{gap.topic ? ` · ${gap.topic}` : ""}</Text>
+          <Text as="div" size="1" color="gray">{KIND[gap.kind].title}{gap.topic ? ` · ${topicName(gap.topic)}` : ""}</Text>
           <Heading as="h2" size="4" mt="1">{gap.kind === "UNCHECKED" ? <><code>{gap.role}</code>{gap.unit ? ` (${gap.unit})` : ""}</> : gap.label}</Heading>
-          {gap.kind === "UNCHECKED" && gap.label && <Text as="p" size="2" color="gray">Ví dụ gần nhất: {gap.label}</Text>}
           {gap.kind === "NO_ROLE" && gap.unit && <Text as="p" size="2" color="gray">Đơn vị: {gap.unit}</Text>}
         </div>
-        <Text as="div" size="2" weight="bold" style={{ whiteSpace: "nowrap" }}>Gặp {gap.occurrences} lần</Text>
+        <div style={{ textAlign: "right" }}>
+          <Text as="div" size="2" weight="bold" style={{ whiteSpace: "nowrap" }}>Gặp {gap.occurrences} lần</Text>
+          <Text as="div" size="1" color="gray" style={{ whiteSpace: "nowrap" }}>Lần gần nhất {lastSeen(gap.updatedAt)}</Text>
+        </div>
       </div>
-      {gap.exampleDescription && <Text as="p" size="2" mt="2"><strong>Mô tả của giáo viên:</strong> {gap.exampleDescription}</Text>}
+      {gap.exampleDescription && (gap.exampleDescription.length > DESCRIPTION_PREVIEW
+        ? <details style={{ marginTop: 8 }}><summary><Text size="2"><strong>Mô tả của giáo viên (ví dụ gần nhất):</strong> {gap.exampleDescription.slice(0, DESCRIPTION_PREVIEW)}… <Text color="blue">Xem đầy đủ</Text></Text></summary>
+            <Text as="p" size="2" mt="1" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{gap.exampleDescription}</Text></details>
+        : <Text as="p" size="2" mt="2"><strong>Mô tả của giáo viên (ví dụ gần nhất):</strong> {gap.exampleDescription}</Text>)}
       {gap.exampleFormula && <Text as="p" size="2" mt="1"><strong>AI đã viết:</strong> <code style={{ wordBreak: "break-word" }}>{gap.exampleFormula}</code></Text>}
       <Text as="p" size="2" mt="2" color="gray"><strong>Việc cần làm:</strong> {KIND[gap.kind].todo} <Link to="/reviewer/topics">Mở Chủ đề vật lý</Link></Text>
       {gap.status === "OPEN" ? <>

@@ -46,7 +46,7 @@ export function ContentModeration() {
 
   return <div className="reviewer-stack">
     <header className="reviewer-page-head">
-      <div><Heading as="h1" size="6">Mô phỏng chờ duyệt</Heading><Text as="p" size="2" color="gray" mt="1">Giáo viên chia sẻ mô phỏng lên thư viện công khai. Hãy chạy thử mô phỏng trước khi quyết định.</Text></div>
+      <div><Heading as="h1" className="admin-content-title" size="6">Mô phỏng chờ duyệt</Heading><Text as="p" size="2" color="gray" mt="1">Giáo viên chia sẻ mô phỏng lên thư viện công khai. Hãy chạy thử mô phỏng trước khi quyết định.</Text></div>
       <ReviewerRefresh refresh={resource.refresh} loading={resource.loading} />
     </header>
     <div className="reviewer-toolbar">

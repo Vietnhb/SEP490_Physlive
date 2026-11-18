@@ -1,7 +1,6 @@
 package com.example.backend.system.reviewer.controller;
 
 import com.example.backend.system.reviewer.dto.BenchmarkContracts;
-import com.example.backend.system.reviewer.model.entity.Adjudication;
 import com.example.backend.system.reviewer.service.BenchmarkReviewService;
 import jakarta.validation.Valid;
 import java.util.*;

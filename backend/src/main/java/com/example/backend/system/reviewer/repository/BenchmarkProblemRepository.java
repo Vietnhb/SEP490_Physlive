@@ -1,8 +1,6 @@
 package com.example.backend.system.reviewer.repository;
 
-import com.example.backend.system.reviewer.model.entity.Adjudication;
 import com.example.backend.system.reviewer.model.entity.BenchmarkProblem;
-import com.example.backend.system.reviewer.model.entity.GoldAnnotation;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

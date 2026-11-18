@@ -359,7 +359,7 @@ function LawForm({ law, ownRoles, roles, kinds, constants, curricula, takenIds, 
       <div className="lawform-field is-wide"><span>Mỗi kí hiệu là đại lượng nào</span>
         {roleSuggestions.length > 0 && <datalist id="lawbook-roles-datalist">{roleSuggestions.map(item => <option key={item} value={item} />)}</datalist>}
         {Object.keys(bind).length === 0 ? <small>Viết công thức ở trên; từng kí hiệu sẽ hiện ra ở đây để bạn nhập tên đại lượng (ví dụ: vận tốc, quãng đường, thời gian…).</small>
-          : <table className="lawform-symbols"><thead><tr><th>Kí hiệu</th><th>Là đại lượng</th>{kindNames.length > 0 && <th>Chỉ loại</th>}<th /></tr></thead><tbody>
+          : <table className="lawform-symbols"><thead><tr><th>Kí hiệu</th><th>Là đại lượng</th>{kindNames.length > 0 && <th>Chỉ loại</th>}<th>Thao tác</th></tr></thead><tbody>
             {Object.entries(bind).map(([symbol, rule]) => {
               const where = record(rule.where), simple = Object.keys(where).every(key => key === "kind") && (where.kind === undefined || typeof where.kind === "string");
               const roleKey = String(rule.role ?? "");
@@ -477,7 +477,7 @@ function RoleDictionary({ value, allRoles, laws, onChange }: Readonly<{ value: C
           : `Không tìm thấy đại lượng nào khớp với “${filterQuery}”.`}
       </p>
     ) : (
-      <table className="lawform-symbols"><thead><tr><th>Tên đại lượng</th><th>Kí hiệu đang dùng</th><th>Dùng trong</th>{onChange && <th />}</tr></thead><tbody>
+      <table className="lawform-symbols"><thead><tr><th>Tên đại lượng</th><th>Kí hiệu đang dùng</th><th>Dùng trong</th>{onChange && <th>Thao tác</th>}</tr></thead><tbody>
         {visibleEntries.map(([id, description]) => {
           const { label } = splitRoleDescription(description, id);
           const syms = symbolsFor(id);

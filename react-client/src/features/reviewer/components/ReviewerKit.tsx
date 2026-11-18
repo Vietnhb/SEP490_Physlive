@@ -1,6 +1,8 @@
-import { Badge, Button, Heading, Select, TextField } from "@radix-ui/themes";
+import PageActions from "../../../shared/layout/PageActions";
+import { Badge, Heading, Select, TextField } from "@radix-ui/themes";
 import type { ComponentProps, ReactNode } from "react";
 import { reviewerStatusLabel } from "../model/reviewerUtils";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 const PATHS = {
   queue: "M4 5h16v14H4z M8 9h8 M8 13h5",
@@ -50,10 +52,11 @@ export function ReviewerFilter({ label, value, onChange, statuses }: Readonly<{ 
 }
 
 export function ReviewStatus({ status }: Readonly<{ status: string }>) {
-  const color = ["APPROVED", "FEATURED", "GOLD_READY", "COMPLETED", "SUCCESS", "SUCCEEDED"].includes(status) ? "cyan" : ["RETIRED", "REJECTED", "REMOVED", "FAILED", "ARCHIVED"].includes(status) ? "gray" : ["PENDING", "DRAFT", "DISAGREEMENT"].includes(status) ? "amber" : "indigo";
+  const color = ["APPROVED", "FEATURED", "GOLD_READY", "COMPLETED", "SUCCESS", "SUCCEEDED"].includes(status) ? "green" : ["RETIRED", "REJECTED", "REMOVED", "FAILED", "ARCHIVED"].includes(status) ? "gray" : ["PENDING", "DRAFT", "DISAGREEMENT"].includes(status) ? "amber" : "indigo";
   return <Badge color={color} variant="soft" size="2">{reviewerStatusLabel(status)}</Badge>;
 }
 
+/** Sits in the area's top bar with the page's other main actions, as on every management page. */
 export function ReviewerRefresh({ refresh, loading }: Readonly<{ refresh: () => void; loading: boolean }>) {
-  return <Button type="button" variant="soft" color="gray" size="2" onClick={refresh} disabled={loading}><ReviewerIcon name="refresh" size={16} />Làm mới</Button>;
+  return <PageActions><RefreshButton onClick={refresh} disabled={loading} /></PageActions>;
 }

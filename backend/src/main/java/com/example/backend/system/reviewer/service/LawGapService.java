@@ -22,40 +22,48 @@ public class LawGapService implements LawGapSink {
     private final LawGapRepository gaps;
 
     @Override
-    public int record(String schemaId, String topic, String description, JsonNode spec, JsonNode validation) {
+    public int recordGaps(String schemaId, String topic, String description, JsonNode spec, JsonNode validation) {
         try {
             Map<String, JsonNode> quantities = new LinkedHashMap<>();
             spec.path("model").path("quantities").forEach(quantity -> quantities.put(quantity.path("id").asText(), quantity));
             Map<String, LawGap> found = new LinkedHashMap<>();
+            Seen seen = new Seen(schemaId, topic, description);
             for (JsonNode id : validation.path("uncheckedQuantities")) {
                 JsonNode quantity = quantities.get(id.asText());
                 if (quantity == null) continue;
-                String role = quantity.path("role").asText("other"), unit = quantity.path("unit").asText("");
+                String role = quantity.path("role").asText("other");
+                String unit = quantity.path("unit").asText("");
                 boolean named = !role.equals("other");
                 // a named role is one gap wherever it is met; a quantity no role fitted is told apart by topic and unit
                 String key = named ? "UNCHECKED|" + role + "|" + unit : "NO_ROLE|" + schemaId + "|" + unit;
-                found.computeIfAbsent(key, ignored -> draft(key, named ? "UNCHECKED" : "NO_ROLE", schemaId, topic, named ? role : null, unit,
-                        quantity.path("label").asText(id.asText()), description, formula(quantity)));
+                found.computeIfAbsent(key, ignored -> draft(key, named ? "UNCHECKED" : "NO_ROLE", seen, named ? role : null, unit,
+                        quantity.path("label").asText(id.asText()), formula(quantity)));
             }
             for (JsonNode law : validation.path("ambiguousLaws")) {
                 String key = "AMBIGUOUS|" + law.path("law").asText();
-                found.computeIfAbsent(key, ignored -> draft(key, "AMBIGUOUS", schemaId, topic, null, null, law.path("title").asText(law.path("law").asText()),
-                        description, "Các đại lượng cùng khớp: " + law.path("quantities")));
+                found.computeIfAbsent(key, ignored -> draft(key, "AMBIGUOUS", seen, null, null, law.path("title").asText(law.path("law").asText()),
+                        "Các đại lượng cùng khớp: " + law.path("quantities")));
             }
             // a law that still refuses the model after the repair loop: the model was wrong, or the law is too narrow
             if ("FLAGGED".equals(validation.path("status").asText()))
                 for (JsonNode check : validation.path("lawChecks")) {
                     if (!"FAILED".equals(check.path("status").asText())) continue;
                     String key = "VIOLATION|" + check.path("law").asText();
-                    found.computeIfAbsent(key, ignored -> draft(key, "VIOLATION", schemaId, topic, null, null,
-                            check.path("title").asText(check.path("law").asText()), description, check.path("message").asText("")));
+                    found.computeIfAbsent(key, ignored -> draft(key, "VIOLATION", seen, null, null,
+                            check.path("title").asText(check.path("law").asText()), check.path("message").asText("")));
                 }
             for (LawGap gap : found.values()) {
                 LawGap known = gaps.findByGapKey(gap.getGapKey()).orElse(null);
                 if (known == null) { gaps.save(gap); continue; }
                 known.setOccurrences(known.getOccurrences() + 1);
+                // the label and topic describe the latest example, so they move with it
+                known.setSchemaId(gap.getSchemaId());
+                known.setTopic(gap.getTopic());
+                known.setLabel(gap.getLabel());
                 known.setExampleDescription(gap.getExampleDescription());
                 known.setExampleFormula(gap.getExampleFormula());
+                // met again after a reviewer closed it: the decision did not hold, so it goes back on the list
+                known.setStatus("OPEN");
                 gaps.save(known);
             }
             return found.size();
@@ -82,16 +90,19 @@ public class LawGapService implements LawGapSink {
         return gaps.save(gap);
     }
 
-    private static LawGap draft(String key, String kind, String schemaId, String topic, String role, String unit, String label, String description, String formula) {
+    /** Where a gap was met: the topic version the model was checked under and the teacher's description. */
+    private record Seen(String schemaId, String topic, String description) { }
+
+    private static LawGap draft(String key, String kind, Seen seen, String role, String unit, String label, String formula) {
         LawGap gap = new LawGap();
         gap.setGapKey(key.length() > 240 ? key.substring(0, 240) : key);
         gap.setKind(kind);
-        gap.setSchemaId(schemaId);
-        gap.setTopic(topic);
+        gap.setSchemaId(seen.schemaId());
+        gap.setTopic(seen.topic());
         gap.setRole(role);
         gap.setUnit(unit);
         gap.setLabel(label);
-        gap.setExampleDescription(description);
+        gap.setExampleDescription(seen.description());
         gap.setExampleFormula(formula);
         return gap;
     }

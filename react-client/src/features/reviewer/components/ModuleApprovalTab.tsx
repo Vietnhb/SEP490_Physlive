@@ -1,3 +1,4 @@
+import RowActions from "../../../shared/ui/RowActions";
 import { useState } from "react";
 import { Button, Card, SegmentedControl, Table, Text } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
@@ -7,10 +8,12 @@ import type { ModuleRelease } from "../model/reviewerTypes";
 import { matches } from "../model/reviewerUtils";
 import { ReviewerDialog } from "./ReviewerDialog";
 import { ReviewerRefresh, ReviewerSearch, ReviewStatus } from "./ReviewerKit";
+import { useTopicName } from "../../../shared/hooks/useTopicName";
 
 type Lifecycle = ModuleRelease["lifecycleStatus"];
 
 export function ModuleApprovalTab() {
+  const topicName = useTopicName();
   const resource = useResource<ModuleRelease[]>("/reviewer/module-releases");
   const action = useAction();
   const [query, setQuery] = useState("");
@@ -41,12 +44,12 @@ export function ModuleApprovalTab() {
       <Table.Header><Table.Row><Table.ColumnHeaderCell>Gói phát hành</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Dùng chủ đề</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Trạng thái</Table.ColumnHeaderCell><Table.ColumnHeaderCell className="reviewer-col-actions">Thao tác</Table.ColumnHeaderCell></Table.Row></Table.Header>
       <Table.Body>
         {rows.map(release => <Table.Row key={release.id}>
-          <Table.Cell><strong>{release.moduleName}</strong><small>{release.topic}</small></Table.Cell>
+          <Table.Cell><strong>{release.moduleName}</strong><small>{topicName(release.topic)}</small></Table.Cell>
           <Table.Cell>{release.schemaId}<small>v{release.schemaVersion}</small></Table.Cell>
           <Table.Cell><ReviewStatus status={release.lifecycleStatus} /></Table.Cell>
           <Table.Cell><div className="reviewer-actions reviewer-actions-end">
-            {release.lifecycleStatus === "DRAFT" && <Button type="button" size="2" disabled={action.busy} onClick={() => setDecision({ release, status: "APPROVED" })}>Phát hành</Button>}
-            {release.lifecycleStatus === "APPROVED" && <Button type="button" variant="soft" color="gray" size="2" disabled={action.busy} onClick={() => setDecision({ release, status: "RETIRED" })}>Ngừng dùng</Button>}
+            {release.lifecycleStatus === "DRAFT" && <RowActions subject={release.moduleName} disabled={action.busy} actions={[{ label: "Phát hành", onSelect: () => setDecision({ release, status: "APPROVED" }) }]} />}
+            {release.lifecycleStatus === "APPROVED" && <RowActions subject={release.moduleName} disabled={action.busy} actions={[{ label: "Ngừng dùng", danger: true, onSelect: () => setDecision({ release, status: "RETIRED" }) }]} />}
             {release.lifecycleStatus === "RETIRED" && <Text size="2" color="gray">—</Text>}
           </div></Table.Cell>
         </Table.Row>)}

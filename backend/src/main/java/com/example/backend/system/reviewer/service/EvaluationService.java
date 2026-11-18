@@ -48,7 +48,7 @@ public class EvaluationService {
         ObjectNode delta = objectMapper.createObjectNode();
         delta.put(PRECISION, numericDelta(baseline.metrics(), candidate.metrics(), CONFIRM_FLOW, PRECISION));
         delta.put(RECALL, numericDelta(baseline.metrics(), candidate.metrics(), CONFIRM_FLOW, RECALL));
-        delta.put("f1", numericDelta(baseline.metrics(), candidate.metrics(), "confirmFlow", "f1"));
+        delta.put("f1", numericDelta(baseline.metrics(), candidate.metrics(), CONFIRM_FLOW, "f1"));
         delta.put(NUMERIC_AGREEMENT, numericDelta(baseline.metrics(), candidate.metrics(), null, NUMERIC_AGREEMENT));
         delta.put(INCORRECT_SIMULATION_RATE, numericDelta(baseline.metrics(), candidate.metrics(), null, INCORRECT_SIMULATION_RATE));
         return new RunComparison(baseline, candidate, delta);

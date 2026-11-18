@@ -5,8 +5,8 @@ import { VersionsTab } from "./VersionsTab";
 export function TopicsWorkspace() {
   return <div className="reviewer-stack">
     <header className="reviewer-page-head"><div>
-      <Heading as="h1" size="6">Chủ đề vật lý</Heading>
-      <Text as="p" size="2" color="gray" mt="1">Mỗi chủ đề khai báo đối tượng, đại lượng, đơn vị và các định luật kiểm chứng mô phỏng. Phiên bản đã phê duyệt được phát hành ngay cho giáo viên và không sửa trực tiếp — khi cần cập nhật, hãy tạo phiên bản mới.</Text>
+      <Heading as="h1" className="admin-content-title" size="6">Chủ đề vật lý</Heading>
+      <Text as="p" size="2" color="gray" mt="1">Đối tượng, đại lượng và định luật của từng chủ đề. Bản đã duyệt không sửa được, hãy tạo phiên bản mới.</Text>
     </div></header>
     <VersionsTab />
   </div>;

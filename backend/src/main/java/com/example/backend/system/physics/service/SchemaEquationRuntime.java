@@ -15,6 +15,21 @@ import java.util.function.ToDoubleFunction;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import static com.example.backend.system.physics.model.SpecKeys.CANONICAL_INPUTS;
+import static com.example.backend.system.physics.model.SpecKeys.CLOSED_FORM;
+import static com.example.backend.system.physics.model.SpecKeys.DURATION_SECONDS;
+import static com.example.backend.system.physics.model.SpecKeys.EXECUTION;
+import static com.example.backend.system.physics.model.SpecKeys.EXPECTED_OUTPUTS;
+import static com.example.backend.system.physics.model.SpecKeys.INITIAL;
+import static com.example.backend.system.physics.model.SpecKeys.INVARIANTS;
+import static com.example.backend.system.physics.model.SpecKeys.JUMPS;
+import static com.example.backend.system.physics.model.SpecKeys.OUTPUTS;
+import static com.example.backend.system.physics.model.SpecKeys.RATES;
+import static com.example.backend.system.physics.model.SpecKeys.STATUS;
+import static com.example.backend.system.physics.model.SpecKeys.UNTIL;
+import static com.example.backend.system.physics.model.SpecKeys.VALIDATION;
+import static com.example.backend.system.physics.model.SpecKeys.VALUE;
+import static com.example.backend.system.physics.model.SpecKeys.VALUES;
 
 /**
  * Interprets bounded arithmetic ASTs from approved schemas; no scene or topic-specific branches.
@@ -26,6 +41,12 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class SchemaEquationRuntime {
+    private static final String END_CONDITION_MESSAGE = "Điều kiện kết thúc của ";
+    private static final String FLAGGED = "FLAGGED";
+    private static final String OP_ATAN2 = "atan2";
+    private static final String OP_FLOOR = "floor";
+    private static final String OP_LATCHED = "latched";
+    private static final String NOT_FINITE = "Phương trình trả về giá trị không xác định hoặc vô hạn";
     private final ObjectMapper json;
     private final double defaultStep;
     private final double maxDuration;
@@ -106,15 +127,18 @@ public class SchemaEquationRuntime {
      * uses elapsed time, because such an expression is a solution for a constant input, not a law at an instant.
      */
     public Set<String> changingInputs(JsonNode capability) {
-        JsonNode math = capability.path("execution").path("math");
-        Set<String> inputs = new LinkedHashSet<>(), declared = new LinkedHashSet<>(), states = new HashSet<>(), clocks = new HashSet<>(Set.of("t"));
-        for (JsonNode input : capability.path("canonicalInputs")) {
+        JsonNode math = capability.path(EXECUTION).path("math");
+        Set<String> inputs = new LinkedHashSet<>();
+        Set<String> declared = new LinkedHashSet<>();
+        Set<String> states = new HashSet<>();
+        Set<String> clocks = new HashSet<>(Set.of("t"));
+        for (JsonNode input : capability.path(CANONICAL_INPUTS)) {
             inputs.add(input.path("key").asText());
             if (input.path("timeVarying").asBoolean(false)) declared.add(input.path("key").asText());
         }
-        math.path("initial").fieldNames().forEachRemaining(states::add);
-        math.path("rates").fields().forEachRemaining(rate -> { if (rate.getValue().isNumber() && rate.getValue().asDouble() != 0) clocks.add(rate.getKey()); });
-        for (String phase : List.of("outputs", "rates")) {
+        math.path(INITIAL).fieldNames().forEachRemaining(states::add);
+        math.path(RATES).fields().forEachRemaining(rate -> { if (rate.getValue().isNumber() && rate.getValue().asDouble() != 0) clocks.add(rate.getKey()); });
+        for (String phase : List.of(OUTPUTS, RATES)) {
             JsonNode expressions = math.path(phase);
             expressions.fields().forEachRemaining(expression -> {
                 Set<String> symbols = new HashSet<>();
@@ -147,15 +171,15 @@ public class SchemaEquationRuntime {
      */
     private record Bound(String id, JsonNode capability, Map<String, Double> constants, Map<String, String> references,
             Map<String, Double> referenceFactor, Set<String> changing, String after, Until until) {
-        JsonNode math() { return capability.path("execution").path("math"); }
-        double absTolerance() { return capability.path("validation").path("absoluteTolerance").asDouble(0); }
-        double relTolerance() { return capability.path("validation").path("relativeTolerance").asDouble(0); }
+        JsonNode math() { return capability.path(EXECUTION).path("math"); }
+        double absTolerance() { return capability.path(VALIDATION).path("absoluteTolerance").asDouble(0); }
+        double relTolerance() { return capability.path(VALIDATION).path("relativeTolerance").asDouble(0); }
         /** The same law on its own, every input fixed to a number. */
         Bound alone(Map<String, Double> inputs) { return new Bound(id, capability, inputs, Map.of(), Map.of(), Set.of(), null, null); }
     }
 
     private static JsonNode output(JsonNode capability, String key) {
-        for (JsonNode candidate : capability.path("outputs")) if (candidate.path("key").asText().equals(key)) return candidate;
+        for (JsonNode candidate : capability.path(OUTPUTS)) if (candidate.path("key").asText().equals(key)) return candidate;
         return null;
     }
 
@@ -170,7 +194,7 @@ public class SchemaEquationRuntime {
         for (JsonNode parameter : spec.path("parameters")) {
             String name = parameter.path("name").asText();
             double value = overrides.has(name) ? overrides.path(name).asDouble(Double.NaN)
-                    : parameter.path("value").asDouble(Double.NaN);
+                    : parameter.path(VALUE).asDouble(Double.NaN);
             require(!name.isBlank() && !parameters.containsKey(name) && Double.isFinite(value), "Tham số không hợp lệ");
             require(value >= parameter.path("min").asDouble(-Double.MAX_VALUE)
                     && value <= parameter.path("max").asDouble(Double.MAX_VALUE), "Tham số nằm ngoài phạm vi cho phép: " + name);
@@ -178,13 +202,13 @@ public class SchemaEquationRuntime {
             parameterUnits.put(name, parameter.path("unit").asText());
         }
         overrides.fieldNames().forEachRemaining(name -> require(parameters.containsKey(name), "Tham số không xác định: " + name));
-        double duration = spec.path("durationSeconds").asDouble(Double.NaN);
+        double duration = spec.path(DURATION_SECONDS).asDouble(Double.NaN);
         if (spec.hasNonNull("durationParameter")) {
             String key = spec.path("durationParameter").asText();
             require(parameters.containsKey(key), "Tham số thời gian không xác định");
             for (JsonNode parameter : spec.path("parameters")) if (parameter.path("name").asText().equals(key)) {
                 String unit = parameter.path("unit").asText();
-                require(sameQuantity(unit, "s") && close(convert(parameter.path("value").asDouble(), unit, "s"), duration),
+                require(sameQuantity(unit, "s") && close(convert(parameter.path(VALUE).asDouble(), unit, "s"), duration),
                         "Tham số thời gian phải khớp thời lượng ban đầu và dùng đơn vị thời gian");
             }
             duration = convert(parameters.get(key), parameterUnits.get(key), "s");
@@ -194,14 +218,15 @@ public class SchemaEquationRuntime {
         // Physical time scales range from milliseconds (AC, RC) to years (decay, orbits).
         // Start from a presentation-friendly resolution and refine (h -> h/2) only while
         // the reference / refinement checks fail, within the configured sample budget.
-        int budgetSteps = (int) Math.max(0, (maxSamples / Math.max(1, bindings.size()) - 1) / 2);
-        int steps = (int) Math.max(Math.min(MIN_STEPS, budgetSteps),
-                Math.min(Math.min((double) budgetSteps, MAX_BASE_STEPS), Math.ceil(duration / defaultStep)));
+        int budgetSteps = Math.max(0, (maxSamples / Math.max(1, bindings.size()) - 1) / 2);
+        // the default step's count, kept within [MIN_STEPS, MAX_BASE_STEPS] and the budget (lower bound <= upper bound
+        // since MIN_STEPS <= MAX_BASE_STEPS)
+        int steps = (int) Math.clamp(Math.ceil(duration / defaultStep), Math.min(MIN_STEPS, budgetSteps), Math.min(budgetSteps, MAX_BASE_STEPS));
         require(steps > 0 && (long) (steps * 2 + 1) * Math.max(1, bindings.size()) <= maxSamples,
                 "Dữ liệu diễn tiến vượt quá giới hạn số mẫu. Vui lòng giảm thời lượng mô phỏng");
         boolean coverage = spec.path("physicsCoverage").asText().equals("COMPLETE");
         ObjectNode result = run(coverage, bindings, duration, steps);
-        while ("FLAGGED".equals(result.path("validation").path("status").asText()) && steps * 2L <= budgetSteps) {
+        while (FLAGGED.equals(result.path(VALIDATION).path(STATUS).asText()) && steps * 2L <= budgetSteps) {
             steps *= 2;
             result = run(coverage, bindings, duration, steps);
         }
@@ -211,7 +236,7 @@ public class SchemaEquationRuntime {
         boolean staircase = false;
         for (Bound bound : bindings) {
             List<JsonNode> conditions = new ArrayList<>();
-            bound.math().path("outputs").forEach(equation -> collectConditions(equation, conditions));
+            bound.math().path(OUTPUTS).forEach(equation -> collectConditions(equation, conditions));
             staircase |= conditions.size() > MAX_LOCATED_CONDITIONS;
         }
         while (!staircase && underSampled(result.path("solverTimeline").path("frames")) && steps * 2L <= Math.min(budgetSteps, MAX_DETAIL_STEPS)) {
@@ -231,24 +256,32 @@ public class SchemaEquationRuntime {
     private static boolean underSampled(JsonNode frames) {
         int count = frames.size();
         if (count < 5) return false;
-        var keys = frames.get(0).path("values").fieldNames();
+        var keys = frames.get(0).path(VALUES).fieldNames();
         while (keys.hasNext()) {
             String key = keys.next();
-            double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY;
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
             for (JsonNode frame : frames) {
-                double value = frame.path("values").path(key).asDouble();
+                double value = frame.path(VALUES).path(key).asDouble();
                 min = Math.min(min, value);
                 max = Math.max(max, value);
             }
             double range = max - min;
-            if (!(range > 1e-9 * Math.max(Math.abs(min), Math.abs(max)))) continue;
+            double flat = 1e-9 * Math.max(Math.abs(min), Math.abs(max));
+            // a result that does not move (or is undefined: NaN compares false) cannot be drawn wrongly
+            boolean moves = range > flat;
+            if (!moves) continue;
             int off = 0;
             for (int i = 1; i < count - 1; i++) {
-                double before = frames.get(i - 1).path("t").asDouble(), here = frames.get(i).path("t").asDouble(), after = frames.get(i + 1).path("t").asDouble();
-                if (!(after > before)) continue;
-                double a = frames.get(i - 1).path("values").path(key).asDouble(), b = frames.get(i + 1).path("values").path(key).asDouble();
+                double before = frames.get(i - 1).path("t").asDouble();
+                double here = frames.get(i).path("t").asDouble();
+                double after = frames.get(i + 1).path("t").asDouble();
+                boolean spanned = after > before;
+                if (!spanned) continue;
+                double a = frames.get(i - 1).path(VALUES).path(key).asDouble();
+                double b = frames.get(i + 1).path(VALUES).path(key).asDouble();
                 double line = a + (b - a) * (here - before) / (after - before);
-                if (Math.abs(frames.get(i).path("values").path(key).asDouble() - line) > 0.02 * range) off++;
+                if (Math.abs(frames.get(i).path(VALUES).path(key).asDouble() - line) > 0.02 * range) off++;
             }
             if (off > 0.08 * (count - 2)) return true;
         }
@@ -266,10 +299,8 @@ public class SchemaEquationRuntime {
             String id = model.path("id").asText();
             require(!id.isBlank() && models.put(id, model) == null, "Định danh mô hình bị trùng hoặc bị thiếu");
             require(models.size() <= maxParticipants, "Số lượng vật thể vượt quá giới hạn cho phép");
-            JsonNode capability = null;
-            for (JsonNode candidate : definition.path("capabilities"))
-                if (candidate.path("capabilityId").asText().equals(model.path("capabilityId").asText())) capability = candidate;
-            require(capability != null && capability.path("execution").path("math").isObject(),
+            JsonNode capability = capabilityOf(definition, model);
+            require(capability != null && capability.path(EXECUTION).path("math").isObject(),
                     "Chức năng chưa có hệ phương trình thực thi được phê duyệt");
             checkDimensions(capability);
             capabilities.put(id, capability);
@@ -278,58 +309,16 @@ public class SchemaEquationRuntime {
         for (JsonNode model : models.values()) {
             String id = model.path("id").asText();
             JsonNode capability = capabilities.get(id);
-            Map<String, Double> constants = new LinkedHashMap<>(), factors = new LinkedHashMap<>();
-            Map<String, String> references = new LinkedHashMap<>();
-            for (JsonNode input : capability.path("canonicalInputs")) {
-                String key = input.path("key").asText(), unit = input.path("unit").asText();
-                JsonNode binding = model.path("inputs").path(key);
-                if (binding.isTextual() && !parameters.containsKey(binding.asText())) {
-                    JsonNode source = source(binding.asText(), models.keySet(), capabilities);
-                    require(sameQuantity(source.path("unit").asText(), unit), "Đầu vào phải sử dụng đơn vị SI chuẩn: " + key
-                            + " cần đơn vị " + unit + ", kết quả " + binding.asText() + " có đơn vị " + source.path("unit").asText());
-                    references.put(key, binding.asText());
-                    factors.put(key, convert(1, source.path("unit").asText(), unit));
-                    continue;
-                }
-                double value;
-                if (binding.isTextual()) {
-                    String parameterUnit = parameterUnits.get(binding.asText());
-                    require(sameQuantity(parameterUnit, unit), "Đầu vào phải sử dụng đơn vị SI chuẩn: " + key + " cần đơn vị "
-                            + unit + ", tham số " + binding.asText() + " đang dùng " + parameterUnit);
-                    value = convert(parameters.get(binding.asText()), parameterUnit, unit);
-                } else value = binding.isNumber() ? binding.asDouble() : input.path("defaultValue").asDouble(Double.NaN);
-                require(Double.isFinite(value), "Thiếu đầu vào chuẩn: " + key);
-                require(value >= input.path("min").asDouble(-Double.MAX_VALUE)
-                        && value <= input.path("max").asDouble(Double.MAX_VALUE), "Giá trị nằm ngoài miền tính toán của bộ giải: " + key);
-                constants.put(key, value);
-            }
+            Inputs inputs = inputs(model, capability, parameters, parameterUnits, models.keySet(), capabilities);
             String after = model.path("after").asText("");
             if (!after.isEmpty()) {
                 require(models.containsKey(after) && !after.equals(id), "Giai đoạn đứng trước không xác định: " + after
                         + " (id hiện có: " + String.join(", ", models.keySet()) + ")");
-                require(models.get(after).path("until").isObject(), "Vật " + id + " bắt đầu sau " + after
+                require(models.get(after).path(UNTIL).isObject(), "Vật " + id + " bắt đầu sau " + after
                         + " nên " + after + " phải có điều kiện kết thúc (until)");
             }
-            Until until = null;
-            if (model.path("until").isObject()) {
-                JsonNode rule = model.path("until");
-                String field = rule.path("field").asText(), direction = rule.path("direction").asText();
-                JsonNode watched = source(field, models.keySet(), capabilities);
-                require(direction.equals("rising") || direction.equals("falling"),
-                        "Điều kiện kết thúc của " + id + " cần direction là rising hoặc falling");
-                double value;
-                if (rule.path("value").isTextual()) {
-                    String name = rule.path("value").asText();
-                    require(parameters.containsKey(name), "Tham số không xác định: " + name);
-                    require(sameQuantity(parameterUnits.get(name), watched.path("unit").asText()), "Điều kiện kết thúc của " + id
-                            + ": tham số " + name + " phải cùng loại đơn vị với " + field + " (" + watched.path("unit").asText() + ")");
-                    value = convert(parameters.get(name), parameterUnits.get(name), watched.path("unit").asText());
-                } else value = rule.path("value").asDouble(Double.NaN);
-                require(Double.isFinite(value), "Điều kiện kết thúc của " + id + " thiếu giá trị");
-                int dot = field.lastIndexOf('.');
-                until = new Until(field.substring(0, dot), field.substring(dot + 1), direction.equals("rising"), value);
-            }
-            bindings.add(new Bound(id, capability, constants, references, factors, changingInputs(capability),
+            Until until = model.path(UNTIL).isObject() ? until(model, parameters, parameterUnits, models.keySet(), capabilities) : null;
+            bindings.add(new Bound(id, capability, inputs.constants(), inputs.references(), inputs.factors(), changingInputs(capability),
                     after.isEmpty() ? null : after, until));
         }
         for (Bound bound : bindings) {
@@ -340,6 +329,78 @@ public class SchemaEquationRuntime {
         return bindings;
     }
 
+    /** The topic's capability a model names; the last one listed where several share its id, null for none. */
+    private static JsonNode capabilityOf(JsonNode definition, JsonNode model) {
+        JsonNode capability = null;
+        for (JsonNode candidate : definition.path("capabilities")) {
+            if (candidate.path("capabilityId").asText().equals(model.path("capabilityId").asText())) capability = candidate;
+        }
+        return capability;
+    }
+
+    /** The inputs of one model: fixed values, and results of other models read with a unit factor. */
+    private record Inputs(Map<String, Double> constants, Map<String, Double> factors, Map<String, String> references) {}
+
+    private Inputs inputs(JsonNode model, JsonNode capability, Map<String, Double> parameters, Map<String, String> parameterUnits,
+            Set<String> ids, Map<String, JsonNode> capabilities) {
+        Inputs inputs = new Inputs(new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
+        for (JsonNode input : capability.path(CANONICAL_INPUTS)) {
+            String key = input.path("key").asText();
+            String unit = input.path("unit").asText();
+            JsonNode binding = model.path("inputs").path(key);
+            if (binding.isTextual() && !parameters.containsKey(binding.asText())) {
+                JsonNode source = source(binding.asText(), ids, capabilities);
+                require(sameQuantity(source.path("unit").asText(), unit), "Đầu vào phải sử dụng đơn vị SI chuẩn: " + key
+                        + " cần đơn vị " + unit + ", kết quả " + binding.asText() + " có đơn vị " + source.path("unit").asText());
+                inputs.references().put(key, binding.asText());
+                inputs.factors().put(key, convert(1, source.path("unit").asText(), unit));
+            } else {
+                double value = inputValue(input, binding, parameters, parameterUnits);
+                require(Double.isFinite(value), "Thiếu đầu vào chuẩn: " + key);
+                require(value >= input.path("min").asDouble(-Double.MAX_VALUE)
+                        && value <= input.path("max").asDouble(Double.MAX_VALUE), "Giá trị nằm ngoài miền tính toán của bộ giải: " + key);
+                inputs.constants().put(key, value);
+            }
+        }
+        return inputs;
+    }
+
+    /** A fixed input: a slider converted to the input's unit, a number written in place, or the input's default. */
+    private double inputValue(JsonNode input, JsonNode binding, Map<String, Double> parameters, Map<String, String> parameterUnits) {
+        String key = input.path("key").asText();
+        String unit = input.path("unit").asText();
+        if (!binding.isTextual()) return binding.isNumber() ? binding.asDouble() : input.path("defaultValue").asDouble(Double.NaN);
+        String parameterUnit = parameterUnits.get(binding.asText());
+        require(sameQuantity(parameterUnit, unit), "Đầu vào phải sử dụng đơn vị SI chuẩn: " + key + " cần đơn vị "
+                + unit + ", tham số " + binding.asText() + " đang dùng " + parameterUnit);
+        return convert(parameters.get(binding.asText()), parameterUnit, unit);
+    }
+
+    /** Where a model's phase ends: a result of the run crossing a value, rising or falling. */
+    private Until until(JsonNode model, Map<String, Double> parameters, Map<String, String> parameterUnits,
+            Set<String> ids, Map<String, JsonNode> capabilities) {
+        String id = model.path("id").asText();
+        JsonNode rule = model.path(UNTIL);
+        String field = rule.path("field").asText();
+        String direction = rule.path("direction").asText();
+        JsonNode watched = source(field, ids, capabilities);
+        require(direction.equals("rising") || direction.equals("falling"),
+                END_CONDITION_MESSAGE + id + " cần direction là rising hoặc falling");
+        double value;
+        if (rule.path(VALUE).isTextual()) {
+            String name = rule.path(VALUE).asText();
+            require(parameters.containsKey(name), "Tham số không xác định: " + name);
+            require(sameQuantity(parameterUnits.get(name), watched.path("unit").asText()), END_CONDITION_MESSAGE + id
+                    + ": tham số " + name + " phải cùng loại đơn vị với " + field + " (" + watched.path("unit").asText() + ")");
+            value = convert(parameters.get(name), parameterUnits.get(name), watched.path("unit").asText());
+        } else {
+            value = rule.path(VALUE).asDouble(Double.NaN);
+        }
+        require(Double.isFinite(value), END_CONDITION_MESSAGE + id + " thiếu giá trị");
+        int dot = field.lastIndexOf('.');
+        return new Until(field.substring(0, dot), field.substring(dot + 1), direction.equals("rising"), value);
+    }
+
     private static int indexOf(List<Bound> bindings, String id) {
         for (int i = 0; i < bindings.size(); i++) if (bindings.get(i).id.equals(id)) return i;
         return -1;
@@ -348,13 +409,14 @@ public class SchemaEquationRuntime {
     /** The declared result "&lt;participantId&gt;.&lt;outputKey&gt;" (or "&lt;participantId&gt;.t", the time since that participant started). */
     private JsonNode source(String reference, Set<String> ids, Map<String, JsonNode> capabilities) {
         int dot = reference.lastIndexOf('.');
-        String id = dot > 0 ? reference.substring(0, dot) : "", key = reference.substring(dot + 1);
+        String id = dot > 0 ? reference.substring(0, dot) : "";
+        String key = reference.substring(dot + 1);
         require(ids.contains(id), "Tham số đầu vào không xác định: " + reference
                 + " (dùng tên một tham số, hoặc id của vật khác, dấu chấm và tên đầu ra; id hiện có: " + String.join(", ", ids) + ")");
         if (key.equals("t")) return json.createObjectNode().put("key", "t").put("unit", "s");
         JsonNode output = output(capabilities.get(id), key);
         List<String> available = new ArrayList<>();
-        for (JsonNode candidate : capabilities.get(id).path("outputs")) available.add(candidate.path("key").asText());
+        for (JsonNode candidate : capabilities.get(id).path(OUTPUTS)) available.add(candidate.path("key").asText());
         require(output != null, "Tham số đầu vào không xác định: " + reference + " (đầu ra của " + id + ": " + String.join(", ", available) + ")");
         return output;
     }
@@ -369,8 +431,10 @@ public class SchemaEquationRuntime {
         /** per participant: grid index → rates and inputs at that instant (null unless running). */
         final Map<String, List<Map<String, Double>>> rates = new LinkedHashMap<>();
         final Map<String, List<Map<String, Double>>> inputs = new LinkedHashMap<>();
-        final Map<String, Double> start = new LinkedHashMap<>(), end = new LinkedHashMap<>();
-        final Map<String, Map<String, Double>> startInputs = new LinkedHashMap<>(), startOutputs = new LinkedHashMap<>();
+        final Map<String, Double> start = new LinkedHashMap<>();
+        final Map<String, Double> end = new LinkedHashMap<>();
+        final Map<String, Map<String, Double>> startInputs = new LinkedHashMap<>();
+        final Map<String, Map<String, Double>> startOutputs = new LinkedHashMap<>();
         /** Instants between grid points where a participant ended: time → every participant's results. */
         final List<Map.Entry<Double, Map<String, Map<String, Double>>>> events = new ArrayList<>();
         /** Instants at which a condition inside an equation changed side, so the equations changed form there. */
@@ -430,15 +494,15 @@ public class SchemaEquationRuntime {
 
         double symbol(Bound bound, String phase, String name) {
             if (name.equals("t")) return localTime(bound.id);
-            if (!phase.equals("initial")) {
+            if (!phase.equals(INITIAL)) {
                 if (running(bound.id)) { Double state = states.get(bound.id).get(name); if (state != null) return state; }
-                else if (bound.math().path("initial").has(name)) return named(bound, "initial", name);
+                else if (bound.math().path(INITIAL).has(name)) return named(bound, INITIAL, name);
             }
             if (bound.constants.containsKey(name)) return bound.constants.get(name);
             if (bound.references.containsKey(name)) return input(bound, name);
             // A rate or a starting value may be written with a named result of the same law (a net force, an acceleration).
             JsonNode math = bound.math();
-            return named(bound, math.path(phase).has(name) || !math.path("outputs").has(name) ? phase : "outputs", name);
+            return named(bound, math.path(phase).has(name) || !math.path(OUTPUTS).has(name) ? phase : OUTPUTS, name);
         }
 
         double input(Bound bound, String key) {
@@ -451,13 +515,13 @@ public class SchemaEquationRuntime {
         double result(String id, String key) {
             if (key.equals("t")) return finished.containsKey(id) ? finished.get(id).get("t") : localTime(id);
             if (finished.containsKey(id)) return finished.get(id).get(key);
-            return named(byId.get(id), "outputs", key);
+            return named(byId.get(id), OUTPUTS, key);
         }
 
         Map<String, Double> results(Bound bound) {
             if (finished.containsKey(bound.id)) return finished.get(bound.id);
             Map<String, Double> values = new LinkedHashMap<>();
-            bound.math().path("outputs").fieldNames().forEachRemaining(key -> values.put(key, named(bound, "outputs", key)));
+            bound.math().path(OUTPUTS).fieldNames().forEachRemaining(key -> values.put(key, named(bound, OUTPUTS, key)));
             return values;
         }
 
@@ -469,13 +533,13 @@ public class SchemaEquationRuntime {
 
         Map<String, Double> rates(Bound bound) {
             Map<String, Double> values = new LinkedHashMap<>();
-            bound.math().path("rates").fieldNames().forEachRemaining(key -> values.put(key, named(bound, "rates", key)));
+            bound.math().path(RATES).fieldNames().forEachRemaining(key -> values.put(key, named(bound, RATES, key)));
             return values;
         }
 
         void start(Bound bound) {
             Map<String, Double> state = new LinkedHashMap<>();
-            bound.math().path("initial").fieldNames().forEachRemaining(key -> state.put(key, named(bound, "initial", key)));
+            bound.math().path(INITIAL).fieldNames().forEachRemaining(key -> state.put(key, named(bound, INITIAL, key)));
             require(!state.isEmpty(), "Hệ phương trình chưa có trạng thái ban đầu");
             Map<String, Map<String, Double>> next = new LinkedHashMap<>(states);
             next.put(bound.id, state);
@@ -526,7 +590,7 @@ public class SchemaEquationRuntime {
                 java.util.IdentityHashMap<JsonNode, Integer> own = new java.util.IdentityHashMap<>();
                 for (JsonNode node : conditions.computeIfAbsent(bound.id, id -> located(bound))) {
                     double value;
-                    try { value = evaluate(node.get(1), scope(bound, "outputs"), 0, new int[]{0}); }
+                    try { value = evaluate(node.get(1), scope(bound, OUTPUTS), 0, new int[]{0}); }
                     catch (ApiException undefined) { value = Double.NaN; }
                     own.put(node.get(1), node.get(0).asText().equals("sign") ? (int) Math.signum(value)
                             : value > 0 || latched.getOrDefault(bound.id, NONE).containsKey(node.get(1)) ? 1 : 0);
@@ -545,25 +609,27 @@ public class SchemaEquationRuntime {
          */
         List<JsonNode> located(Bound bound) {
             List<JsonNode> all = new ArrayList<>();
-            for (String phase : List.of("rates", "outputs")) bound.math().path(phase).forEach(equation -> collectConditions(equation, all));
-            bound.math().path("jumps").forEach(list -> list.forEach(pair -> collectConditions(pair.get(0), all)));
+            for (String phase : List.of(RATES, OUTPUTS)) bound.math().path(phase).forEach(equation -> collectConditions(equation, all));
+            bound.math().path(JUMPS).forEach(list -> list.forEach(pair -> collectConditions(pair.get(0), all)));
             if (all.size() <= MAX_LOCATED_CONDITIONS) return all;
             List<JsonNode> needed = new ArrayList<>();
             Set<String> seen = new HashSet<>();
             java.util.ArrayDeque<JsonNode> open = new java.util.ArrayDeque<>();
-            bound.math().path("rates").forEach(open::add);
-            bound.math().path("jumps").forEach(list -> list.forEach(pair -> { open.add(pair.get(0)); open.add(pair.get(1)); }));
-            for (Bound other : bounds) if (other.until != null && other.until.sourceId.equals(bound.id) && bound.math().path("outputs").has(other.until.key))
-                open.add(bound.math().path("outputs").get(other.until.key));
+            bound.math().path(RATES).forEach(open::add);
+            bound.math().path(JUMPS).forEach(list -> list.forEach(pair -> { open.add(pair.get(0)); open.add(pair.get(1)); }));
+            for (Bound other : bounds) {
+                if (other.until != null && other.until.sourceId.equals(bound.id) && bound.math().path(OUTPUTS).has(other.until.key))
+                    open.add(bound.math().path(OUTPUTS).get(other.until.key));
+            }
             while (!open.isEmpty()) {
                 JsonNode ast = open.pop();
                 collectConditions(ast, needed);
                 Set<String> names = new LinkedHashSet<>();
                 names(ast, names);
-                for (String name : names) if (seen.add(name) && bound.math().path("outputs").has(name)) open.add(bound.math().path("outputs").get(name));
+                for (String name : names) if (seen.add(name) && bound.math().path(OUTPUTS).has(name)) open.add(bound.math().path(OUTPUTS).get(name));
             }
             List<JsonNode> rest = new ArrayList<>();
-            for (JsonNode node : all) if (needed.stream().noneMatch(known -> known == node)) { if (node.get(0).asText().equals("latched")) needed.add(node); else rest.add(node); }
+            for (JsonNode node : all) if (needed.stream().noneMatch(known -> known == node)) { if (node.get(0).asText().equals(OP_LATCHED)) needed.add(node); else rest.add(node); }
             loose.put(bound.id, rest);
             return needed;
         }
@@ -574,7 +640,7 @@ public class SchemaEquationRuntime {
             for (Bound bound : bounds) for (JsonNode node : loose.getOrDefault(bound.id, List.of())) {
                 if (!running(bound.id)) { sides.add(0); continue; }
                 double value;
-                try { value = evaluate(node.get(1), scope(bound, "outputs"), 0, new int[]{0}); } catch (ApiException undefined) { value = Double.NaN; }
+                try { value = evaluate(node.get(1), scope(bound, OUTPUTS), 0, new int[]{0}); } catch (ApiException undefined) { value = Double.NaN; }
                 sides.add(node.get(0).asText().equals("sign") ? (int) Math.signum(value) : value > 0 ? 1 : 0);
             }
             return sides;
@@ -590,20 +656,23 @@ public class SchemaEquationRuntime {
             boolean any = false;
             for (Bound bound : bounds) {
                 if (!running(bound.id) || held == null || !held.containsKey(bound.id)) continue;
-                var jumps = bound.math().path("jumps").fields();
+                var jumps = bound.math().path(JUMPS).fields();
                 while (jumps.hasNext()) {
                     var entry = jumps.next();
                     for (JsonNode pair : entry.getValue()) {
                         JsonNode condition = pair.get(0).get(1);
                         Integer was = held.get(bound.id).get(condition);
-                        if (was == null || was != 0 || !(evaluate(condition, scope(bound, "outputs"), 0, new int[]{0}) > 0)) continue;
-                        double value = evaluate(pair.get(1), scope(bound, "outputs"), 0, new int[]{0});
-                        require(Double.isFinite(value), "Bước nhảy của " + entry.getKey() + " cho giá trị không xác định");
-                        if (next.get(bound.id) == states.get(bound.id)) next.put(bound.id, new LinkedHashMap<>(states.get(bound.id)));
-                        next.get(bound.id).put(entry.getKey(), value);
-                        any = true;
-                        hit.add(entry.getKey());
-                        break;
+                        // the condition has just come to hold: it was off when held, and holds now
+                        boolean comesToHold = was != null && was == 0 && evaluate(condition, scope(bound, OUTPUTS), 0, new int[]{0}) > 0;
+                        if (comesToHold) {
+                            double value = evaluate(pair.get(1), scope(bound, OUTPUTS), 0, new int[]{0});
+                            require(Double.isFinite(value), "Bước nhảy của " + entry.getKey() + " cho giá trị không xác định");
+                            if (next.get(bound.id) == states.get(bound.id)) next.put(bound.id, new LinkedHashMap<>(states.get(bound.id)));
+                            next.get(bound.id).put(entry.getKey(), value);
+                            any = true;
+                            hit.add(entry.getKey());
+                            break;
+                        }
                     }
                 }
             }
@@ -618,9 +687,12 @@ public class SchemaEquationRuntime {
             if (on) {
                 lock = sides();
                 // "latched" remembers: once its condition has held at an instant the run has reached, it holds for good
-                for (Bound bound : bounds) for (JsonNode node : conditions.getOrDefault(bound.id, List.of()))
-                    if (node.get(0).asText().equals("latched") && lock.containsKey(bound.id) && lock.get(bound.id).get(node.get(1)) == 1)
-                        latched.computeIfAbsent(bound.id, id -> new java.util.IdentityHashMap<>()).put(node.get(1), 1);
+                for (Bound bound : bounds) {
+                    for (JsonNode node : conditions.getOrDefault(bound.id, List.of())) {
+                        if (node.get(0).asText().equals(OP_LATCHED) && lock.containsKey(bound.id) && lock.get(bound.id).get(node.get(1)) == 1)
+                            latched.computeIfAbsent(bound.id, id -> new java.util.IdentityHashMap<>()).put(node.get(1), 1);
+                    }
+                }
                 memo.clear();
             }
         }
@@ -665,10 +737,11 @@ public class SchemaEquationRuntime {
             Map<String, Map<String, Double>> all = new LinkedHashMap<>();
             from.forEach((id, state) -> {
                 Map<String, Double> next = new LinkedHashMap<>();
-                for (String key : state.keySet()) {
+                for (Map.Entry<String, Double> current : state.entrySet()) {
+                    String key = current.getKey();
                     require(k1.get(id).containsKey(key) && k2.get(id).containsKey(key) && k3.get(id).containsKey(key)
                             && k4.get(id).containsKey(key), "Thiếu đạo hàm của trạng thái: " + key);
-                    double value = state.get(key) + h / 6 * (k1.get(id).get(key) + 2 * k2.get(id).get(key)
+                    double value = current.getValue() + h / 6 * (k1.get(id).get(key) + 2 * k2.get(id).get(key)
                             + 2 * k3.get(id).get(key) + k4.get(id).get(key));
                     require(Double.isFinite(value), "Bộ giải trả về giá trị không xác định hoặc vô hạn");
                     next.put(key, value);
@@ -694,7 +767,7 @@ public class SchemaEquationRuntime {
     private static void collectConditions(JsonNode ast, List<JsonNode> into) {
         if (!ast.isArray() || ast.isEmpty()) return;
         String op = ast.get(0).asText();
-        if ((op.equals("if") || op.equals("sign") || op.equals("latched")) && ast.size() > 1 && into.stream().noneMatch(known -> known == ast)) into.add(ast);
+        if ((op.equals("if") || op.equals("sign") || op.equals(OP_LATCHED)) && ast.size() > 1 && into.stream().noneMatch(known -> known == ast)) into.add(ast);
         for (int i = 1; i < ast.size(); i++) collectConditions(ast.get(i), into);
     }
 
@@ -743,7 +816,8 @@ public class SchemaEquationRuntime {
                 require(events < MAX_EVENTS_PER_STEP, "Trong một bước tính có quá nhiều lần kết thúc giai đoạn hoặc đổi điều kiện (if, sign) liên tiếp. "
                         + "Một điều kiện đổi qua lại liên tục thường là vật đã dừng lại mà phương trình vẫn coi là đang chuyển động: hãy kết thúc bằng until, hoặc viết riêng trạng thái đứng yên");
                 // the earliest instant in this step at which one of them has reached its value, or a condition changes side
-                double low = 0, high = remaining;
+                double low = 0;
+                double high = remaining;
                 for (int cut = 0; cut < EVENT_BISECTIONS && high - low > Math.ulp(t + high); cut++) {
                     double middle = (low + high) / 2;
                     sim.at(sim.step(state, t, middle, k1), t + middle);
@@ -806,7 +880,7 @@ public class SchemaEquationRuntime {
 
     private ObjectNode run(boolean coverage, List<Bound> bindings, double duration, int steps) {
         ObjectNode result = json.createObjectNode();
-        ObjectNode validation = result.putObject("validation");
+        ObjectNode validation = result.putObject(VALIDATION);
         var flags = validation.putArray("flags");
         var assumptions = validation.putArray("assumptions");
         var evidence = validation.putArray("convergenceEvidence");
@@ -826,55 +900,65 @@ public class SchemaEquationRuntime {
         double h = duration / steps;
         for (Bound bound : bindings) {
             JsonNode math = bound.math();
-            double absTolerance = bound.capability.path("validation").path("absoluteTolerance").asDouble(Double.NaN);
-            double relTolerance = bound.capability.path("validation").path("relativeTolerance").asDouble(Double.NaN);
+            double absTolerance = bound.capability.path(VALIDATION).path("absoluteTolerance").asDouble(Double.NaN);
+            double relTolerance = bound.capability.path(VALIDATION).path("relativeTolerance").asDouble(Double.NaN);
             require(Double.isFinite(absTolerance) && absTolerance >= 0 && Double.isFinite(relTolerance) && relTolerance >= 0,
                     "Mô hình cần có sai số cho phép để kiểm định");
-            List<Map<String, Double>> samples = coarse.outputs.get(bound.id), liveInputs = coarse.inputs.get(bound.id);
+            List<Map<String, Double>> samples = coarse.outputs.get(bound.id);
+            List<Map<String, Double>> liveInputs = coarse.inputs.get(bound.id);
             // A law with no reference solution may ask to be judged by step refinement alone, each result against
             // its own size over the run (a result that passes through zero has no size of its own there).
-            boolean byRefinement = bound.capability.path("validation").path("strategy").asText().equals("step_refinement");
+            boolean byRefinement = bound.capability.path(VALIDATION).path("strategy").asText().equals("step_refinement");
             Map<String, Double> size = new LinkedHashMap<>();
             if (byRefinement) {
                 // results of the same unit share one yardstick, so a sum that cancels to zero is still judged fairly
                 Map<String, Double> worth = new LinkedHashMap<>();
                 Map<String, String> unitOf = new LinkedHashMap<>();
-                for (JsonNode output : bound.capability.path("outputs")) unitOf.put(output.path("key").asText(), canonicalUnit.getOrDefault(output.path("unit").asText(), output.path("unit").asText()));
-                for (Map<String, Double> sample : samples) if (sample != null)
-                    sample.forEach((key, value) -> worth.merge(unitOf.getOrDefault(key, key), Math.abs(value), Math::max));
+                for (JsonNode output : bound.capability.path(OUTPUTS)) unitOf.put(output.path("key").asText(), canonicalUnit.getOrDefault(output.path("unit").asText(), output.path("unit").asText()));
+                for (Map<String, Double> sample : samples) {
+                    if (sample != null) sample.forEach((key, value) -> worth.merge(unitOf.getOrDefault(key, key), Math.abs(value), Math::max));
+                }
                 unitOf.forEach((key, unit) -> size.put(key, worth.getOrDefault(unit, 0.0)));
             }
             Map<String, Double> startInputs = coarse.startInputs.get(bound.id);
             double start = coarse.start.getOrDefault(bound.id, Double.NaN);
-            int first = -1, last = -1;
-            for (int i = 0; i < samples.size(); i++) if (liveInputs.get(i) != null) { if (first < 0) first = i; last = i; }
+            int first = -1;
+            int last = -1;
+            for (int i = 0; i < samples.size(); i++) {
+                if (liveInputs.get(i) == null) continue;
+                if (first < 0) first = i;
+                last = i;
+            }
             // an input that reads another participant either accepts a changing value or must stay what it was at the start
             boolean driven = false;
             for (int i = first; first >= 0 && i <= last; i++) for (String key : bound.references.keySet()) {
-                double value = liveInputs.get(i).get(key), initial = startInputs.get(key);
+                double value = liveInputs.get(i).get(key);
+                double initial = startInputs.get(key);
                 Bound source = bindings.get(indexOf(bindings, bound.references.get(key).substring(0, bound.references.get(key).lastIndexOf('.'))));
                 if (Math.abs(value - initial) <= source.absTolerance() + source.relTolerance() * Math.abs(initial)) continue;
                 require(bound.changing.contains(key), "Kết quả " + bound.references.get(key) + " thay đổi theo thời gian nên không dùng làm đầu vào "
                         + key + " của " + bound.id + " được: định luật này chỉ đúng khi " + key + " không đổi");
                 driven = true;
             }
-            boolean hasReference = math.path("closedForm").isObject() && !math.path("closedForm").isEmpty() && !driven;
+            boolean hasReference = math.path(CLOSED_FORM).isObject() && !math.path(CLOSED_FORM).isEmpty() && !driven;
             allReference &= hasReference;
             Map<String, Double> initialInvariants = new LinkedHashMap<>();
             for (int i = first; first >= 0 && i <= last; i++) {
                 Map<String, Double> sample = samples.get(i);
-                Map<String, Double> reference = hasReference ? evaluateMap(math.path("closedForm"), startInputs,
+                Map<String, Double> reference = hasReference ? evaluateMap(math.path(CLOSED_FORM), startInputs,
                         Map.of("t", coarse.times.get(i) - start)) : fineSample(fine, bound.id, i * 2);
-                if (reference != null) for (String key : sample.keySet()) {
+                if (reference != null) for (Map.Entry<String, Double> output : sample.entrySet()) {
+                    String key = output.getKey();
+                    double value = output.getValue();
                     require(reference.containsKey(key), "Dữ liệu đối chiếu thiếu đầu ra chuẩn: " + key);
-                    double error = Math.abs(sample.get(key) - reference.get(key));
-                    double scale = Math.max(Math.max(Math.abs(sample.get(key)), Math.abs(reference.get(key))), size.getOrDefault(key, 0.0));
+                    double error = Math.abs(value - reference.get(key));
+                    double scale = Math.max(Math.max(Math.abs(value), Math.abs(reference.get(key))), size.getOrDefault(key, 0.0));
                     absoluteError = Math.max(absoluteError, error);
                     relativeError = Math.max(relativeError, error / Math.max(scale, absTolerance > 0 ? absTolerance : Double.MIN_NORMAL));
                     passed &= error <= absTolerance + relTolerance * scale;
                 }
                 if (!driven) {
-                    Map<String, Double> inv = evaluateMap(math.path("invariants"), startInputs, sample);
+                    Map<String, Double> inv = evaluateMap(math.path(INVARIANTS), startInputs, sample);
                     if (i == first) initialInvariants.putAll(inv);
                     for (var invariant : inv.entrySet()) {
                         double baseline = initialInvariants.get(invariant.getKey());
@@ -884,7 +968,8 @@ public class SchemaEquationRuntime {
                         passed &= valid;
                     }
                 }
-                double stencilFrom = i >= 2 ? coarse.times.get(i - 2) : 0, stencilTo = coarse.times.get(Math.min(i + 2, coarse.times.size() - 1));
+                double stencilFrom = i >= 2 ? coarse.times.get(i - 2) : 0;
+                double stencilTo = coarse.times.get(Math.min(i + 2, coarse.times.size() - 1));
                 boolean smooth = coarse.switches.stream().noneMatch(at -> at >= stencilFrom && at <= stencilTo);
                 if (smooth && !byRefinement && i >= first + 2 && i <= last - 2 && coarse.times.get(i - 2) >= start) {
                     for (var rate : coarse.rates.get(bound.id).get(i).entrySet()) {
@@ -899,17 +984,17 @@ public class SchemaEquationRuntime {
                 }
             }
             int declaredBenchmarks = 0;
-            for (JsonNode benchmark : bound.capability.path("validation").path("benchmarks")) {
-                if (startInputs == null || !benchmark.path("expectedOutputs").isObject() || benchmark.path("expectedOutputs").isEmpty()) continue;
+            for (JsonNode benchmark : bound.capability.path(VALIDATION).path("benchmarks")) {
+                if (startInputs == null || !benchmark.path(EXPECTED_OUTPUTS).isObject() || benchmark.path(EXPECTED_OUTPUTS).isEmpty()) continue;
                 Map<String, Double> benchmarkInputs = new LinkedHashMap<>(startInputs);
                 benchmark.path("inputs").fields().forEachRemaining(field -> benchmarkInputs.put(field.getKey(), field.getValue().asDouble()));
-                double benchmarkDuration = benchmark.path("durationSeconds").asDouble(1);
+                double benchmarkDuration = benchmark.path(DURATION_SECONDS).asDouble(1);
                 require(benchmarkDuration > 0 && benchmarkDuration <= maxDuration, "Thời lượng kiểm chuẩn không hợp lệ");
                 int benchmarkSteps = (int) Math.ceil(benchmarkDuration / defaultStep);
                 require(benchmarkSteps <= maxSamples, "Số mẫu kiểm chuẩn vượt quá giới hạn");
                 var benchmarkSamples = integrate(List.of(bound.alone(benchmarkInputs)), benchmarkDuration, benchmarkSteps).outputs.get(bound.id);
                 Map<String, Double> end = benchmarkSamples.get(benchmarkSamples.size() - 1);
-                var expected = benchmark.path("expectedOutputs").fields();
+                var expected = benchmark.path(EXPECTED_OUTPUTS).fields();
                 while (expected.hasNext()) {
                     var field = expected.next();
                     require(end.containsKey(field.getKey()), "Bài kiểm chuẩn tham chiếu đến đầu ra không xác định");
@@ -918,12 +1003,12 @@ public class SchemaEquationRuntime {
                 }
                 declaredBenchmarks++; benchmarksChecked++;
             }
-            boolean hasInvariants = math.path("invariants").isObject() && !math.path("invariants").isEmpty();
+            boolean hasInvariants = math.path(INVARIANTS).isObject() && !math.path(INVARIANTS).isEmpty();
             if (driven) {
                 // the law itself is checked on its own with the inputs it started from; the coupled run by halving the step
                 String law = run(true, List.of(bound.alone(startInputs)), Math.max(coarse.times.get(last) - start, h), Math.max(4, last - first))
-                        .path("validation").path("status").asText();
-                passed &= !law.equals("FLAGGED");
+                        .path(VALIDATION).path(STATUS).asText();
+                passed &= !law.equals(FLAGGED);
                 numericalEvidence &= law.startsWith("VERIFIED") && steps >= 4;
                 evidence.add(bound.id + ": inputs change during the run; the law verified on its own (" + law
                         + "), the coupled run by step refinement h -> h/2 over " + (last - first + 1) + " checkpoints");
@@ -936,7 +1021,7 @@ public class SchemaEquationRuntime {
         }
         boolean staged = bindings.stream().anyMatch(bound -> bound.after != null || bound.until != null);
         ObjectNode timeline = result.putObject("solverTimeline");
-        timeline.put("durationSeconds", staged ? coarse.endTime : duration);
+        timeline.put(DURATION_SECONDS, staged ? coarse.endTime : duration);
         var frames = timeline.putArray("frames");
         int event = 0;
         for (int i = 0; i < coarse.times.size(); i++) {
@@ -954,7 +1039,7 @@ public class SchemaEquationRuntime {
             var breaks = timeline.putArray("breaks");
             coarse.events.forEach(moment -> breaks.add(moment.getKey()));
             if (!coarse.jumped.isEmpty()) {
-                var jumps = timeline.putArray("jumps");
+                var jumps = timeline.putArray(JUMPS);
                 for (var moment : coarse.jumped) { var names = jumps.addObject().put("t", moment.getKey()).putArray("quantities"); moment.getValue().forEach(names::add); }
             }
         }
@@ -966,12 +1051,15 @@ public class SchemaEquationRuntime {
                 if (coarse.end.containsKey(bound.id)) phase.put("end", coarse.end.get(bound.id)); else phase.putNull("end");
             }
         }
-        String status = !passed ? "FLAGGED" : !coverage || !numericalEvidence ? "VISUAL_ONLY_UNVERIFIED"
-                : allReference ? "VERIFIED_ANALYTICAL" : "VERIFIED_NUMERICAL";
+        String status;
+        if (!passed) status = FLAGGED;
+        else if (!coverage || !numericalEvidence) status = "VISUAL_ONLY_UNVERIFIED";
+        else if (allReference) status = "VERIFIED_ANALYTICAL";
+        else status = "VERIFIED_NUMERICAL";
         if (!coverage) flags.add("Một phần nội dung vật lý chưa được liên kết với phương trình thực thi đã phê duyệt.");
         if (!numericalEvidence && !bindings.isEmpty()) flags.add("Minh chứng tính toán số chưa đầy đủ.");
         if (!passed) flags.add("Kết quả đối chiếu hoặc kiểm tra đại lượng bảo toàn không đạt; mô phỏng chưa được xác minh.");
-        validation.put("status", status);
+        validation.put(STATUS, status);
         validation.put("executionMethod", bindings.isEmpty() ? "VISUAL_ONLY" : "NUMERICAL");
         validation.put("solverMethod", "RK4");
         validation.put("verificationMethod", allReference ? "CLOSED_FORM_CHECKPOINTS" : "STEP_REFINEMENT_AND_INVARIANTS");
@@ -992,7 +1080,7 @@ public class SchemaEquationRuntime {
             Map<String, Map<String, Double>> values) {
         ObjectNode frame = frames.addObject();
         frame.put("t", t);
-        ObjectNode fields = frame.putObject("values");
+        ObjectNode fields = frame.putObject(VALUES);
         fields.put("t", t);
         for (Bound bound : bindings) {
             String prefix = bound.id + ".";
@@ -1004,10 +1092,10 @@ public class SchemaEquationRuntime {
 
     private void checkDimensions(JsonNode capability) {
         Map<String, Map<String, Double>> symbols = new LinkedHashMap<>();
-        capability.path("execution").path("math").path("jumps").fields().forEachRemaining(entry -> entry.getValue().forEach(pair -> {
+        capability.path(EXECUTION).path("math").path(JUMPS).fields().forEachRemaining(entry -> entry.getValue().forEach(pair -> {
             Map<String, Map<String, Double>> known = new LinkedHashMap<>();
             known.put("t", Map.of("T", 1.0));
-            for (String group : List.of("canonicalInputs", "outputs")) for (JsonNode quantity : capability.path(group)) known.put(quantity.path("key").asText(), unitDimensions.get(quantity.path("unit").asText()));
+            for (String group : List.of(CANONICAL_INPUTS, OUTPUTS)) for (JsonNode quantity : capability.path(group)) known.put(quantity.path("key").asText(), unitDimensions.get(quantity.path("unit").asText()));
             try {
                 dimension(pair.get(0), known, 0, new int[]{0});
                 Map<String, Double> actual = dimension(pair.get(1), known, 0, new int[]{0});
@@ -1017,13 +1105,13 @@ public class SchemaEquationRuntime {
             }
         }));
         symbols.put("t", Map.of("T", 1.0));
-        for (String group : List.of("canonicalInputs", "outputs")) for (JsonNode quantity : capability.path(group)) {
+        for (String group : List.of(CANONICAL_INPUTS, OUTPUTS)) for (JsonNode quantity : capability.path(group)) {
             String unit = quantity.path("unit").asText();
             require(unitDimensions.containsKey(unit), "Thứ nguyên đơn vị chuẩn không xác định: " + unit);
             symbols.put(quantity.path("key").asText(), unitDimensions.get(unit));
         }
-        JsonNode math = capability.path("execution").path("math");
-        for (String phase : List.of("initial", "rates", "outputs", "closedForm", "invariants")) {
+        JsonNode math = capability.path(EXECUTION).path("math");
+        for (String phase : List.of(INITIAL, RATES, OUTPUTS, CLOSED_FORM, INVARIANTS)) {
             var equations = math.path(phase).fields();
             while (equations.hasNext()) {
                 var equation = equations.next();
@@ -1033,22 +1121,22 @@ public class SchemaEquationRuntime {
                 } catch (ApiException error) {
                     // say which equation, so its author can correct it
                     throw ApiException.unprocessable(error.getMessage() + " (trong phương trình của " + equation.getKey()
-                            + (phase.equals("rates") ? ", tốc độ biến thiên" : phase.equals("initial") ? ", giá trị ban đầu" : "") + ")");
+                            + phaseNote(phase, ", tốc độ biến thiên", ", giá trị ban đầu") + ")");
                 }
-                if (!phase.equals("invariants")) {
+                if (!phase.equals(INVARIANTS)) {
                     require(symbols.containsKey(equation.getKey()), "Đơn vị của trạng thái hoặc đầu ra chưa được khai báo: " + equation.getKey());
                     Map<String, Double> expected = symbols.get(equation.getKey());
-                    if (phase.equals("rates")) expected = combine(expected, Map.of("T", 1.0), -1);
+                    if (phase.equals(RATES)) expected = combine(expected, Map.of("T", 1.0), -1);
                     require(actual == null || actual.equals(expected), "Hai vế không cùng thứ nguyên trong phương trình của " + equation.getKey()
-                            + (phase.equals("rates") ? " (tốc độ biến thiên phải có đơn vị của đại lượng chia cho giây)" : phase.equals("initial") ? " (giá trị ban đầu)" : "")
+                            + phaseNote(phase, " (tốc độ biến thiên phải có đơn vị của đại lượng chia cho giây)", " (giá trị ban đầu)")
                             + ": đơn vị khai báo không khớp với biểu thức");
                 }
             }
         }
     }
 
-    private static final Set<String> UNARY = Set.of("neg", "sin", "cos", "tan", "sqrt", "exp", "abs", "log", "asin", "acos", "atan", "sign", "floor", "latched");
-    private static final Set<String> BINARY = Set.of("add", "sub", "mul", "div", "pow", "min", "max", "atan2", "mod");
+    private static final Set<String> UNARY = Set.of("neg", "sin", "cos", "tan", "sqrt", "exp", "abs", "log", "asin", "acos", "atan", "sign", OP_FLOOR, OP_LATCHED);
+    private static final Set<String> BINARY = Set.of("add", "sub", "mul", "div", "pow", "min", "max", OP_ATAN2, "mod");
 
     /** Operand count of an operator: one, two, or three for "if" (condition, value when positive, value otherwise). */
     private static int arity(String op) {
@@ -1079,10 +1167,10 @@ public class SchemaEquationRuntime {
                 if (a != null) a.forEach((key, value) -> { if (value * exponent != 0) result.put(key, value * exponent); });
                 yield result;
             }
-            case "sin", "cos", "tan", "exp", "log", "asin", "acos", "atan", "floor" -> {
+            case "sin", "cos", "tan", "exp", "log", "asin", "acos", "atan", OP_FLOOR -> {
                 require(a == null || a.isEmpty(), "Đầu vào hàm siêu việt phải không có thứ nguyên; góc dùng đơn vị radian"); yield Map.of(); }
-            case "sign", "latched" -> Map.of();
-            case "atan2" -> { require(a == null || b == null || a.equals(b), "Hai thành phần của atan2 phải cùng thứ nguyên"); yield Map.of(); }
+            case "sign", OP_LATCHED -> Map.of();
+            case OP_ATAN2 -> { require(a == null || b == null || a.equals(b), "Hai thành phần của atan2 phải cùng thứ nguyên"); yield Map.of(); }
             case "if" -> {
                 Map<String, Double> otherwise = dimension(ast.get(3), symbols, depth + 1, nodes);
                 require(b == null || otherwise == null || b.equals(otherwise), "Hai nhánh của điều kiện phải cùng thứ nguyên");
@@ -1139,7 +1227,7 @@ public class SchemaEquationRuntime {
         require(ast.size() == arity(op) + 1, "Số toán hạng trong biểu thức không hợp lệ");
         double a = evaluate(ast.get(1), lookup, depth + 1, nodes);
         // only the chosen branch of a condition is evaluated, so the other may be undefined there
-        Integer held = (op.equals("if") || op.equals("sign") || op.equals("latched")) && lookup instanceof Scope scope ? scope.side(ast.get(1)) : null;
+        Integer held = (op.equals("if") || op.equals("sign") || op.equals(OP_LATCHED)) && lookup instanceof Scope scope ? scope.side(ast.get(1)) : null;
         if (op.equals("if")) return evaluate(ast.get((held != null ? held > 0 : a > 0) ? 2 : 3), lookup, depth + 1, nodes);
         if (held != null) return held;
         double b = ast.size() > 2 ? evaluate(ast.get(2), lookup, depth + 1, nodes) : 0;
@@ -1147,12 +1235,18 @@ public class SchemaEquationRuntime {
             case "add" -> a + b;
             case "sub" -> a - b;
             case "mul" -> a * b;
-            case "div" -> a / b;
+            case "div" -> {
+                if (b == 0) throw ApiException.unprocessable(NOT_FINITE);
+                yield a / b;
+            }
             case "pow" -> Math.pow(a, b);
             case "min" -> Math.min(a, b);
             case "max" -> Math.max(a, b);
-            case "atan2" -> Math.atan2(a, b);
-            case "mod" -> a - b * Math.floor(a / b);
+            case OP_ATAN2 -> Math.atan2(a, b);
+            case "mod" -> {
+                if (b == 0) throw ApiException.unprocessable(NOT_FINITE);
+                yield a - b * Math.floor(a / b);
+            }
             case "neg" -> -a;
             case "sin" -> Math.sin(a);
             case "cos" -> Math.cos(a);
@@ -1165,12 +1259,19 @@ public class SchemaEquationRuntime {
             case "acos" -> Math.acos(a);
             case "atan" -> Math.atan(a);
             case "sign" -> Math.signum(a);
-            case "latched" -> a > 0 ? 1 : 0;
-            case "floor" -> Math.floor(a);
+            case OP_LATCHED -> a > 0 ? 1 : 0;
+            case OP_FLOOR -> Math.floor(a);
             default -> throw ApiException.unprocessable("Phép toán số học không được hỗ trợ: " + op);
         };
-        require(Double.isFinite(value), "Phương trình trả về giá trị không xác định hoặc vô hạn");
+        require(Double.isFinite(value), NOT_FINITE);
         return value;
+    }
+
+    /** The note that names which part of an equation a message is about. */
+    private static String phaseNote(String phase, String ratesNote, String initialNote) {
+        if (phase.equals(RATES)) return ratesNote;
+        if (phase.equals(INITIAL)) return initialNote;
+        return "";
     }
 
     private static void require(boolean condition, String message) {

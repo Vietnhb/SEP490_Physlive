@@ -24,6 +24,7 @@ public final class SchemaContracts {
                     schema.getLifecycleStatus(), schema.getRecordVersion(), schema.getCreatedAt(), schema.getUpdatedAt());
         }
     }
+    public record TopicName(String topic, String name, LifecycleStatus lifecycleStatus) {}
     public record ModuleRelease(UUID id, String topic, String moduleName, String schemaId,
                                 String schemaVersion, LifecycleStatus lifecycleStatus) {
         public static ModuleRelease from(SchemaVersion schema) {

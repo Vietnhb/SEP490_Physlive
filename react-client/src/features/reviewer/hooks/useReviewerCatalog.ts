@@ -22,7 +22,7 @@ function buildMaps(data: Version[]): Maps {
     return { topics, quantities };
 }
 
-const prettyKey = (key: string) => key.replace(/_/g, " ");
+const prettyKey = (key: string) => key.replaceAll("_", " ");
 
 export function useReviewerCatalog(): ReviewerCatalog {
   const { data } = useResource<Version[]>("/schemas");
@@ -32,7 +32,7 @@ export function useReviewerCatalog(): ReviewerCatalog {
     topicName: code => !code ? "" : maps?.topics.get(code) ?? code,
     quantityLabel,
     // Replace snake_case quantity keys inside AI-generated sentences, e.g. "đại lượng initial_position".
-    humanize: text => !text ? "" : text.replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g, key => {
+    humanize: text => !text ? "" : text.replaceAll(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g, key => {
       const label = maps?.quantities.get(key);
       return label ? `“${label}”` : `“${prettyKey(key)}”`;
     }),

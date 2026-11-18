@@ -28,6 +28,12 @@ public class SchemaController {
         return schemaService.listVisible(enabledOnly);
     }
 
+    /** Topic code → name only (a few KB), for screens that just label topics; the full list carries every definition. */
+    @GetMapping("/topic-names")
+    public List<SchemaContracts.TopicName> topicNames() {
+        return schemaService.topicNames();
+    }
+
     @GetMapping("/{schemaId}")
     public SchemaContracts.Response get(@PathVariable String schemaId) {
         return SchemaContracts.Response.from(schemaService.get(schemaId));

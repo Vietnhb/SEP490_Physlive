@@ -24,7 +24,7 @@ export function TopicDefinitionForm({ value, sharedCatalogue, onChange }: Readon
   return <div className="reviewer-form-sections">
     <label className="reviewer-field"><span>Mô tả chủ đề</span><TextArea size="2" rows={3} placeholder="Chủ đề này bao gồm những hiện tượng nào?" value={typeof value.description === "string" ? value.description : ""} onChange={event => set("description", event.target.value)} /></label>
     <section className="reviewer-law-section"><Heading as="h3" size="4">Định luật dùng để xác minh mô phỏng</Heading>
-      <Text as="p" size="2" color="gray" mb="3">AI viết mô hình theo mô tả của giáo viên; hệ thống tính rồi đối chiếu kết quả với từng định luật dưới đây. Khi mục “Định luật còn thiếu” báo có đại lượng chưa được kiểm, hãy thêm định luật tương ứng ở đây.</Text>
+      <Text as="p" size="2" color="gray" mb="3">Kết quả mô phỏng được đối chiếu với các định luật dưới đây. Thiếu định luật nào thì thêm tại đây.</Text>
       <LawBook value={value.lawCatalogue && typeof value.lawCatalogue === "object" && !Array.isArray(value.lawCatalogue) ? value.lawCatalogue as Definition : {}} shared={sharedCatalogue} onChange={next => set("lawCatalogue", next)} />
     </section>
     <details className="reviewer-disclosure"><summary>Vật và đại lượng thường gặp trong đề bài (gợi ý cho AI)</summary>

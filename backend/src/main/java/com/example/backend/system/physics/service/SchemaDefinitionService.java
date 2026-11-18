@@ -81,7 +81,7 @@ public class SchemaDefinitionService {
         }
         JsonNode metaVersion = definition.path("metaSchemaVersion");
         if (metaVersion.isTextual() && !metaVersion.asText().isBlank()
-                && !metaVersion.asText().matches("[0-9]+\\.[0-9]+")) {
+                && !metaVersion.asText().matches("\\d+\\.\\d+")) {
             throw new SchemaCompilationException("Topic definition metaSchemaVersion must use MAJOR.MINOR format");
         }
     }

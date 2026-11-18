@@ -51,7 +51,7 @@ export function RowsEditor({ rows, columns, onChange, addLabel, empty }: Readonl
   };
   return <div className="reviewer-rows">
     {rows.length === 0 && <Text as="p" size="2" color="gray" className="reviewer-rows-empty">{empty}</Text>}
-    {rows.length > 0 && <table className="reviewer-mini-table reviewer-edit-table"><thead><tr>{columns.map(column => <th key={column.key} style={column.width ? { width: column.width } : undefined}>{column.label}</th>)}<th aria-label="Thao tác" style={{ width: 44 }} /></tr></thead><tbody>
+    {rows.length > 0 && <table className="reviewer-mini-table reviewer-edit-table"><thead><tr>{columns.map(column => <th key={column.key} style={column.width ? { width: column.width } : undefined}>{column.label}</th>)}<th style={{ width: 80 }}>Thao tác</th></tr></thead><tbody>
       {rows.map((row, index) => <tr key={index}>{columns.map(column => column.type === "flag"
         ? <td key={column.key}><input type="checkbox" aria-label={column.label} checked={row[column.key] === true} onChange={event => onChange(rows.map((item, i) => {
           if (i !== index) return item;

@@ -1,3 +1,4 @@
+import PageActions from "../../../shared/layout/PageActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useMemo, useState } from "react";
 import axios from "axios";
@@ -5,6 +6,7 @@ import { Button, Card, Heading, SegmentedControl, Text, TextArea } from "@radix-
 import { resolveComplaint, type SimulationComplaint, type SupportStatus } from "../../support/api/supportApi";
 import { COMPLAINT_STATUS } from "../../support/model/complaintStatus";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 type Filter = "todo" | "done";
 
@@ -37,7 +39,7 @@ export function ComplaintsDesk() {
       const updated = await resolveComplaint(item.id, status, response || undefined);
       setItems(current => current.map(value => value.id === updated.id ? updated : value));
       setDrafts(current => ({ ...current, [item.id]: "" }));
-      setNotice("Đã lưu kết quả kiểm tra. Manager và người gửi có thể xem phản hồi.");
+      setNotice("Đã lưu kết quả kiểm tra. Bộ phận vận hành và người gửi có thể xem phản hồi.");
     } catch (cause) {
       const message = axios.isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
       setActionError({ id: item.id, message: message || "Chưa lưu được. Vui lòng thử lại." });
@@ -47,10 +49,10 @@ export function ComplaintsDesk() {
   return <div className="reviewer-stack">
     <div className="reviewer-toolbar">
       <div style={{ flex: 1, minWidth: 0 }}>
-        <Heading as="h1" size="6">Khiếu nại mô phỏng</Heading>
+        <Heading as="h1" className="admin-content-title" size="6">Khiếu nại mô phỏng</Heading>
         <Text as="p" size="2" color="gray" mt="1">Các báo lỗi mô phỏng do giáo viên gửi trực tiếp. Hãy kiểm tra, phản hồi và đánh dấu khi đã giải quyết.</Text>
       </div>
-      <Button variant="soft" color="gray" onClick={() => void load()} disabled={loading}>Làm mới</Button>
+      <PageActions><RefreshButton onClick={() => void load()} disabled={loading} /></PageActions>
     </div>
     <div className="reviewer-toolbar">
       <SegmentedControl.Root value={filter} onValueChange={value => setFilter(value as Filter)}>

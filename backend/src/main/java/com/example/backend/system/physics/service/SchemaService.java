@@ -28,6 +28,16 @@ public class SchemaService {
                 .map(SchemaContracts.Response::from).toList();
     }
 
+    /** The names screens show for topic codes; the same versions as {@link #listVisible}, only three columns of each. */
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.TopicName> topicNames() {
+        boolean privileged = access.canEditContext(currentUser.requireCurrentUser());
+        return schemaRepository.findTopicNames().stream()
+                .filter(row -> privileged || row.getLifecycleStatus() == LifecycleStatus.APPROVED)
+                .map(row -> new SchemaContracts.TopicName(row.getTopic(), row.getName(), row.getLifecycleStatus()))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<SchemaVersion> list(boolean enabledOnly) {
         return enabledOnly

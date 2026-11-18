@@ -1,6 +1,5 @@
 package com.example.backend.system.reviewer.dto;
 
-import com.example.backend.system.reviewer.model.entity.Adjudication;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

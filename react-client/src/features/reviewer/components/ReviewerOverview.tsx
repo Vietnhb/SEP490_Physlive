@@ -5,6 +5,7 @@ import type { ReviewerAccess, ReviewerView } from "../model/reviewerAccess";
 import type { Version } from "../model/reviewerTypes";
 import { timeAgo } from "../model/reviewerUtils";
 import { ReviewerIcon, ReviewerRefresh, type ReviewerIconName } from "./ReviewerKit";
+import { compareCodeUnits } from "../../../shared/lib/compareText";
 
 type PendingItem = { createdAt?: string };
 type Counts = {
@@ -23,10 +24,10 @@ function useOverview(access: ReviewerAccess) {
   const gapsResource = useResource<{ occurrences: number }[]>("/reviewer/law-gaps?status=OPEN", access.canEdit);
   const library = libraryResource.data, complaints = complaintsResource.data, schemas = schemasResource.data, gaps = gapsResource.data;
   const counts: Counts = {};
-  if (access.canReview && library) counts.moderation = { pending: library.length, oldest: library.map(item => item.createdAt).filter(Boolean).sort()[0] };
+  if (access.canReview && library) counts.moderation = { pending: library.length, oldest: library.map(item => item.createdAt).filter((date): date is string => Boolean(date)).sort(compareCodeUnits)[0] };
   if (canHandleComplaints && complaints) {
     const open = complaints.filter(item => item.status !== "RESOLVED");
-    counts.complaints = { open: open.length, oldest: open.map(item => item.createdAt).filter(Boolean).sort()[0] };
+    counts.complaints = { open: open.length, oldest: open.map(item => item.createdAt).filter((date): date is string => Boolean(date)).sort(compareCodeUnits)[0] };
   }
   if (access.canEdit) {
     counts.drafts = schemas?.filter(item => item.lifecycleStatus === "DRAFT").length ?? 0;
@@ -43,7 +44,7 @@ export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: Re
   const tasks: Task[] = [];
   if (counts.moderation) tasks.push({ id: "moderation", view: "moderation", icon: "library", count: counts.moderation.pending, title: "Mô phỏng chờ duyệt", detail: counts.moderation.pending ? `Giáo viên gửi lên thư viện công khai${counts.moderation.oldest ? ` · cũ nhất ${timeAgo(counts.moderation.oldest)}` : ""}.` : "Không có mô phỏng nào đang chờ.", action: "Bắt đầu duyệt" });
   if (counts.complaints) tasks.push({ id: "complaints", view: "complaints", icon: "message", count: counts.complaints.open, title: "Khiếu nại mô phỏng", detail: counts.complaints.open ? `Giáo viên báo mô phỏng tính sai hoặc lệch đề bài${counts.complaints.oldest ? ` · cũ nhất ${timeAgo(counts.complaints.oldest)}` : ""}.` : "Không có khiếu nại nào đang chờ xử lý.", action: "Xem khiếu nại" });
-  if (counts.gaps) tasks.push({ id: "gaps", view: "gaps", icon: "benchmark", count: counts.gaps.open, title: "Định luật còn thiếu", detail: counts.gaps.open ? `${counts.gaps.open} loại đại lượng chưa có định luật kiểm, gặp ${counts.gaps.met} lần trong mô phỏng của giáo viên.` : "Mọi đại lượng giáo viên dùng đều đã có định luật kiểm.", action: "Xem danh sách" });
+  if (counts.gaps) tasks.push({ id: "gaps", view: "gaps", icon: "benchmark", count: counts.gaps.open, title: "Định luật cần rà soát", detail: counts.gaps.open ? `${counts.gaps.open} mục định luật chưa áp dụng được, gặp ${counts.gaps.met} lần trong mô phỏng của giáo viên.` : "Mọi đại lượng giáo viên dùng đều đã được định luật kiểm.", action: "Xem danh sách" });
   if (counts.drafts !== undefined) {
     tasks.push({ id: "drafts", view: "topics", icon: "schema", count: counts.drafts, title: "Bản nháp chờ phê duyệt", detail: counts.drafts ? `${counts.drafts} bản nháp chủ đề vật lý đang chờ kiểm tra và phê duyệt phát hành.` : "Không có bản nháp chủ đề nào tồn đọng.", action: "Xem chủ đề" });
   }
@@ -76,7 +77,7 @@ export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: Re
         {canHandleComplaints && <li><ReviewerIcon name="message" size={16} /><span><strong>Hỗ trợ giáo viên</strong> — kiểm tra và phản hồi khi giáo viên báo mô phỏng tính sai hoặc không đúng đề bài.</span></li>}
         {access.canEdit && <li><ReviewerIcon name="edit" size={16} /><span><strong>Biên soạn dữ liệu chuẩn</strong> — quản lý vai trò, định luật của từng chủ đề và bổ sung định luật còn thiếu.</span></li>}
       </ul>
-      {!access.isManager && (!access.canEdit || !access.canReview) && <Text as="p" size="2" color="gray">Cần thêm quyền? Liên hệ bộ phận vận hành (Manager) để được cấp.</Text>}
+      {!access.isManager && (!access.canEdit || !access.canReview) && <Text as="p" size="2" color="gray">Cần thêm quyền? Liên hệ bộ phận vận hành để được cấp.</Text>}
     </Card>
   </div>;
 }

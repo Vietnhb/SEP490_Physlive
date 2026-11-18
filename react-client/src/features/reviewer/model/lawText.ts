@@ -30,7 +30,7 @@ export function print(ast: Ast): string {
 }
 
 /** Squares and cubes as a reader expects them; only for showing, never typed back. */
-export const pretty = (text: string) => text.replace(/\^2(?!\d)/g, "²").replace(/\^3(?!\d)/g, "³");
+export const pretty = (text: string) => text.replaceAll(/\^2(?!\d)/g, "²").replaceAll(/\^3(?!\d)/g, "³");
 
 export function relationOf(law: Record<string, unknown>): Relation | null {
   const sides = (law.equal ?? law.atMost) as unknown;
@@ -62,7 +62,7 @@ class Unreadable extends Error {}
 
 /** Reads one side of a law. Throws Unreadable with a sentence the reviewer can act on. */
 export function parse(text: string): Ast {
-  const tokens = text.replace(/²/g, "^2").replace(/³/g, "^3").match(/\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[\p{L}_][\p{L}\p{N}_]*|\S/gu) ?? [];
+  const tokens = text.replaceAll("²", "^2").replaceAll("³", "^3").match(/\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[\p{L}_][\p{L}\p{N}_]*|\S/gu) ?? [];
   let at = 0;
   const peek = () => tokens[at];
   const take = (expected?: string) => {
@@ -108,7 +108,7 @@ export function parse(text: string): Ast {
 
 /** "m·a = ΣF" or "Pu ≤ P" → the relation, or the reason it cannot be read. */
 export function parseRelation(text: string): Relation | string {
-  const parts = text.replace(/<=/g, "≤").split(/([=≤])/);
+  const parts = text.replaceAll("<=", "≤").split(/([=≤])/);
   if (parts.length !== 3) return parts.length < 3 ? "Công thức cần có dấu = (hoặc ≤) giữa hai vế." : "Chỉ dùng một dấu = hoặc ≤.";
   try { return { sign: parts[1] as "=" | "≤", left: parse(parts[0]), right: parse(parts[2]) }; }
   catch (problem) { if (problem instanceof Unreadable) return problem.message; throw problem; }
@@ -120,9 +120,18 @@ export const plainName = (description: unknown, fallback: string) => {
   return text || fallback;
 };
 
+/** The text without the underscores at its two ends. */
+const trimUnderscores = (text: string) => {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "_") start++;
+  while (end > start && text[end - 1] === "_") end--;
+  return text.slice(start, end);
+};
+
 /** A code the system can keep from a Vietnamese name: "Tốc độ góc" → "toc_do_goc". */
 export const codeFrom = (name: string, taken: Iterable<string>) => {
-  const base = name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "muc";
+  const base = trimUnderscores(name.normalize("NFD").replaceAll(/[̀-ͯ]/g, "").replaceAll("đ", "d").replaceAll("Đ", "D").toLowerCase().replaceAll(/[^a-z0-9]+/g, "_")).slice(0, 40) || "muc";
   const used = new Set(taken);
   let code = base;
   for (let n = 2; used.has(code); n++) code = `${base}_${n}`;

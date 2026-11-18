@@ -16,6 +16,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import static com.example.backend.system.physics.model.SpecKeys.TOPIC;
 
 /** Publishes the curriculum-aligned topic schemas compiled from schemas/library + schemas/topics. */
 @Component
@@ -75,7 +76,7 @@ public class PhysicsCatalogInitializer implements CommandLineRunner {
             throw new IllegalStateException("Catalog template has no definition: " + id + "@" + version);
         }
         object.put("model", entry.path("model").asText());
-        schemaDefinitions.validateDefinition(definition, id, version, entry.path("topic").asText());
+        schemaDefinitions.validateDefinition(definition, id, version, entry.path(TOPIC).asText());
         String checksum = schemaDefinitions.compiledChecksum(definition);
 
         var published = schemaRepository.findFirstBySchemaIdAndVersion(id, version);
@@ -83,7 +84,7 @@ public class PhysicsCatalogInitializer implements CommandLineRunner {
             SchemaVersion schema = new SchemaVersion();
             schema.setSchemaId(id);
             schema.setName(entry.path("name").asText());
-            schema.setTopic(entry.path("topic").asText());
+            schema.setTopic(entry.path(TOPIC).asText());
             schema.setVersion(version);
             schema.setDefinition(definition);
             schema.setDefinitionChecksum(checksum);
@@ -94,7 +95,7 @@ public class PhysicsCatalogInitializer implements CommandLineRunner {
 
         SchemaVersion existing = published.orElseThrow();
         existing.setName(entry.path("name").asText());
-        existing.setTopic(entry.path("topic").asText());
+        existing.setTopic(entry.path(TOPIC).asText());
         existing.setDefinition(definition);
         existing.setDefinitionChecksum(checksum);
         existing.setLifecycleStatus(LifecycleStatus.APPROVED);

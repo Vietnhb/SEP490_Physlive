@@ -20,6 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import static com.example.backend.system.physics.model.SpecKeys.OBJECTS;
+import static com.example.backend.system.physics.model.SpecKeys.RELATIONS;
 
 @Service
 @RequiredArgsConstructor
@@ -169,7 +171,7 @@ public class BenchmarkReviewService {
     /** Row order and blank cells are presentation details; two experts agree when the rows match as sets. */
     private static java.util.Map<String, java.util.List<String>> canonical(JsonNode specification) {
         java.util.Map<String, java.util.List<String>> sections = new java.util.TreeMap<>();
-        for (String section : List.of("objects", QUANTITIES, "relations")) {
+        for (String section : List.of(OBJECTS, QUANTITIES, RELATIONS)) {
             List<String> rows = new ArrayList<>();
             for (JsonNode row : specification == null ? com.fasterxml.jackson.databind.node.MissingNode.getInstance() : specification.path(section)) {
                 java.util.Map<String, String> cells = new java.util.TreeMap<>();
@@ -190,14 +192,14 @@ public class BenchmarkReviewService {
 
     private void validate(JsonNode specification) {
         if (specification == null || !specification.isObject()
-                || !specification.path("objects").isArray()
+                || !specification.path(OBJECTS).isArray()
                 || !specification.path(QUANTITIES).isArray()
-                || !specification.path("relations").isArray()) {
+                || !specification.path(RELATIONS).isArray()) {
             throw ApiException.badRequest("Đáp án phải gồm ba bảng: đối tượng, đại lượng và quan hệ.");
         }
-        if (specification.path("objects").size() > 256
+        if (specification.path(OBJECTS).size() > 256
                 || specification.path(QUANTITIES).size() > 512
-                || specification.path("relations").size() > 1024) {
+                || specification.path(RELATIONS).size() > 1024) {
             throw ApiException.badRequest("Đáp án có quá nhiều dòng.");
         }
         List<String> names = new ArrayList<>();

@@ -44,7 +44,7 @@ export default function ReviewerLayout() {
   if (canHandleComplaints) groups.push({ label: "Hỗ trợ giáo viên", items: [{ to: "/reviewer/complaints", label: "Khiếu nại mô phỏng", icon: "message", badge: openComplaints }] });
   if (access.canEdit) groups.push({ label: "Biên soạn dữ liệu chuẩn", items: [
     { to: "/reviewer/topics", label: "Chủ đề vật lý", icon: "atom" },
-    { to: "/reviewer/gaps", label: "Định luật còn thiếu", icon: "chart", badge: openGaps },
+    { to: "/reviewer/gaps", label: "Định luật cần rà soát", icon: "chart", badge: openGaps },
   ] });
   if (access.isManager) groups.push({ label: "Vận hành", items: [{ to: "/manager", label: "Về trang vận hành", icon: "back" }] });
 
@@ -52,7 +52,7 @@ export default function ReviewerLayout() {
     {!access.canEdit && !access.canReview
       ? <div className="reviewer-blocked"><Card size="4"><span className="reviewer-empty-icon"><ReviewerIcon name="lock" size={28} /></span>
           <Heading as="h1" size="5" mt="3">Tài khoản chưa được cấp quyền</Heading>
-          <Text as="p" color="gray" mt="2">Tài khoản kiểm duyệt cần ít nhất một quyền: <strong>kiểm duyệt nội dung</strong> hoặc <strong>biên soạn dữ liệu chuẩn</strong>. Hãy liên hệ bộ phận vận hành (Manager) để được cấp quyền.</Text>
+          <Text as="p" color="gray" mt="2">Tài khoản kiểm duyệt cần ít nhất một quyền: <strong>kiểm duyệt nội dung</strong> hoặc <strong>biên soạn dữ liệu chuẩn</strong>. Hãy liên hệ bộ phận vận hành để được cấp quyền.</Text>
         </Card></div>
       : <Outlet context={{ access } satisfies ReviewerContext} />}
   </AppSidebarLayout>;

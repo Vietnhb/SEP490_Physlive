@@ -1,3 +1,5 @@
+import PageActions from "../../../shared/layout/PageActions";
+import RowActions from "../../../shared/ui/RowActions";
 import { useMemo, useState, type ReactNode } from "react";
 import { Badge, Button, Card, Heading, SegmentedControl, Table, Text } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
@@ -121,8 +123,8 @@ export function VersionsTab() {
       </SegmentedControl.Root>
       <ReviewerSearch aria-label={`Tìm ${noun}`} placeholder="Tìm tên hoặc mã chủ đề" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }} />
       <ReviewerRefresh refresh={resource.refresh} loading={resource.loading} />
-      <Button type="button" size="2" onClick={() => setEditor({ clone: false })}><ReviewerIcon name="add" size={16} />Thêm chủ đề</Button>
     </div>
+    <PageActions><Button type="button" size="2" onClick={() => setEditor({ clone: false })}><ReviewerIcon name="add" size={16} />Thêm chủ đề</Button></PageActions>
     <LoadState {...resource} headers={["Chủ đề", "Phiên bản", "Trạng thái", "Thao tác"]} />{action.feedback}
 
     {!resource.loading && <>
@@ -134,9 +136,18 @@ export function VersionsTab() {
             <Table.Cell>v{version.version}<small>{formatDate(version.createdAt)}</small></Table.Cell>
             <Table.Cell><ReviewStatus status={version.lifecycleStatus} /></Table.Cell>
             <Table.Cell><div className="reviewer-actions reviewer-actions-end">
-              {version.lifecycleStatus === "DRAFT" && <><Button type="button" variant="soft" color="gray" size="2" onClick={() => setEditor({ version, clone: false })}>Sửa</Button><Button type="button" size="2" onClick={() => setDecision({ version, status: "APPROVED" })}>Phê duyệt</Button><Button type="button" variant="soft" color="red" size="2" onClick={() => setDecision({ version, status: "DELETE" })}>Xoá</Button></>}
-              {version.lifecycleStatus === "APPROVED" && <><Button type="button" variant="soft" size="2" onClick={() => setEditor({ version, clone: true })}>Tạo phiên bản mới</Button><Button type="button" variant="soft" color="gray" size="2" onClick={() => setDecision({ version, status: "RETIRED" })}>Ngừng dùng</Button></>}
-              {version.lifecycleStatus === "RETIRED" && <Button type="button" variant="soft" color="gray" size="2" onClick={() => setEditor({ version, clone: true })}>Nhân bản</Button>}
+              <RowActions subject={version.name || version.schemaId} actions={[
+                ...(version.lifecycleStatus === "DRAFT" ? [
+                  { label: "Sửa", onSelect: () => setEditor({ version, clone: false }) },
+                  { label: "Phê duyệt", onSelect: () => setDecision({ version, status: "APPROVED" }) },
+                  { label: "Xoá", danger: true, onSelect: () => setDecision({ version, status: "DELETE" }) },
+                ] : []),
+                ...(version.lifecycleStatus === "APPROVED" ? [
+                  { label: "Tạo phiên bản mới", onSelect: () => setEditor({ version, clone: true }) },
+                  { label: "Ngừng dùng", danger: true, onSelect: () => setDecision({ version, status: "RETIRED" }) },
+                ] : []),
+                ...(version.lifecycleStatus === "RETIRED" ? [{ label: "Nhân bản", onSelect: () => setEditor({ version, clone: true }) }] : []),
+              ]} />
             </div></Table.Cell>
           </Table.Row>)}
           {!resource.loading && !resource.error && rows.length === 0 && <Table.Row><Table.Cell colSpan={4} className="reviewer-table-empty">{query || filter !== "ALL" ? `Không có ${noun} phù hợp.` : `Chưa có ${noun} nào. Bấm “Thêm chủ đề” để bắt đầu.`}</Table.Cell></Table.Row>}
