@@ -64,7 +64,7 @@ export default function PlanCard({
           <dd>{count(plan.studentQuota)}</dd>
         </div>
         <div>
-          <dt>Token AI / tháng</dt>
+          <dt>Hạn mức AI / tháng (token)</dt>
           <dd>
             {plan.monthlyTokenQuota === null
               ? "Không giới hạn"
@@ -81,7 +81,7 @@ export default function PlanCard({
         </li>
       </ul>
       <span className={s.select}>
-        {selected ? "Đã chọn gói" : "Chọn gói này"}
+        {selected ? "Đã chọn gói" : disabled ? "Không chọn được" : "Chọn gói này"}
       </span>
     </motion.label>
   );

@@ -1,9 +1,4 @@
 .reports { display: grid; gap: 20px; min-width: 0; }
-.reportToolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--gray-11); font-size: 13px; }
-.summary { gap: 14px; margin: 0; }
-.summary :global(.admin-stat-card) { min-height: 132px; padding: 20px; }
-.summary :global(.admin-stat-card) p { margin-bottom: 8px; }
-.summary :global(.admin-stat-card) strong { font-size: 30px; }
 .dataPanel, .licencePanel { min-width: 0; margin: 0; overflow: hidden; }
 .dataPanel :global(.admin-panel-heading), .licencePanel :global(.admin-panel-heading) { margin-bottom: 18px; gap: 16px; }
 .licenceGrid { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 24px; }
@@ -44,5 +39,4 @@
 }
 @media (max-width: 500px) {
   .tokenToolbar { grid-template-columns: 1fr; }
-  .reportToolbar { align-items: flex-start; }
 }

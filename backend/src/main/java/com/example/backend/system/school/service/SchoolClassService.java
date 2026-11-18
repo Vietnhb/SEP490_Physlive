@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class SchoolClassService {
+    private static final String SCHOOL_NOT_FOUND = "Không tìm thấy trường.";
     private final SchoolClassRepository classes;
     private final ClassEnrollmentRepository enrollments;
     private final ClassTeacherAssignmentRepository teacherAssignments;
@@ -159,7 +160,7 @@ public class SchoolClassService {
             throw ApiException.forbidden("Chỉ SCHOOL được tạo lớp học.");
         requireWriteAccess(schoolId);
         School school = schools.findByIdForUpdate(schoolId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+                .orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         entityManager.refresh(school, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         String name = clean(request.name());
         String year = clean(request.schoolYear());
@@ -190,7 +191,7 @@ public class SchoolClassService {
     @Transactional
     public void archive(UUID schoolId, UUID classId) {
         requireWriteAccess(schoolId);
-        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass schoolClass = activeClassInSchool(schoolId, classId);
         schoolClass.setIsActive(false); classes.save(schoolClass);
         teacherAssignments.findByClassIdAndIsActiveTrue(classId).forEach(item -> { item.setIsActive(false); teacherAssignments.save(item); });
@@ -200,7 +201,7 @@ public class SchoolClassService {
     @Transactional
     public ClassSummary restore(UUID schoolId, UUID classId) {
         requireWriteAccess(schoolId);
-        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass schoolClass = classInSchool(schoolId, classId);
         if (!Boolean.TRUE.equals(schoolClass.getIsActive())) {
             // Old memberships remain closed: people may have joined a different class since archiving.
@@ -215,7 +216,7 @@ public class SchoolClassService {
         requireWriteAccess(schoolId);
         // Serialize manual and CSV assignments so each class keeps at most one teacher.
         schools.findByIdForUpdate(schoolId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+                .orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass schoolClass = activeClassInSchool(schoolId, classId);
         User teacher = userInSchool(schoolId, teacherId, RoleName.STAFF.name());
         if (!accountAccess.canTeach(teacher))
@@ -265,7 +266,7 @@ public class SchoolClassService {
     private Enrollment enrollStudentInternal(UUID schoolId, UUID classId, Integer studentId) {
         requireWriteAccess(schoolId);
         School school = schools.findByIdForUpdate(schoolId)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+                .orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass schoolClass = activeClassInSchool(schoolId, classId);
         User student = userInSchool(schoolId, studentId, RoleName.STUDENT.name());
         Optional<ClassEnrollment> activeEnrollment = enrollments.findActiveEnrollment(studentId, schoolClass.getSchoolYear());
@@ -291,7 +292,7 @@ public class SchoolClassService {
     @Transactional
     public Enrollment transferStudent(UUID schoolId, UUID targetClassId, Integer studentId) {
         requireWriteAccess(schoolId);
-        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường."));
+        schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass target = activeClassInSchool(schoolId, targetClassId);
         User student = userInSchool(schoolId, studentId, RoleName.STUDENT.name());
         enrollments.findActiveEnrollment(studentId, target.getSchoolYear()).ifPresent(existing -> {

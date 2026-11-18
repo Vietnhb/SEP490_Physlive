@@ -1,5 +1,6 @@
 import { Badge, Button, Callout, Card, Heading, Text } from "@radix-ui/themes";
 import { motion, useReducedMotion } from "motion/react";
+import type { ReactNode } from "react";
 import type { StudentClassSummary } from "../../school/api/schoolApi";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import DotField from "../../../shared/effects/DotField";
@@ -18,9 +19,11 @@ type Props = {
   onRetryClasses: () => void;
   onAssignments: () => void;
   onExplore: () => void;
+  /** Rendered between the greeting and the class list: what the student should do next. */
+  upNext?: ReactNode;
 };
 
-export function StudentClassOverview({ studentName, schoolName, classes, loading, pendingAssignments, completedAssignments, assignmentsLoading, assignmentsError, classesError, onRetryClasses, onAssignments, onExplore }: Readonly<Props>) {
+export function StudentClassOverview({ studentName, schoolName, classes, loading, pendingAssignments, completedAssignments, assignmentsLoading, assignmentsError, classesError, onRetryClasses, onAssignments, onExplore, upNext }: Readonly<Props>) {
   const reducedMotion = useReducedMotion();
   const givenName = studentName.trim().split(/\s+/).at(-1) || studentName;
   const message = assignmentsLoading ? "Đang cập nhật tình hình bài tập của bạn…" : assignmentsError ? "Chưa tải được tình hình bài tập. Hãy thử làm mới danh sách bên dưới." : pendingAssignments > 0
@@ -46,6 +49,7 @@ export function StudentClassOverview({ studentName, schoolName, classes, loading
         {stats.map(stat => <div key={stat.label}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}
       </dl>
     </section>
+    {upNext}
     <section className="student-classes" aria-labelledby="student-classes-title">
       <div className="student-section-title"><Heading as="h2" size="4" id="student-classes-title">Lớp của tôi</Heading></div>
       {loading ? <CardLoadingSkeleton cards={3} label="Đang tải thông tin lớp…" /> : classesError ? <Callout.Root color="red"><Callout.Text>{classesError}</Callout.Text><Button variant="ghost" color="red" onClick={onRetryClasses}>Thử lại</Button></Callout.Root> : classes.length === 0 ? <Card className="student-quiet-state"><Text color="gray">Chưa được xếp vào lớp học.</Text></Card> :

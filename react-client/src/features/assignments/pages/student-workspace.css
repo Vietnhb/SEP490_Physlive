@@ -161,11 +161,12 @@
   .student-workspace .student-assignment-list { padding: 16px; }
   .student-workspace .student-assignment-search { gap: 8px; }
   .student-workspace .student-assignment-search > .rt-TextFieldRoot { flex-basis: 100%; }
-  .student-workspace .student-assignment-table table, .student-workspace .student-assignment-table tbody { display: block; }
+  /* Radix gives the table height 0 (a minimum for display: table); as a block it would collapse the card list to nothing */
+  .student-workspace .student-assignment-table table, .student-workspace .student-assignment-table tbody { display: block; height: auto; }
   .student-workspace .student-assignment-table thead { display: none; }
   .student-workspace .student-assignment-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 8px; border-top: 1px solid var(--gray-4); }
   .student-workspace .student-assignment-table tr:first-child { border-top: 0; }
-  .student-workspace .student-assignment-table td { display: block; padding: 0; border: 0; box-shadow: none; }
+  .student-workspace .student-assignment-table td.rt-TableCell { display: block; height: auto; padding: 0; border: 0; box-shadow: none; }
   .student-workspace .student-assignment-title { grid-column: 1 / -1; width: auto; }
   .student-workspace .student-assignment-deadline::before, .student-workspace .student-assignment-table td:nth-child(3)::before { display: block; margin-bottom: 6px; color: var(--gray-11); font-size: 12px; }
   .student-workspace .student-assignment-deadline::before { content: "Hạn nộp"; }
@@ -198,3 +199,18 @@
 .student-workspace .student-hero-stats dt { color: var(--night-muted); font-size: 12px; }
 .student-workspace .student-hero-stats dd { margin: 2px 0 0; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 @media (max-width: 760px) { .student-workspace .student-hero { grid-template-columns: 1fr; padding: 26px 22px; } }
+
+/* Home: the next few assignments still open */
+.student-workspace .student-up-next { margin-bottom: 28px; }
+.student-up-next__list ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.student-up-next__list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 12px 8px; border-bottom: 1px solid var(--line); }
+.student-up-next__list li:last-child { border-bottom: 0; }
+.student-up-next__text { display: grid; gap: 2px; min-width: 0; }
+.student-up-next__text strong { overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.student-up-next__text small { color: var(--muted); font-size: 12px; }
+.student-up-next__more { margin: 4px 8px 6px; }
+@media (max-width: 640px) {
+  .student-up-next__list li { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+  .student-up-next__list li .rt-Badge { grid-row: 1; grid-column: 2; }
+  .student-up-next__list li .rt-Button { grid-column: 1 / -1; justify-self: start; }
+}

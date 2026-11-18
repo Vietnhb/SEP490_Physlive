@@ -52,7 +52,7 @@ public class AiQuotaService implements AiUsageMeter {
     /** Kept in a transaction of its own: the provider has spent the tokens even if the caller's work fails afterwards. */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(String operation, long tokens) {
+    public void recordUsage(String operation, long tokens) {
         User user = currentUser.currentUserOrNull();
         UUID schoolId = user == null || user.getSchool() == null ? null : user.getSchool().getId();
         if (schoolId == null || tokens <= 0) return;

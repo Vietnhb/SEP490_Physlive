@@ -2,7 +2,6 @@ package com.example.backend.system.school.service;
 
 import com.example.backend.config.VnpayProperties;
 import com.example.backend.exception.ApiException;
-import com.example.backend.system.account.model.entity.Role;
 import com.example.backend.system.account.model.entity.User;
 import com.example.backend.system.account.model.enums.RoleName;
 import com.example.backend.system.account.repository.RoleRepository;
@@ -51,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service @RequiredArgsConstructor
 public class SchoolPaymentService {
+    private static final String RENEWAL = "RENEWAL";
     private static final String PENDING = "PENDING";
     private static final String FAILED = "FAILED";
     private static final String REGISTRATION = "REGISTRATION";
@@ -223,7 +223,7 @@ public class SchoolPaymentService {
                     && quotaAtLeast(payment.getStudentQuota(), school.getStudentQuota())
                     && quotaAtLeast(payment.getMonthlyTokenQuota(), school.getMonthlyTokenQuota());
         }
-        if (!"RENEWAL".equals(payment.getPurpose())) return false;
+        if (!RENEWAL.equals(payment.getPurpose())) return false;
         if (school.getLicenseEnd() == null || school.getLicenseEnd().isBefore(today)) {
             return payment.getLicenseStart() != null && payment.getLicenseEnd() != null
                     && !payment.getLicenseEnd().isBefore(today);
@@ -492,11 +492,11 @@ public class SchoolPaymentService {
         if (plan.getStudentQuota() != null && plan.getStudentQuota() < studentsUsed)
             throw ApiException.conflict("Số học sinh đang hoạt động vượt quota gói này. Vui lòng giảm số tài khoản trước khi đổi gói.");
         if (school.getLicenseEnd() == null || school.getLicenseEnd().isBefore(today))
-            return new Quote(plan.getCode(), "RENEWAL", plan.getAnnualPriceVnd(), today, today.plusYears(1).minusDays(1));
+            return new Quote(plan.getCode(), RENEWAL, plan.getAnnualPriceVnd(), today, today.plusYears(1).minusDays(1));
         if (school.getLicenseStart() == null || school.getLicenseStart().isAfter(today) || school.getAnnualPriceVnd() == null || school.getPlanCode() == null)
             throw ApiException.conflict("Gói hiện tại cần admin xác nhận thông tin trước khi đổi gói.");
         if (school.getPlanCode().equals(plan.getCode()))
-            return new Quote(plan.getCode(), "RENEWAL", plan.getAnnualPriceVnd(), school.getLicenseStart(), school.getLicenseEnd().plusYears(1));
+            return new Quote(plan.getCode(), RENEWAL, plan.getAnnualPriceVnd(), school.getLicenseStart(), school.getLicenseEnd().plusYears(1));
         long difference = plan.getAnnualPriceVnd() - school.getAnnualPriceVnd();
         if (difference <= 0) throw ApiException.conflict("Không thể hạ gói khi gói hiện tại còn hiệu lực. Chỉ có thể gia hạn gói hiện tại hoặc nâng lên gói lớn hơn.");
         if (!quotaAtLeast(plan.getStudentQuota(), school.getStudentQuota())

@@ -1,9 +1,10 @@
+import RowActions from "../../../shared/ui/RowActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import type { DataPage } from "../../../shared/api/page";
 import { useRef, useState, type FormEvent } from "react";
 import { AlertDialog, Badge, Button, Callout, Card, Dialog, Flex, Select, Table, TextField } from "@radix-ui/themes";
-import { EyeOpenIcon, MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
+import { MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
 import { motion, useReducedMotion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { archiveSchoolClass, createSchoolClass, restoreSchoolClass } from "../api/schoolApi";
@@ -12,7 +13,7 @@ import { apiMessage } from "../../../shared/lib/apiError";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import s from "./SchoolClasses.module.css";
 import { ClassTableLoading } from "./SchoolLoading";
-import { FormField } from "../../../shared/ui/ManagementUI";
+import { FormField, PageHeader } from "../../../shared/ui/ManagementUI";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 
 const blankClass = (): SchoolClassRequest => {
@@ -102,15 +103,13 @@ export default function SchoolClasses() {
   if (!schoolId) return null;
 
   return <div className="admin-content">
+    <PageHeader title="Lớp học" description={loading ? "Đang tải dữ liệu lớp học…" : `${total.toLocaleString("vi-VN")} lớp ${status === "ACTIVE" ? "đang hoạt động" : status === "INACTIVE" ? "đã xóa" : "phù hợp"}`}
+      action={actorRole === "SCHOOL" ? <Button disabled={busy || loading} onClick={() => { setForm(blankClass()); setFormError(""); setNotice(""); setShowCreate(true); }}><PlusIcon />Tạo lớp</Button> : undefined} />
     {notice && <Callout.Root color="green" role="status" mb="4"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {(error || resource.error) && <div className="admin-error-banner" role="alert">{error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
 
     <motion.div className="school-classes-grid" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0 : .18 }}>
       <Card asChild size="3"><section className="admin-panel">
-        <div className="admin-panel-heading">
-          <div><h2>Danh sách lớp</h2><p className="admin-panel-description">{loading ? "Đang tải dữ liệu lớp học…" : `${total.toLocaleString("vi-VN")} lớp ${status === "ACTIVE" ? "đang hoạt động" : status === "INACTIVE" ? "đã xóa" : "phù hợp"}`}</p></div>
-          {actorRole === "SCHOOL" && <Button disabled={busy || loading} onClick={() => { setForm(blankClass()); setFormError(""); setNotice(""); setShowCreate(true); }}><PlusIcon />Tạo lớp</Button>}
-        </div>
 
         <div className={`${s.filters} ${s.classFilters}`}>
           <TextField.Root type="search" value={query} onChange={event => updateQuery(event.target.value)} placeholder="Tìm theo tên lớp hoặc môn học…" aria-label="Tìm lớp học">
@@ -151,13 +150,11 @@ export default function SchoolClasses() {
                 <Table.Cell>{item.teacherNames?.filter(Boolean).join(", ") || "Chưa phân công"}</Table.Cell>
                 <Table.Cell>{item.studentCount}</Table.Cell>
                 <Table.Cell><Badge color={item.active ? "green" : "gray"} variant="soft">{item.active ? "Hoạt động" : "Đã xóa"}</Badge></Table.Cell>
-                <Table.Cell><div className={s.actions}>
-                  {item.active ? <>
-                    <Button size="1" variant="soft" disabled={busy} onClick={() => navigate(`/school/classes/${item.id}`)}><EyeOpenIcon />Xem</Button>
-                    <Button size="1" variant="soft" color="cyan" disabled={busy} onClick={() => navigate(`/school/classes/${item.id}?mode=edit`)}>Sửa</Button>
-                    <Button size="1" variant="soft" color="red" disabled={busy} onClick={() => setStatusTarget(item)}>Xóa</Button>
-                  </> : <Button size="1" variant="soft" color="green" disabled={busy} onClick={() => setStatusTarget(item)}>Mở lại</Button>}
-                </div></Table.Cell>
+                <Table.Cell><RowActions subject={item.name} disabled={busy} actions={item.active ? [
+                  { label: "Xem lớp", onSelect: () => navigate(`/school/classes/${item.id}`) },
+                  { label: "Sửa lớp", onSelect: () => navigate(`/school/classes/${item.id}?mode=edit`) },
+                  { label: "Xóa lớp", danger: true, onSelect: () => setStatusTarget(item) },
+                ] : [{ label: "Mở lại", onSelect: () => setStatusTarget(item) }]} /></Table.Cell>
               </Table.Row>)}
             </Table.Body>
           </Table.Root></div>

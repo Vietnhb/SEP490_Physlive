@@ -54,22 +54,35 @@ public final class SchoolCsvParser {
         List<List<String>> records = new ArrayList<>();
         List<String> fields = new ArrayList<>();
         StringBuilder field = new StringBuilder();
-        boolean quoted = false, closed = false;
-        for (int index = 0; index < text.length(); index++) {
+        boolean quoted = false;
+        boolean closed = false;
+        int index = 0;
+        while (index < text.length()) {
             char ch = text.charAt(index);
+            // a doubled quote inside a quoted cell, and "\r\n", are read as one character pair
+            int next = index + 1;
             if (ch == '\0') throw bad("CSV chứa ký tự không hợp lệ.");
             if (quoted) {
-                if (ch == '"' && index + 1 < text.length() && text.charAt(index + 1) == '"') { field.append('"'); index++; }
-                else if (ch == '"') { quoted = false; closed = true; }
-                else field.append(ch);
+                if (ch == '"' && next < text.length() && text.charAt(next) == '"') {
+                    field.append('"');
+                    next++;
+                } else if (ch == '"') {
+                    quoted = false;
+                    closed = true;
+                } else {
+                    field.append(ch);
+                }
             } else if (ch == '"') {
-                if (field.length() > 0 || closed) throw bad("Dấu ngoặc kép phải bao quanh toàn bộ ô CSV.");
+                if (!field.isEmpty() || closed) throw bad("Dấu ngoặc kép phải bao quanh toàn bộ ô CSV.");
                 quoted = true;
             } else if (ch == ',' || ch == '\r' || ch == '\n') {
-                fields.add(field.toString()); field.setLength(0); closed = false;
+                fields.add(field.toString());
+                field.setLength(0);
+                closed = false;
                 if (ch != ',') {
-                    records.add(fields); fields = new ArrayList<>();
-                    if (ch == '\r' && index + 1 < text.length() && text.charAt(index + 1) == '\n') index++;
+                    records.add(fields);
+                    fields = new ArrayList<>();
+                    if (ch == '\r' && next < text.length() && text.charAt(next) == '\n') next++;
                     if (records.size() > MAX_ROWS + 1) throw bad("Mỗi lần nhập tối đa " + MAX_ROWS + " dòng.");
                 }
             } else {
@@ -77,9 +90,13 @@ public final class SchoolCsvParser {
                 field.append(ch);
             }
             if (field.length() > 10_000 || fields.size() > 20) throw bad("Ô hoặc số cột CSV vượt giới hạn.");
+            index = next;
         }
         if (quoted) throw bad("CSV thiếu dấu ngoặc kép kết thúc ô.");
-        if (!fields.isEmpty() || field.length() > 0 || closed) { fields.add(field.toString()); records.add(fields); }
+        if (!fields.isEmpty() || !field.isEmpty() || closed) {
+            fields.add(field.toString());
+            records.add(fields);
+        }
         if (records.size() > MAX_ROWS + 1) throw bad("Mỗi lần nhập tối đa " + MAX_ROWS + " dòng.");
         return records;
     }

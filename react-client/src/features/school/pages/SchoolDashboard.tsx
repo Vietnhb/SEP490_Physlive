@@ -66,19 +66,10 @@ export default function SchoolDashboard() {
           <div className="school-license-details">
             <div><span>Hạn sử dụng</span><strong>{dateLabel(license?.licenseEnd ?? summary.licenseEnd)}</strong></div>
             <div><span>Thời gian còn lại</span><strong>{license ? (license.daysUntilExpiry >= 0 ? `${license.daysUntilExpiry} ngày` : "Đã hết hạn") : "—"}</strong></div>
-            <div><span>Quota token tháng</span><strong>{quota == null ? "Không giới hạn" : `${Math.max(0, quota - tokenUsage).toLocaleString("vi-VN")} còn lại`}</strong></div>
+            <div><span>Hạn mức AI tháng này (token)</span><strong>{quota == null ? "Không giới hạn" : `${Math.max(0, quota - tokenUsage).toLocaleString("vi-VN")} còn lại`}</strong></div>
           </div>
           {quota != null && <Progress value={quotaPercent} size="2" color={quotaPercent >= 80 ? "orange" : "indigo"} aria-label={`Đã dùng ${quotaPercent}% quota token tháng`} />}
           <Button asChild size="2" mt="5"><Link to="/school/billing">Xem gói & thanh toán<LearningIcon name="arrow" /></Link></Button>
-        </section></Card>
-
-        <Card size="3" asChild><section className="admin-panel school-quick-panel">
-          <div className="admin-panel-heading"><div><h2>Thao tác nhanh</h2></div></div>
-          <div className="school-quick-actions">
-            <Link to="/school/users"><LearningIcon name="users" /><span><strong>Quản lý tài khoản</strong><small>Tạo hoặc tạm khóa tài khoản</small></span><LearningIcon name="arrow" /></Link>
-            <Link to="/school/classes"><LearningIcon name="book" /><span><strong>Quản lý lớp học</strong><small>Phân giáo viên và xếp học sinh</small></span><LearningIcon name="arrow" /></Link>
-            <Link to="/school/reports"><LearningIcon name="chart" /><span><strong>Xem báo cáo</strong><small>Theo dõi lớp học và mức sử dụng</small></span><LearningIcon name="arrow" /></Link>
-          </div>
         </section></Card>
 
         <Card size="3" asChild><section className="admin-panel school-classes-panel">

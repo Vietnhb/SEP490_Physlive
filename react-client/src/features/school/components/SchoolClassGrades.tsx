@@ -2,12 +2,13 @@ import GradeHistory from "../../assignments/components/GradeHistory";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useState } from "react";
 import { Badge, Button, Dialog, Flex, Select, TextField } from "@radix-ui/themes";
-import { DownloadIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { DownloadIcon } from "@radix-ui/react-icons";
 import { downloadClassGrades, type ClassGradebook, type GradeAssignment, type GradeCell, type GradeStudent } from "../api/classGradesApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import s from "./SchoolClassGrades.module.css";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 const STATES: Record<string, string> = { NOT_ASSIGNED: "Không được giao", NOT_STARTED: "Chưa làm", IN_PROGRESS: "Đang làm", SUBMITTED: "Chưa chấm", RETURNED: "Trả làm lại", AI_GRADED: "AI đã chấm", TEACHER_CONFIRMED: "Đã xác nhận" };
 const STATE_COLORS: Record<string, "gray" | "blue" | "amber" | "red" | "purple" | "green"> = {
@@ -46,7 +47,7 @@ export default function SchoolClassGrades({ schoolId, classId }: Readonly<{ scho
     finally { setExporting(false); }
   };
   return <section className={s.panel} aria-label="Bảng điểm lớp học">
-    <Flex className={s.heading} justify="between" align="center" gap="3" wrap="wrap"><div><h2>Bảng điểm {book?.className}</h2><p>Năm học {book?.schoolYear ?? "…"} · Bảng điểm chỉ xem</p>{assignedBy && <p className={s.assignedBy}>Giáo viên giao bài: {assignedBy}</p>}</div><Flex gap="3"><Button variant="outline" disabled={loading} onClick={() => void load()}><ReloadIcon />Làm mới</Button><Button variant="soft" loading={exporting} disabled={!book?.assignments.length || exporting} onClick={() => void exportCsv()}><DownloadIcon />Xuất toàn bộ CSV</Button></Flex></Flex>
+    <Flex className={s.heading} justify="between" align="center" gap="3" wrap="wrap"><div><h2>Bảng điểm {book?.className}</h2><p>Năm học {book?.schoolYear ?? "…"} · Bảng điểm chỉ xem</p>{assignedBy && <p className={s.assignedBy}>Giáo viên giao bài: {assignedBy}</p>}</div><Flex gap="3"><RefreshButton onClick={() => void load()} disabled={loading} /><Button variant="soft" loading={exporting} disabled={!book?.assignments.length || exporting} onClick={() => void exportCsv()}><DownloadIcon />Xuất toàn bộ CSV</Button></Flex></Flex>
     {error && <p role="alert" className="admin-error-banner">{error}</p>}{notice && <p role="status" className={s.success}>{notice}</p>}
     <Flex gap="3" wrap="wrap" mb="4"><TextField.Root aria-label="Tìm học sinh trong bảng điểm" placeholder="Tìm tên hoặc email học sinh…" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
       <Select.Root value={membership} onValueChange={value => { setMembership(value); setPage(1); }}><Select.Trigger aria-label="Thành viên lớp" /><Select.Content><Select.Item value="ALL">Tất cả học sinh</Select.Item><Select.Item value="CURRENT">Đang học trong lớp</Select.Item><Select.Item value="FORMER">Đã rời lớp</Select.Item></Select.Content></Select.Root>

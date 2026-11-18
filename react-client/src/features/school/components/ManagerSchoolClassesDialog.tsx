@@ -3,12 +3,13 @@ import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import type { DataPage } from "../../../shared/api/page";
 import { useState } from "react";
 import { Badge, Button, Dialog, Flex, IconButton, Select, Table, TextField } from "@radix-ui/themes";
-import { ArrowLeftIcon, Cross2Icon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { ArrowLeftIcon, Cross2Icon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import type { SchoolClassOverview, SchoolClassSummary } from "../types";
 import { CardLoadingSkeleton, TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import tableScroll from "../../../shared/ui/TableScroll.module.css";
 import s from "./ManagerSchoolClassesDialog.module.css";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 type Props = { school: { id: string; name: string } | null; onClose: () => void };
 const PAGE_SIZE = 10;
@@ -55,7 +56,7 @@ export default function ManagerSchoolClassesDialog({ school, onClose }: Readonly
             </section>
           </>}
         </> : <>
-          <Flex justify="between" align="center" gap="3" wrap="wrap" mb="4"><span className={s.caption}>{loading ? "Đang tải danh sách lớp…" : `${roster.data?.totalClasses ?? 0} lớp · ${roster.data?.activeClasses ?? 0} đang hoạt động`}</span><Button variant="outline" disabled={loading} onClick={retryList}><ReloadIcon />Làm mới</Button></Flex>
+          <Flex justify="between" align="center" gap="3" wrap="wrap" mb="4"><span className={s.caption}>{loading ? "Đang tải danh sách lớp…" : `${roster.data?.totalClasses ?? 0} lớp · ${roster.data?.activeClasses ?? 0} đang hoạt động`}</span><RefreshButton onClick={retryList} disabled={loading} /></Flex>
           <div className={s.filters}>
             <TextField.Root aria-label="Tìm lớp học" placeholder="Tìm tên lớp hoặc môn học…" value={query} onChange={event => { setQuery(event.target.value); setPage(1); }}><TextField.Slot><MagnifyingGlassIcon /></TextField.Slot></TextField.Root>
             <Select.Root value={grade} onValueChange={value => { setGrade(value); setPage(1); }}><Select.Trigger aria-label="Khối lớp" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả khối</Select.Item>{[10, 11, 12].map(value => <Select.Item key={value} value={String(value)}>Khối {value}</Select.Item>)}</Select.Content></Select.Root>

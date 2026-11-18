@@ -1,4 +1,5 @@
 import axiosClient from "../../../shared/api/client";
+import { saveFile } from "../../../shared/lib/saveFile";
 import type { SchoolClassDetail, SchoolClassRequest, SchoolClassSummary, SchoolClassOverview } from "../types";
 
 const classesPath = (schoolId: string) => `/schools/${schoolId}/classes`;
@@ -11,14 +12,8 @@ export const schoolClassOverview = (schoolId: string, classId: string, signal?: 
 
 export const downloadSchoolClassStudentsCsv = async (schoolId: string, classId: string, className: string, schoolYear: string) => {
   const response = await axiosClient.get<Blob>(`${classesPath(schoolId)}/${classId}/students.csv`, { responseType: "blob" });
-  const url = URL.createObjectURL(response.data);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  const fileName = `${className}-${schoolYear}`.replace(/[^\p{L}\p{N}._-]+/gu, "-").slice(0, 120);
-  anchor.download = `danh-sach-hoc-sinh-${fileName || classId}.csv`;
-  document.body.append(anchor);
-  anchor.click(); anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const fileName = `${className}-${schoolYear}`.replaceAll(/[^\p{L}\p{N}._-]+/gu, "-").slice(0, 120);
+  saveFile(`danh-sach-hoc-sinh-${fileName || classId}.csv`, response.data);
 };
 
 export const createSchoolClass = (schoolId: string, payload: SchoolClassRequest) => axiosClient.post<SchoolClassDetail>(classesPath(schoolId), payload).then(r => r.data);
@@ -67,14 +62,7 @@ export const schoolReportTokenOptions = (schoolId: string) => axiosClient.get<Sc
 
 export const downloadSchoolClassesCsv = async (schoolId: string, params?: { grade?: number; year?: string; query?: string }) => {
   const response = await axiosClient.get<Blob>(`${reportPath(schoolId)}/classes.csv`, { responseType: "blob", params });
-  const url = URL.createObjectURL(response.data);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "danh-sach-lop.csv";
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  saveFile("danh-sach-lop.csv", response.data);
 };
 
 export type ManagedSchool = { id: string; code: string; name: string; address?: string | null; active: boolean; licenseStart?: string | null; licenseEnd?: string | null; monthlyTokenQuota?: number | null; studentQuota?: number | null; planCode?: string | null; annualPriceVnd?: number | null; nextPlanCode?: string | null; subscriptionStatus?: "ACTIVE" | "UPCOMING" | "EXPIRED" | "UNLICENSED" | "SUSPENDED" };

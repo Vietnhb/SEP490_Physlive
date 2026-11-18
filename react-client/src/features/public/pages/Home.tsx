@@ -69,7 +69,7 @@ function HomePlanCatalog() {
             <p className={s.planPrice}>{money(plan.annualPriceVnd)}<span>/ năm</span></p>
             <dl className={s.planFacts}>
               <div><dt>Học sinh</dt><dd>{count(plan.studentQuota)}</dd></div>
-              <div><dt>Token AI / tháng</dt><dd>{plan.monthlyTokenQuota === null ? "Không giới hạn" : count(plan.monthlyTokenQuota)}</dd></div>
+              <div><dt>Hạn mức AI / tháng (token)</dt><dd>{plan.monthlyTokenQuota === null ? "Không giới hạn" : count(plan.monthlyTokenQuota)}</dd></div>
             </dl>
             <Link className={s.ghost} to="/signup">Chọn gói {plan.name}</Link>
           </SpotlightCard>

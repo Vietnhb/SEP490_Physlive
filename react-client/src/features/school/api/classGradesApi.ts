@@ -1,4 +1,5 @@
 import api from "../../../shared/api/client";
+import { saveFile } from "../../../shared/lib/saveFile";
 
 export type GradeAssignment = { id: string; title: string; status: string; maxScore: number; assignedBy: string; dueAt?: string | null };
 export type GradeCell = { submissionId?: string | null; assignmentId: string; state: string; score: number | null; maxScore: number; feedback?: string | null; gradedBy?: string | null; gradedAt?: string | null; completedAt?: string | null };
@@ -10,8 +11,5 @@ export const classGradebook = (schoolId: string, classId: string, signal?: Abort
 
 export async function downloadClassGrades(schoolId: string, classId: string, name: string) {
   const response = await api.get<Blob>(`/schools/${schoolId}/classes/${classId}/grades.csv`, { responseType: "blob" });
-  const url = URL.createObjectURL(response.data);
-  const anchor = document.createElement("a"); anchor.href = url;
-  anchor.download = `bang-diem-${name.replace(/[^\p{L}\p{N}._-]/gu, "-")}.csv`;
-  anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile(`bang-diem-${name.replaceAll(/[^\p{L}\p{N}._-]/gu, "-")}.csv`, response.data);
 }

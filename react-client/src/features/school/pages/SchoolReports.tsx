@@ -1,3 +1,4 @@
+import PageActions from "../../../shared/layout/PageActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useMemo, useState } from "react";
@@ -9,6 +10,10 @@ import LearningIcon from "../../../shared/ui/LearningIcon";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { DashboardLoadingSkeleton, TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import s from "./SchoolReports.module.css";
+import { compareCodeUnits } from "../../../shared/lib/compareText";
+import { getRegistrationPlans } from "../../billing/api/billingApi";
+import { usePlanNames } from "../../billing/hooks/usePlanNames";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 const number = (value: number) => value.toLocaleString("vi-VN");
 const monthLabel = (value: string) => { const [year, month] = value.split("-"); return `Tháng ${Number(month)}/${year}`; };
@@ -17,11 +22,8 @@ const operations: Record<string, string> = { AI_GENERATION: "Tạo mô phỏng b
 const operationLabel = (value: string) => operations[value] ?? value;
 const licenceLabels: Record<SchoolReportSummary["licenseStatus"], string> = { ACTIVE: "Đang hiệu lực", EXPIRED: "Đã hết hạn", UPCOMING: "Chưa đến hạn sử dụng", UNLICENSED: "Chưa có bản quyền", SUSPENDED: "Trường tạm khóa" };
 
-function SummaryCard({ label, value, detail, icon }: Readonly<{ label: string; value: number; detail: string; icon: "users" | "book" | "activity" | "chart" }>) {
-  return <Card size="3" className="admin-stat-card"><div className="admin-stat-icon blue"><LearningIcon name={icon} /></div><p>{label}</p><strong>{number(value)}</strong><small>{detail}</small></Card>;
-}
-
 export default function SchoolReports() {
+  const planName = usePlanNames(getRegistrationPlans);
   const schoolId = useSessionStore(state => state.user?.schoolId);
   const [actionError, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -57,7 +59,7 @@ export default function SchoolReports() {
   const refreshing = summaryResource.refreshing || classesResource.refreshing || optionsResource.refreshing || tokensResource.refreshing;
   const load = () => { setError(""); return Promise.all([summaryResource.refresh(), classesResource.refresh(), optionsResource.refresh()]); };
 
-  const years = useMemo(() => [...new Set(classes.map(item => item.schoolYear))].sort().reverse(), [classes]);
+  const years = useMemo(() => [...new Set(classes.map(item => item.schoolYear))].sort(compareCodeUnits).reverse(), [classes]);
   const filteredClasses = useMemo(() => classes.filter(item => item.name.toLocaleLowerCase("vi").includes(classQuery.trim().toLocaleLowerCase("vi"))
     && (classGrade === "ALL" || item.gradeLevel === Number(classGrade)) && (classYear === "ALL" || item.schoolYear === classYear)), [classes, classQuery, classGrade, classYear]);
   const currentClassPage = Math.min(classPage, Math.max(0, Math.ceil(filteredClasses.length / 10) - 1));
@@ -76,19 +78,12 @@ export default function SchoolReports() {
 
   if (!schoolId) return null;
   return <div className={`admin-content ${s.reports}`}>
-    <div className={s.reportToolbar}><span>Số liệu tài khoản và lớp đang hoạt động</span><Button variant="outline" disabled={refreshing} onClick={() => { void load(); void tokensResource.refresh(); }}><LearningIcon name="refresh" />Làm mới</Button></div>
+    <PageActions><RefreshButton onClick={() => { void load(); void tokensResource.refresh(); }} disabled={refreshing} /></PageActions>
     {error && <Callout.Root color="red" role="alert"><Callout.Text>{error}</Callout.Text><Button variant="soft" onClick={() => void load()}>Thử lại</Button></Callout.Root>}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {loading && !summary ? <DashboardLoadingSkeleton cards={4} label="Đang tải báo cáo…" /> : summary && <>
-      <section className={`admin-stats-grid ${s.summary}`} aria-label="Tổng quan trường">
-        <SummaryCard label="Học sinh đang hoạt động" value={summary.students} detail={`${number(summary.enrolledStudents)} học sinh đã xếp lớp`} icon="users" />
-        <SummaryCard label="Giáo viên đang hoạt động" value={summary.teachers} detail="Tài khoản thuộc trường" icon="book" />
-        <SummaryCard label="Lớp đang hoạt động" value={summary.activeClasses} detail="Tất cả năm học" icon="activity" />
-        <SummaryCard label="Token AI tháng này" value={summary.usedTokens} detail={`${monthLabel(summary.usageMonth)} · ${summary.tokenQuota == null ? "Không giới hạn" : `Hạn mức ${number(summary.tokenQuota)}`}`} icon="chart" />
-      </section>
-
       <Card size="3" asChild><section className={`admin-panel ${s.licencePanel}`} aria-label="Bản quyền và hạn mức">
-        <div className="admin-panel-heading"><div><h2>Bản quyền và hạn mức</h2><p className="admin-panel-description">Gói {summary.planCode || "chưa được thiết lập"}</p></div><Badge color={summary.licenseStatus === "ACTIVE" ? "green" : "orange"}>{licenceLabels[summary.licenseStatus]}</Badge></div>
+        <div className="admin-panel-heading"><div><h2>Bản quyền và hạn mức</h2><p className="admin-panel-description">{summary.planCode ? `Gói ${planName(summary.planCode)}` : "Gói chưa được thiết lập"}</p></div><Badge color={summary.licenseStatus === "ACTIVE" ? "green" : "orange"}>{licenceLabels[summary.licenseStatus]}</Badge></div>
         <div className={s.licenceGrid}>
           <div><span>Thời hạn bản quyền</span><strong>{dateLabel(summary.licenseStart)} – {dateLabel(summary.licenseEnd)}</strong><Button asChild size="1" variant="soft"><Link to="/school/billing">Xem gói / gia hạn</Link></Button></div>
           <div><span>Hạn mức học sinh</span><strong>{number(summary.students)} / {summary.studentQuota == null ? "Không giới hạn" : number(summary.studentQuota)}</strong>{summary.studentQuota != null && <><Progress value={summary.studentQuota > 0 ? Math.min(100, summary.students / summary.studentQuota * 100) : summary.students > 0 ? 100 : 0} color={summary.students >= summary.studentQuota ? "orange" : "indigo"} aria-label="Mức sử dụng hạn mức học sinh" /><small>{summary.students > summary.studentQuota ? `Vượt ${number(summary.students - summary.studentQuota)} học sinh` : `Còn ${number(summary.studentQuota - summary.students)} chỗ`}</small></>}</div>

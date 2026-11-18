@@ -7,6 +7,9 @@ import { useEffectiveTheme } from "../../../shared/theme/themeStore";
 import { Magnetic, Marquee, Reveal, ScrollLine, ScrollProgress, SplitWords, SpotlightCard } from "../../../shared/effects/Motion";
 import { useScrollSpy } from "../../../shared/hooks/useScrollSpy";
 import s from "./SiteInfo.module.css";
+import { useResource } from "../../../shared/hooks/operationsData";
+import { topicLabel } from "../../../shared/lib/topicLabel";
+import type { Curriculum } from "../../../shared/types/physlive";
 
 type SiteInfoProps = { kind: "about" | "terms" };
 
@@ -32,7 +35,6 @@ const principles = [
   { title: "Bám sát chương trình THPT", text: "Chủ đề được tổ chức theo Vật lí 10, 11 và 12, dùng đúng kí hiệu và đơn vị trong sách giáo khoa." },
 ];
 
-const topics = ["Động học", "Động lực học", "Năng lượng", "Động lượng", "Dao động", "Sóng", "Điện trường", "Dòng điện", "Từ trường", "Khí lí tưởng", "Hạt nhân", "Lượng tử"];
 
 const terms = [
   { id: "pham-vi", title: "Phạm vi áp dụng", body: ["Điều khoản này áp dụng cho mọi người dùng PhysLive: quản lý trường, giáo viên, học sinh và chuyên gia kiểm duyệt.", "Khi đăng nhập và sử dụng dịch vụ, bạn đồng ý tuân theo các điều khoản dưới đây."] },
@@ -62,9 +64,12 @@ function Hero({ title, shine, lead }: Readonly<{ title: string; shine: string; l
 }
 
 function About() {
+  // topic names come from the public curriculum (database), not from this file
+  const { data: curriculum } = useResource<Curriculum>("/curriculum");
+  const topics = (curriculum?.topics ?? []).filter(topic => topic.enabled).map(topic => topicLabel(topic.name)).filter(Boolean);
   return <>
     <Hero title="Phòng thí nghiệm" shine="Vật lý trên trình duyệt." lead="PhysLive biến đề bài thành mô phỏng tương tác đã được kiểm chứng, để giáo viên giảng bằng thí nghiệm và học sinh học bằng cách tự thử." />
-    <Marquee items={topics} className={s.marquee} />
+    {topics.length > 0 && <Marquee items={topics} className={s.marquee} />}
 
     <section className={s.section} aria-labelledby="about-roles">
       <Reveal className={s.sectionHead}><h2 id="about-roles">Một nền tảng, ba vai trò.</h2></Reveal>

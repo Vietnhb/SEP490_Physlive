@@ -1,4 +1,5 @@
 import axiosClient from "../../../../shared/api/client";
+import { saveFile } from "../../../../shared/lib/saveFile";
 
 export type ImportKind = "USERS" | "CLASSES" | "ENROLLMENTS" | "TEACHER_ASSIGNMENTS";
 export const IMPORT_LABELS: Record<ImportKind, string> = {
@@ -25,10 +26,7 @@ export async function commitImport(schoolId: string, preview: ImportPreview) {
   return (await axiosClient.post<ImportResult>(`${base(schoolId)}/commit`, { kind: preview.kind, rows: preview.rows.map(({ row, data }) => ({ row, data })), previewToken: preview.previewToken })).data;
 }
 export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a"); link.href = url; link.download = filename;
-  document.body.appendChild(link); link.click(); link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile(filename, blob);
 }
 export async function downloadImportTemplate(schoolId: string, kind: ImportKind) {
   const response = await axiosClient.get<Blob>(`${base(schoolId)}/template`, { params: { kind }, responseType: "blob" });

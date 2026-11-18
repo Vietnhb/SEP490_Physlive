@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SchoolClassGradeService {
+    private static final String SUBMITTED = "SUBMITTED";
     private final SchoolClassRepository classes;
     private final ClassEnrollmentRepository enrollments;
     private final AssignmentRepository assignments;
@@ -61,8 +62,8 @@ public class SchoolClassGradeService {
         if (submission == null) state = assignment.getAssignedStudentIds().contains(studentId) ? "NOT_STARTED" : "NOT_ASSIGNED";
         else if (submission.isRetryAllowed()) state = "RETURNED";
         else if (submission.getCompletedAt() == null) state = "IN_PROGRESS";
-        else if (submission.getScore() == null) state = "SUBMITTED";
-        else state = submission.getGradingStatus() == null ? "SUBMITTED" : submission.getGradingStatus().name();
+        else if (submission.getScore() == null) state = SUBMITTED;
+        else state = submission.getGradingStatus() == null ? SUBMITTED : submission.getGradingStatus().name();
         return new ClassGradebook.Cell(assignment.getId(), state, submission == null || submission.getCompletedAt() == null ? null : submission.getScore(),
                 submission == null || submission.getMaxScore() == null ? assignment.getMaxScore() : submission.getMaxScore(),
                 submission == null ? null : submission.getFeedback(),
@@ -88,7 +89,7 @@ public class SchoolClassGradeService {
 
     private static String stateLabel(String state) {
         return switch (state) {
-            case "NOT_STARTED" -> "Chưa làm"; case "IN_PROGRESS" -> "Đang làm"; case "SUBMITTED" -> "Chưa chấm";
+            case "NOT_STARTED" -> "Chưa làm"; case "IN_PROGRESS" -> "Đang làm"; case SUBMITTED -> "Chưa chấm";
             case "RETURNED" -> "Trả làm lại"; case "AI_GRADED" -> "AI đã chấm"; case "TEACHER_CONFIRMED" -> "Giáo viên đã xác nhận";
             default -> state;
         };
