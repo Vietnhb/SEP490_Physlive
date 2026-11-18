@@ -16,7 +16,7 @@ import {
   type PaymentStatus,
 } from "../api/billingApi";
 import styles from "./AdminPayments.module.css";
-import { usePlanNames } from "../hooks/usePlanNames";
+import { usePlanNames } from "../../../shared/hooks/usePlanNames";
 import { adminPlans } from "../api/billingApi";
 import RefreshButton from "../../../shared/ui/RefreshButton";
 

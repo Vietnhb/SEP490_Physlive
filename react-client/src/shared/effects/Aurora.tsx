@@ -142,5 +142,5 @@ export default function Aurora({
 
   // decoration only: the phone app keeps its GPU and battery for the simulations
   if (inAndroidApp()) return null;
-  return <canvas ref={canvasRef} className={`aurora ${className}`} aria-hidden="true" />;
+  return <canvas ref={canvasRef} className={`aurora ${className}`} aria-hidden="true" tabIndex={-1} />;
 }

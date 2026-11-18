@@ -155,5 +155,5 @@ export default function DotField({
 
   // decoration only: the phone app keeps its GPU and battery for the simulations
   if (inAndroidApp()) return null;
-  return <canvas ref={canvasRef} className={`dot-field ${className}`} aria-hidden="true" />;
+  return <canvas ref={canvasRef} className={`dot-field ${className}`} aria-hidden="true" tabIndex={-1} />;
 }

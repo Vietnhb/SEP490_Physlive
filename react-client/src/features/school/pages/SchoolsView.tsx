@@ -13,7 +13,7 @@ import ManagerSchoolClassesDialog from "../components/ManagerSchoolClassesDialog
 import SchoolSubscriptionDialog from "../components/SchoolSubscriptionDialog";
 import { SUBSCRIPTION_STATUS } from "../model/schoolSubscription";
 import { adminPlans } from "../../billing/api/billingApi";
-import { usePlanNames } from "../../billing/hooks/usePlanNames";
+import { usePlanNames } from "../../../shared/hooks/usePlanNames";
 
 type SchoolForm = { code: string; name: string; address: string; active: boolean; licenseStart: string; licenseEnd: string; monthlyTokenQuota: string };
 

@@ -1,6 +1,6 @@
 import { usePendingSupport } from "../../../shared/hooks/usePendingSupport";
 import { adminPlans } from "../../billing/api/billingApi";
-import { usePlanNames } from "../../billing/hooks/usePlanNames";
+import { usePlanNames } from "../../../shared/hooks/usePlanNames";
 import { useEffect, useState } from "react";
 import { DropdownMenu, IconButton } from "@radix-ui/themes";
 import { useNavigate } from "react-router-dom";

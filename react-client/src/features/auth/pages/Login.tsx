@@ -83,7 +83,7 @@ export default function Login() {
           <span>Email</span>
           <span className="account-field">
             <svg className="account-field__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7.5 8 6 8-6" /></svg>
-            <input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@truong.edu.vn" autoComplete="email" autoFocus required disabled={loading} />
+            <input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@truong.edu.vn" autoComplete="email" required disabled={loading} />
           </span>
         </label>
         <label htmlFor="login-password">
