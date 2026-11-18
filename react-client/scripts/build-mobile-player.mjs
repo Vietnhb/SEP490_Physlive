@@ -29,7 +29,7 @@ const runtime = "const sampleTimeline = (" + engine.sampleTimeline.toString() + 
 
 // The host page: receives the scene from the app, starts it in the sandboxed frame and reports progress back.
 // A srcdoc frame inherits this policy, so it has to allow what the stage needs: its blob worker and the generated code.
-const host = `<!doctype html><html lang="vi"><head><meta charset="utf-8">
+const host = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>PhysLive player</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; worker-src blob:; img-src blob: data:; frame-src 'self' about: blob: data:; style-src 'unsafe-inline'; connect-src 'none'">
 <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}iframe{border:0;width:100%;height:100%;display:block;background:transparent}</style>

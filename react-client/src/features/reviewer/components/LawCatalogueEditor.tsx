@@ -53,7 +53,8 @@ const partOf = (law: Law) => String(law.curriculum ?? "").split(" – ")[0].trim
 function splitRoleDescription(raw: unknown, fallback = ""): { label: string; suffix: string } {
   const text = String(raw ?? "").trim();
   if (!text) return { label: fallback, suffix: "" };
-  const idx = text.search(/\s*[(;]/);
+  const mark = text.search(/[(;]/);
+  const idx = mark === -1 ? -1 : text.slice(0, mark).trimEnd().length;
   if (idx === -1) return { label: text, suffix: "" };
   return { label: text.slice(0, idx).trim() || fallback, suffix: text.slice(idx).trim() };
 }
@@ -144,7 +145,7 @@ export function LawBook({ value, shared, onChange }: Readonly<{ value: Catalogue
   }, [laws, editing]);
 
   // The book sits inside the topic form: Enter in one of its boxes must not save the whole topic.
-  return <div className="lawbook" onKeyDown={event => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
+  return <div className="lawbook" role="group" aria-label="Bộ định luật" onKeyDown={event => { if (event.key === "Enter" && (event.target as HTMLElement).tagName === "INPUT") event.preventDefault(); }}>
     <div className="lawbook-bar">
       <input className="lawbook-input lawbook-search" type="search" placeholder="Tìm định luật, công thức hoặc đại lượng…" value={query} onChange={event => setQuery(event.target.value)} aria-label="Tìm định luật" />
       <span className="lawbook-count">{laws.length} định luật · {new Set(laws.map(partOf)).size} phần{unfinished > 0 && <b> · {unfinished} cần bổ sung</b>}</span>

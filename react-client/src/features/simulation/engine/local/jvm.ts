@@ -116,7 +116,12 @@ export function ulp(x: number): number {
 /** String.hashCode: 31·h + char over the UTF-16 units, as a 32-bit int. */
 export function javaHash(text: string): number {
   let h = 0;
-  for (let i = 0; i < text.length; i++) h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
+  for (let i = 0; i < text.length; i++) {
+    const point = text.codePointAt(i) ?? 0;
+    // codePointAt joins a surrogate pair at its first unit; Java hashes the units, so take the high surrogate alone
+    const unit = point > 0xffff ? ((point - 0x10000) >> 10) + 0xd800 : point;
+    h = (Math.imul(31, h) + unit) | 0;
+  }
   return h;
 }
 

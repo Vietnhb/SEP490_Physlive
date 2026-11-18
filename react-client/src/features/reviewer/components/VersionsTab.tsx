@@ -31,7 +31,7 @@ export function VersionsTab() {
   const [selected, setSelected] = useState<Version | null>(null);
   const [editor, setEditor] = useState<{ version?: Version; clone: boolean } | null>(null);
   const [decision, setDecision] = useState<{ version: Version; status: "APPROVED" | "RETIRED" | "DELETE" } | null>(null);
-  const all = resource.data ?? [];
+  const all = useMemo(() => resource.data ?? [], [resource.data]);
   const count = (status: Lifecycle) => all.filter(version => version.lifecycleStatus === status).length;
   const rows = all.filter(version => (filter === "ALL" || version.lifecycleStatus === filter) && matches(query, version.schemaId, version.name, version.topic, version.version))
     .sort((a, b) => ORDER.indexOf(a.lifecycleStatus) - ORDER.indexOf(b.lifecycleStatus));

@@ -77,10 +77,10 @@ export default function SimulationComplaintDialog({ simulationId, description, p
         {hasSimulation
           ? <p className="complaint-context"><strong>Mô phỏng đang mở:</strong> {description!.trim().slice(0, 220)}{description!.trim().length > 220 ? "…" : ""}</p>
           : <p className="complaint-context">Hãy mở hoặc dựng một mô phỏng trước, rồi quay lại đây để gửi khiếu nại về mô phỏng đó.</p>}
-        <label>Vấn đề gặp phải
+        <label>Vấn đề gặp phải{" "}
           <select value={reason} onChange={event => setReason(event.target.value)} disabled={!hasSimulation || busy}>{REASONS.map(value => <option key={value} value={value}>{value}</option>)}</select>
         </label>
-        <label>Mô tả chi tiết
+        <label>Mô tả chi tiết{" "}
           <textarea value={detail} maxLength={4000} disabled={!hasSimulation || busy} onChange={event => setDetail(event.target.value)}
             placeholder="Ví dụ: Với v0 = 15 m/s và h = 20 m, tầm xa đúng phải là khoảng 30,3 m nhưng mô phỏng hiển thị 25 m." />
         </label>

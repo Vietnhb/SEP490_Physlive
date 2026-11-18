@@ -36,7 +36,7 @@ type Props = {
 type Accent = "indigo" | "cyan" | "amber";
 function hashOf(value: string) {
   let hash = 0;
-  for (const character of value) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  for (const character of value) hash = Math.imul(hash, 31) + (character.codePointAt(0) ?? 0) >>> 0;
   return Math.abs(hash);
 }
 const resourceAccent = (moduleId: string): Accent => (["indigo", "cyan", "amber"] as const)[hashOf(moduleId) % 3];
