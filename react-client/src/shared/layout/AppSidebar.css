@@ -417,11 +417,29 @@
   font-weight: 600;
   text-overflow: ellipsis;
 }
+.app-topbar__crumb-link {
+  flex: 0 0 auto;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.app-topbar__crumb-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.app-topbar__title strong.app-topbar__crumb-child { max-width: 48ch; }
 .app-topbar__actions {
   display: flex;
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+/* the open page's main actions, on the breadcrumb's row */
+.app-topbar__page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+}
+.app-topbar__page-actions:empty {
+  display: none;
 }
 .app-content {
   flex: 1;
@@ -477,9 +495,11 @@
   .app-shell[data-collapsed] .account-menu--sidebar .account-menu__panel { right: 0; width: auto; }
   .app-shell[data-collapsed] .app-sidebar__badge { position: static; width: auto; height: auto; min-width: 20px; padding: 1px 6px; color: #fff; box-shadow: none; }
   .app-shell button.app-topbar__toggle--desktop { display: none; }
-  .app-shell button.app-topbar__toggle--mobile { display: grid; }
+  /* the bottom tab bar ("Thêm") opens the drawer on phones */
+  .app-shell button.app-topbar__toggle--mobile, .app-topbar__divider { display: none; }
   .app-topbar__title > span:first-child,
-  .app-topbar__title > span[aria-hidden] { display: none; }
+  .app-topbar__title > span[aria-hidden],
+  .app-topbar__crumb-link { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .app-shell,

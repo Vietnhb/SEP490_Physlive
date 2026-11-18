@@ -15,6 +15,9 @@ import org.springframework.util.StringUtils;
 
 @Configuration
 public class DatabaseConfig {
+    private static final long KEEPALIVE_MS = 30_000;
+    private static final long ALIVE_BYPASS_MS = 15_000;
+    private static final String ALIVE_BYPASS_PROPERTY = "com.zaxxer.hikari.aliveBypassWindowMs";
 
     @Bean
     public DataSource dataSource(Environment environment) {
@@ -45,6 +48,11 @@ public class DatabaseConfig {
         hikari.setConnectionTimeout(requiredPositiveLong(environment, "DB_CONNECTION_TIMEOUT_MS"));
         hikari.setIdleTimeout(requiredPositiveLong(environment, "DB_POOL_IDLE_TIMEOUT_MS"));
         hikari.setMaxLifetime(requiredPositiveLong(environment, "DB_POOL_MAX_LIFETIME_MS"));
+        // Hikari checks a connection that sat idle for more than 0.5 s before lending it out: one extra round trip
+        // to the remote database on almost every request. Idle connections are checked in the background instead.
+        hikari.setKeepaliveTime(KEEPALIVE_MS);
+        if (System.getProperty(ALIVE_BYPASS_PROPERTY) == null)
+            System.setProperty(ALIVE_BYPASS_PROPERTY, Long.toString(ALIVE_BYPASS_MS));
         return new HikariDataSource(hikari);
     }
 

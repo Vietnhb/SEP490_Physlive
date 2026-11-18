@@ -45,7 +45,7 @@ export default function CountUp({
     const str = num.toString();
     if (str.includes('.')) {
       const decimals = str.split('.')[1];
-      if (parseInt(decimals) !== 0) {
+      if (Number.parseInt(decimals) !== 0) {
         return decimals.length;
       }
     }
@@ -66,7 +66,7 @@ export default function CountUp({
 
       const formattedNumber = Intl.NumberFormat('en-US', options).format(latest);
 
-      return separator ? formattedNumber.replace(/,/g, separator) : formattedNumber;
+      return separator ? formattedNumber.replaceAll(",", separator) : formattedNumber;
     },
     [maxDecimals, separator]
   );

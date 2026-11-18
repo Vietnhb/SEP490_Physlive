@@ -2,7 +2,6 @@ package com.example.backend.config;
 
 import com.example.backend.base.web.dto.ErrorResponse;
 import com.example.backend.security.JwtFilter;
-import com.example.backend.system.school.model.entity.School;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -36,8 +35,10 @@ public class SecurityConfig {
     private static final String STAFF = "STAFF";
     private static final String STUDENT = "STUDENT";
     private static final String[] APPLICATION_ROLES = {MANAGER, REVIEWER, SCHOOL, STAFF, STUDENT};
-    private static final String LIBRARY = "/api/library", LIBRARY_ALL = "/api/library/**";
-    private static final String SCHEMAS = "/api/schemas", SCHEMAS_ALL = "/api/schemas/**";
+    private static final String LIBRARY = "/api/library";
+    private static final String LIBRARY_ALL = "/api/library/**";
+    private static final String SCHEMAS = "/api/schemas";
+    private static final String SCHEMAS_ALL = "/api/schemas/**";
     private final JwtFilter jwtFilter;
     private final ObjectMapper objectMapper;
     private final SecurityProperties securityProperties;
@@ -112,6 +113,8 @@ public class SecurityConfig {
                 .requestMatchers(POST, SCHEMAS, SCHEMAS_ALL).hasAnyRole(REVIEWER, MANAGER)
                 .requestMatchers(PUT, SCHEMAS, SCHEMAS_ALL).hasAnyRole(REVIEWER, MANAGER)
                 .requestMatchers(SCHEMAS, SCHEMAS_ALL).hasAnyRole(APPLICATION_ROLES)
+                // every signed-in role hears that data changed, the platform admin too; what changed is read through checked APIs
+                .requestMatchers(GET, "/api/realtime/events").hasAnyRole(ADMIN, MANAGER, REVIEWER, SCHOOL, STAFF, STUDENT)
                 .anyRequest().hasAnyRole(APPLICATION_ROLES))
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

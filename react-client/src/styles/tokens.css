@@ -10,7 +10,8 @@
   --ink: #172033;
   --ink-2: #344054;
   --muted: #667085;
-  --subtle: #98a2b3;
+  /* secondary text: at least 4.5:1 on every light surface */
+  --subtle: #626d7e;
   --line: #e4e8ee;
   --line-strong: #d0d7e2;
 

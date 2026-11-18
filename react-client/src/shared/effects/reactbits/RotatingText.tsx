@@ -118,7 +118,7 @@ const RotatingText = forwardRef<RotatingTextRef, RotatingTextProps>((props, ref)
         return Math.abs(center - index) * staggerDuration;
       }
       if (staggerFrom === 'random') {
-        const randomIndex = Math.floor(Math.random() * total);
+        const randomIndex = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % total;
         return Math.abs(randomIndex - index) * staggerDuration;
       }
       return Math.abs((staggerFrom as number) - index) * staggerDuration;

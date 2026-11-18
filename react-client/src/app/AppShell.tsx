@@ -7,6 +7,7 @@ import LicenseNotice from "./LicenseNotice";
 import { useSessionStore } from "../shared/auth/sessionStore";
 import { useEffectiveTheme } from "../shared/theme/themeStore";
 import academic from "../shared/layout/AcademicChrome.module.css";
+import { inAndroidApp } from "../shared/lib/appShell";
 
 export default function AppShell({ children }: PropsWithChildren) {
   const { pathname } = useLocation();
@@ -32,8 +33,10 @@ export default function AppShell({ children }: PropsWithChildren) {
       (prefix) => pathname === prefix || pathname.startsWith(prefix + "/"),
     );
   const shellClassName = `${fullPage ? "full-shell" : "shell"} ${academicPage ? academic.chrome : ""}`;
+  // the app opens on sign-in; the website's menu (introduction, terms, school sign-up) is not part of it
+  const appSignIn = inAndroidApp() && !user;
   const content = <>
-      {!fullPage && !passwordRequired && <NavBar />}
+      {!fullPage && !passwordRequired && !appSignIn && <NavBar />}
       {!passwordRequired && <LicenseNotice />}
       {children}
     </>;

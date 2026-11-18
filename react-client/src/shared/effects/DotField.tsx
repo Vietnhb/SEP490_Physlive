@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { inAndroidApp } from "../lib/appShell";
 
 type DotFieldProps = {
   /** Distance between dots in CSS pixels. */
@@ -152,5 +153,7 @@ export default function DotField({
     };
   }, [gap, radius, color, activeColor]);
 
+  // decoration only: the phone app keeps its GPU and battery for the simulations
+  if (inAndroidApp()) return null;
   return <canvas ref={canvasRef} className={`dot-field ${className}`} aria-hidden="true" />;
 }

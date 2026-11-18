@@ -1,12 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { motion, useReducedMotion } from "motion/react";
 import LearningIcon from "../ui/LearningIcon";
 import BrandMark from "../ui/BrandMark";
 import ThemeToggle from "../theme/ThemeToggle";
 import AccountMenu from "./AccountMenu";
+import MobileTabBar from "./MobileTabBar";
 import "./AppSidebar.css";
 import { PageBreadcrumbContext, type PageBreadcrumb } from "./PageBreadcrumbContext";
+import { PageActionsSlot } from "./PageActionsContext";
 
 type IconName = Parameters<typeof LearningIcon>[0]["name"];
 
@@ -62,7 +64,20 @@ export default function AppSidebarLayout({ id, subtitle, home, groups, actions, 
   // The drawer belongs to the page it was opened on; navigating closes it.
   const [drawerPath, setDrawerPath] = useState<string | null>(null);
   const [pageBreadcrumb, setPageBreadcrumb] = useState<PageBreadcrumb>();
+  const [pageActions, setPageActions] = useState<HTMLDivElement | null>(null);
   const drawerOpen = drawerPath === pathname;
+  // a page that names itself keeps its own heading; one that does not gets the menu name as its heading
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [ownHeading, setOwnHeading] = useState(true);
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    const check = () => setOwnHeading(Boolean(content.querySelector("h1:not([data-layout-heading])")));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(content, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [pathname]);
 
   const toggleCollapsed = () => setCollapsed(value => {
     try { localStorage.setItem(STORAGE_KEY, value ? "expanded" : "collapsed"); } catch { /* keep for this visit */ }
@@ -80,10 +95,18 @@ export default function AppSidebarLayout({ id, subtitle, home, groups, actions, 
 
   const items = groups.flatMap(group => group.items);
   const current = items.filter(item => isActive(pathname, item)).sort((a, b) => b.to.length - a.to.length)[0];
+  // a detail page's own name (set by the page), else the item's generic child name on nested routes
+  const childCrumb = pageBreadcrumb?.path === pathname ? pageBreadcrumb.title
+    : current?.childTitle && pathname.startsWith(`${current.to}/`) ? current.childTitle : undefined;
   const spring = reduced ? { duration: 0 } : { type: "spring" as const, stiffness: 420, damping: 36 };
+  // Phones: the first sections become tabs; the rest, and the account menu when it lives in the sidebar, stay in the drawer.
+  const tabs = items.slice(0, 4);
+  const drawerOnly = items.slice(4);
+  const needsMore = drawerOnly.length > 0 || accountPlacement === "sidebar";
 
   return (
     <PageBreadcrumbContext.Provider value={setPageBreadcrumb}>
+    <PageActionsSlot.Provider value={pageActions}>
     <div className={`app-shell ${shellClassName}`} data-collapsed={collapsed || undefined} data-drawer={drawerOpen || undefined}>
       <button type="button" className="app-scrim" aria-label="Đóng menu" tabIndex={drawerOpen ? 0 : -1} onClick={() => setDrawerPath(null)} />
       <aside className="app-sidebar" aria-label={`Điều hướng ${subtitle}`}>
@@ -126,16 +149,25 @@ export default function AppSidebarLayout({ id, subtitle, home, groups, actions, 
           <button type="button" className="app-topbar__toggle app-topbar__toggle--desktop" onClick={toggleCollapsed} aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"} aria-pressed={collapsed} title="Thu gọn / mở rộng (Ctrl+B)"><LearningIcon name="panel" /></button>
           <button type="button" className="app-topbar__toggle app-topbar__toggle--mobile" onClick={() => setDrawerPath(drawerOpen ? null : pathname)} aria-label="Mở menu" aria-expanded={drawerOpen}><LearningIcon name="menu" /></button>
           <span className="app-topbar__divider" aria-hidden="true" />
-          <p className="app-topbar__title"><span>{subtitle}</span>{current && <><span aria-hidden="true">/</span><strong>{current.title ?? current.label}</strong>{current.childTitle && pathname.startsWith(`${current.to}/`) && <><span aria-hidden="true">/</span><strong>{pageBreadcrumb?.path === pathname ? pageBreadcrumb.title : current.childTitle}</strong></>}</>}</p>
+          <p className="app-topbar__title"><span>{subtitle}</span>{current && <><span aria-hidden="true">/</span>{childCrumb ? <Link to={current.to} className="app-topbar__crumb-link">{current.title ?? current.label}</Link> : <strong>{current.title ?? current.label}</strong>}{childCrumb && <><span aria-hidden="true">/</span><strong className="app-topbar__crumb-child" title={childCrumb}>{childCrumb}</strong></>}</>}</p>
           <div className="app-topbar__actions">
+            <div ref={setPageActions} className="app-topbar__page-actions" />
             {actions}
             {showThemeToggle && <ThemeToggle />}
             {accountPlacement === "topbar" && <AccountMenu variant="workspace" />}
           </div>
         </header>
-        <div className={`app-content ${contentClassName}`}>{children ?? <Outlet />}</div>
+        <div ref={contentRef} className={`app-content ${contentClassName}`}>
+          {!ownHeading && current && <h1 className="sr-only" data-layout-heading>{current.title ?? current.label}</h1>}
+          {children ?? <Outlet />}
+        </div>
+        <MobileTabBar
+          items={tabs.map(item => ({ to: item.to, label: item.label, icon: item.icon, badge: item.badge, active: current?.to === item.to }))}
+          more={needsMore ? { onOpen: () => setDrawerPath(pathname), badge: drawerOnly.reduce((sum, item) => sum + (item.badge ?? 0), 0), accountOnly: drawerOnly.length === 0 } : undefined}
+        />
       </div>
     </div>
+    </PageActionsSlot.Provider>
     </PageBreadcrumbContext.Provider>
   );
 }

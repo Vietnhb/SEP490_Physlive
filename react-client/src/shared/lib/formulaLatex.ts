@@ -168,7 +168,7 @@ function displayExpression(source: string): string {
 
 export type PresentedEquation = { latex: string; before?: string; after?: string };
 export function equationLatex(source: string): PresentedEquation {
-  const normalized = source.replace(/×|·/g, "*").replace(/÷/g, "/").replace(/−/g, "-").trim();
+  const normalized = source.replaceAll(/×|·/g, "*").replaceAll("÷", "/").replaceAll("−", "-").trim();
   if (!normalized || normalized.length > MAX_LENGTH) throw new FormulaError("Công thức trống hoặc quá dài");
   // Reuse the established schema grammar for ordinary expressions.
   const convert = (text: string): string => {
@@ -184,7 +184,7 @@ export function equationLatex(source: string): PresentedEquation {
   // Never drop an unparsed mathematical operator or a lone symbol.
   for (const boundary of [...normalized.matchAll(/\s+/g)].reverse()) {
     const tail = normalized.slice(boundary.index! + boundary[0].length);
-    if (!/^(?:\([A-Za-zÀ-ỹ]|[A-Za-zÀ-ỹ])/.test(tail) || !/[À-ỹ]|[A-Za-z]+[ ,]+[A-Za-z]+/.test(tail)) continue;
+    if (!/^(?:\([A-Za-zÀ-ỹ]|[A-Za-zÀ-ỹ])/.test(tail) || !/[À-ỹ]|[A-Za-z][ ,]+[A-Za-z]/.test(tail)) continue;
     try { return { latex: convert(normalized.slice(0, boundary.index)), after: tail }; } catch { /* Try another prose boundary. */ }
   }
   throw new FormulaError("Giữ nguyên dòng công thức chưa hỗ trợ");

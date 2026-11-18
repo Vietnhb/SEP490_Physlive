@@ -27,7 +27,7 @@
 .chrome :global(.admin-shell .admin-role-pill) { background: var(--accent-3); color: var(--accent-11) !important; border-radius: 6px; font-size: 11px !important; font-weight: 600; }
 .chrome :global(.admin-shell .admin-topbar-user) { background: transparent; padding: 4px 8px; }
 
-.chrome :global(.admin-shell .admin-content) { max-width: 1600px; padding: 32px; }
+.chrome :global(.admin-shell .admin-content) { padding: 32px; }
 .chrome :global(.admin-shell .admin-content-header) { margin: 0 0 24px; padding: 0; align-items: center; justify-content: space-between; }
 .chrome :global(.admin-shell .admin-content-header > div:first-child) { display: block; }
 .chrome :global(.admin-shell .admin-content-title) { margin: 0; font-size: 26px; font-weight: 650; line-height: 1.3; letter-spacing: -.035em; }
@@ -100,3 +100,43 @@
 /* Radix cards already draw a hairline border; keep a single outline. */
 .chrome :global(.rt-Card.admin-stat-card::after),
 .chrome :global(.rt-Card.admin-panel::after) { box-shadow: none; }
+
+/*
+ * One page, one frame. Every management page (operations, school, admin) is a title row and the frame that holds its
+ * work: the frame spans the whole content width, reaches the bottom of the window, and the table inside it grows into
+ * that space instead of stopping in a short box on grey. Frames share one radius, border and padding.
+ */
+.chrome :global(.app-content.admin-shell) { display: flex; flex-direction: column; }
+.chrome :global(.admin-shell > .admin-content),
+.chrome :global(.admin-shell > .support-page) { flex: 1 0 auto; display: flex; flex-direction: column; width: 100%; max-width: none; margin: 0; padding: 32px; gap: 0; }
+.chrome :global(.admin-shell > .support-page > :first-child) { margin-bottom: 24px; }
+/* a page whose single frame sits in a wrapper (the class list) stretches through it */
+.chrome :global(.admin-shell > .admin-content > .school-classes-grid:last-child) { flex: 1 0 auto; display: flex; flex-direction: column; }
+.chrome :global(.admin-shell > .admin-content > .school-classes-grid:last-child > .admin-panel:only-child) { flex: 1 0 auto; display: flex; flex-direction: column; margin-bottom: 0; }
+.chrome :global(.admin-shell > .admin-content > .school-classes-grid:last-child > .admin-panel:only-child > .admin-table-scroll) { flex: 1 0 auto; }
+.chrome :global(.admin-shell > .admin-content > .admin-panel:last-child),
+.chrome :global(.admin-shell > .support-page > .support-panel:last-child) { flex: 1 0 auto; display: flex; flex-direction: column; margin-bottom: 0; }
+.chrome :global(.admin-shell > .admin-content > .admin-panel:last-child > .rt-TableRoot),
+.chrome :global(.admin-shell > .admin-content > .admin-panel:last-child > .admin-table-scroll),
+.chrome :global(.admin-shell > .support-page > .support-panel:last-child > .support-scroll) { flex: 1 0 auto; max-height: none; }
+.chrome :global(.admin-shell .support-panel) { padding: 24px; border-radius: 12px; border-color: var(--gray-5); box-shadow: var(--shadow-xs); }
+@media (max-width: 900px) {
+  .chrome :global(.admin-shell > .admin-content),
+  .chrome :global(.admin-shell > .support-page) { padding: 24px; }
+}
+@media (max-width: 600px) {
+  .chrome :global(.admin-shell > .admin-content),
+  .chrome :global(.admin-shell > .support-page) { padding: 24px 16px; }
+  .chrome :global(.admin-shell .support-panel) { padding: 16px; }
+}
+
+/*
+ * The breadcrumb in the top bar already names the page, so a page's own title is not shown a second time: it stays
+ * for screen readers and the browser tab, and the header row keeps the page's summary line and its actions.
+ */
+.chrome :global(.app-content .admin-content-title),
+.chrome :global(.app-content > .support-page--manager > :first-child h1) {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.chrome :global(.app-content .admin-content-description),
+.chrome :global(.app-content > .support-page--manager > :first-child header p) { margin: 0; font-size: 14px; color: var(--gray-11); }

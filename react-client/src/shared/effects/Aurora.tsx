@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { inAndroidApp } from "../lib/appShell";
 
 const VERTEX = `#version 300 es
 in vec2 position;
@@ -139,5 +140,7 @@ export default function Aurora({
     };
   }, [colors, intensity]);
 
+  // decoration only: the phone app keeps its GPU and battery for the simulations
+  if (inAndroidApp()) return null;
   return <canvas ref={canvasRef} className={`aurora ${className}`} aria-hidden="true" />;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { login } from "../api/authApi";
+import { LOGIN_TIMEOUT_SECONDS, login } from "../api/authApi";
 import { setToken } from "../../../shared/lib/token";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import LearningIcon from "../../../shared/ui/LearningIcon";
@@ -11,6 +11,7 @@ import DotField from "../../../shared/effects/DotField";
 import Aurora from "../../../shared/effects/Aurora";
 import { SplitWords } from "../../../shared/effects/Motion";
 import { useEffectiveTheme } from "../../../shared/theme/themeStore";
+import { inAndroidApp } from "../../../shared/lib/appShell";
 import "../styles/account.css";
 
 const AURORA_DARK: [string, string, string] = ["#1d4ed8", "#22d3ee", "#8b5cf6"];
@@ -56,7 +57,7 @@ export default function Login() {
     catch (err: unknown) {
       if (requestRef.current !== controller) return;
       if (axios.isCancel(err)) setError("Đã hủy đăng nhập. Bạn có thể thử lại.");
-      else if (axios.isAxiosError(err) && (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT")) setError("Máy chủ chưa phản hồi sau 15 giây. Vui lòng thử đăng nhập lại.");
+      else if (axios.isAxiosError(err) && (err.code === "ECONNABORTED" || err.code === "ETIMEDOUT")) setError(`Máy chủ chưa phản hồi sau ${LOGIN_TIMEOUT_SECONDS} giây. Vui lòng thử đăng nhập lại.`);
       else if (axios.isAxiosError<{ message?: string }>(err) && err.response) setError(err.response.data?.message ?? (err.response.status === 401 ? "Email hoặc mật khẩu không đúng." : "Không thể đăng nhập."));
       else setError("Không thể kết nối tới máy chủ.");
     } finally {
@@ -78,18 +79,18 @@ export default function Login() {
         <p>Đăng nhập bằng tài khoản do nhà trường hoặc PhysLive cấp.</p>
       </div>
       <form onSubmit={handleLogin} className="account-form">
-        <label>
+        <label htmlFor="login-email">
           <span>Email</span>
           <span className="account-field">
             <svg className="account-field__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7.5 8 6 8-6" /></svg>
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@truong.edu.vn" autoComplete="email" autoFocus required disabled={loading} />
+            <input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="ten@truong.edu.vn" autoComplete="email" autoFocus required disabled={loading} />
           </span>
         </label>
-        <label>
+        <label htmlFor="login-password">
           <span>Mật khẩu</span>
           <span className="account-field account-password">
             <svg className="account-field__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></svg>
-            <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)}
+            <input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)}
               onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} autoComplete="current-password" required disabled={loading} />
             <button type="button" className="account-password-toggle" onClick={() => setShowPassword((value) => !value)} aria-pressed={showPassword}
               aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
@@ -108,10 +109,11 @@ export default function Login() {
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5.5M12 7.8v.2" /></svg>
         <span>Quên mật khẩu? Liên hệ quản lý trường để được đặt lại. Giáo viên và học sinh nhận tài khoản từ quản lý trường.</span>
       </p>
-      <div className="account-links">
+      {/* schools sign up and pay on the website; the app is for the accounts they hand out */}
+      {!inAndroidApp() && <div className="account-links">
         <span>Trường chưa dùng PhysLive?</span>
         <Link to="/signup">Đăng ký cho trường</Link>
-      </div>
+      </div>}
     </section>
     </div>
   </main>;

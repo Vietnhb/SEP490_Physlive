@@ -19,9 +19,9 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @RequiredArgsConstructor
 public class AccountCapabilityInterceptor implements HandlerInterceptor {
     /** Routes this interceptor must be registered for. */
-    public static final String[] PATHS = {"/api/reviewer/**", "/api/evaluations/**", "/api/schemas/**",
+    public static final List<String> PATHS = List.of("/api/reviewer/**", "/api/evaluations/**", "/api/schemas/**",
         "/api/simulation/**", "/api/problems/**", "/api/specifications/**", "/api/exports/**",
-        "/api/assignments", "/api/assignments/**", "/api/user/students", "/api/library", "/api/library/**"};
+        "/api/assignments", "/api/assignments/**", "/api/user/students", "/api/library", "/api/library/**");
     private static final List<String> READ_METHODS = List.of("GET", "HEAD", "OPTIONS");
     private static final Pattern COMMUNITY_INTERACTION = Pattern.compile("^/api/library/[^/]+/(comments(/[^/]+)?|reaction)$");
 

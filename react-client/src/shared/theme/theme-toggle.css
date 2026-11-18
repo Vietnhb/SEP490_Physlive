@@ -54,7 +54,6 @@ button.theme-menu__trigger {
 .theme-menu__list--start { left: 0; transform-origin: top left; }
 button.theme-menu__item {
   appearance: none;
-  min-height: 0;
   margin: 0;
   border: 0;
   background: transparent;

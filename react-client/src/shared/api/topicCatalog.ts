@@ -8,7 +8,7 @@ type SchemaSummary = { topic?: string | null; name?: string | null; lifecycleSta
  * catalogue every signed-in role may read. An approved version names its topic before any other version.
  */
 export function loadTopicNames(): Promise<Map<string, string>> {
-  return readData<SchemaSummary[]>("/schemas").then(data => {
+  return readData<SchemaSummary[]>("/schemas/topic-names").then(data => {
     const names = new Map<string, string>();
     const ordered = [...data].sort((a, b) => Number(b.lifecycleStatus === "APPROVED") - Number(a.lifecycleStatus === "APPROVED"));
     for (const schema of ordered) if (schema.topic && schema.name && !names.has(schema.topic)) names.set(schema.topic, schema.name);

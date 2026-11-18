@@ -5,6 +5,7 @@ import BrandMark from "../ui/BrandMark";
 import { ActivePill } from "../effects/Motion";
 import { ThemeSegmented } from "../theme/ThemeToggle";
 import AccountMenu from "./AccountMenu";
+import MobileTabBar from "./MobileTabBar";
 import { useSessionStore } from "../auth/sessionStore";
 
 type HeaderVariant = "workspace" | "submissions";
@@ -49,6 +50,14 @@ export default function LearningHeader({
   }, [settingsOpen]);
 
   const isSubmissions = variant === "submissions";
+  // three jobs, three places: make a simulation, run assignments (give, follow, grade), keep simulations
+  const inLibrary = pathname.startsWith("/lab/library") || pathname.startsWith("/lab/community");
+  const journey = [
+    { to: "/workspace", label: "Mô phỏng", icon: "atom" as const, active: pathname === "/workspace" },
+    { to: "/lab", label: "Bài tập", icon: "book" as const,
+      active: pathname === "/assignments/workspace" || (pathname.startsWith("/lab") && !inLibrary) },
+    { to: "/lab/library", label: "Thư viện", icon: "folder" as const, active: inLibrary },
+  ];
 
   return (
     <header className="learn-header unified-header" data-header-variant={variant}>
@@ -74,10 +83,10 @@ export default function LearningHeader({
       </div>
 
       <nav className="learn-journey" aria-label="Điều hướng workspace">
-        <Link to="/workspace" aria-current={pathname === "/workspace" ? "page" : undefined} className={pathname === "/workspace" ? "active" : ""}>{pathname === "/workspace" && <ActivePill id="learn-journey-pill" />}<span>Mô phỏng</span></Link>
-        <Link to="/assignments/workspace" aria-current={pathname === "/assignments/workspace" ? "page" : undefined} className={pathname === "/assignments/workspace" ? "active" : ""}>{pathname === "/assignments/workspace" && <ActivePill id="learn-journey-pill" />}<span>Giao bài</span></Link>
-        <Link to="/lab" aria-current={pathname.startsWith("/lab") ? "page" : undefined} className={pathname.startsWith("/lab") ? "active" : ""}>{pathname.startsWith("/lab") && <ActivePill id="learn-journey-pill" />}<span>Quản lý</span></Link>
+        {journey.map(step => <Link key={step.to} to={step.to} aria-current={step.active ? "page" : undefined} className={step.active ? "active" : ""}>{step.active && <ActivePill id="learn-journey-pill" />}<span>{step.label}</span></Link>)}
       </nav>
+      {/* phones hide the journey links in the header; the same steps become the bottom tabs */}
+      <MobileTabBar items={journey} spacer={false} />
 
       <div className="learn-header-actions">
         {!isSubmissions && <>

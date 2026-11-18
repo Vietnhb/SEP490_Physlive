@@ -2,12 +2,18 @@ import { type ReactNode } from "react";
 import { Button as ThemeButton, Callout, Card, Heading, Text } from "@radix-ui/themes";
 import { motion, useReducedMotion } from "motion/react";
 import LearningIcon from "./LearningIcon";
+import PageActions from "../layout/PageActions";
+import { usePageActionsInTopbar } from "../layout/PageActionsContext";
 import { CardLoadingSkeleton, TableLoadingSkeleton } from "./LoadingSkeleton";
 
 type IconName = "grid" | "users" | "book" | "activity" | "shield" | "refresh" | "plus" | "check" | "search" | "close";
 
 export function PageHeader({ title, description, action }: Readonly<{ title: string; description: string; action?: ReactNode }>) {
-  return <header className="admin-content-header"><div><Heading as="h1" size="7" className="admin-content-title">{title}</Heading>{description && <Text as="p" size="2" color="gray" className="admin-content-description">{description}</Text>}</div>{action}</header>;
+  const inTopbar = usePageActionsInTopbar();
+  // Inside an area with a top bar the breadcrumb names the page and the bar holds its actions: no header row at all.
+  if (inTopbar) return <>{title && <Heading as="h1" className="sr-only">{title}</Heading>}<PageActions>{action}</PageActions></>;
+  if (!title && !description && !action) return null;
+  return <header className="admin-content-header"><div>{title && <Heading as="h1" size="7" className="admin-content-title">{title}</Heading>}{description && <Text as="p" size="2" color="gray" className="admin-content-description">{description}</Text>}</div>{action}</header>;
 }
 
 export function Panel({ title, description, children, action, className, hideHeader = false }: Readonly<{ title: string; description?: string; children: ReactNode; action?: ReactNode; className?: string; hideHeader?: boolean }>) {

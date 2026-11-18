@@ -4,7 +4,16 @@ import { API_URL } from "../../config/api";
 import { clearToken, getToken } from "../lib/token";
 import { useSessionStore } from "../auth/sessionStore";
 
-export const realtimeClientId = globalThis.crypto?.randomUUID?.() ?? `client-${Date.now()}-${Math.random()}`;
+/** This tab's id, so it can tell its own changes from other tabs' in realtime events. */
+function newClientId(): string {
+  const random = globalThis.crypto;
+  if (typeof random.randomUUID === "function") return random.randomUUID();
+  // randomUUID needs a secure context (https or localhost); getRandomValues works everywhere
+  const bytes = random.getRandomValues(new Uint8Array(16));
+  return `client-${Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+export const realtimeClientId = newClientId();
 
 const axiosClient = axios.create({
     baseURL: API_URL

@@ -64,7 +64,7 @@ function tokenize(source: string): Token[] {
 
 /** Parses "a * sin(w * t) + 2" into the AST the backend runs. Throws FormulaError with a Vietnamese message. */
 export function parseFormula(source: string): Ast {
-  const tokens = tokenize(source.replace(/×|·/g, "*").replace(/÷/g, "/").replace(/−/g, "-"));
+  const tokens = tokenize(source.replaceAll(/×|·/g, "*").replaceAll("÷", "/").replaceAll("−", "-"));
   if (tokens.length === 0) throw new FormulaError("Công thức đang để trống");
   let index = 0;
   const peek = (text: string) => tokens[index]?.kind === "symbol" && tokens[index].text === text;

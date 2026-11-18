@@ -6,6 +6,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./app/App";
 import "./styles/global.css";
 import "./shared/theme/themeStore";
+import { markAndroidApp } from "./shared/lib/appShell";
+
+markAndroidApp();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -4,8 +4,10 @@ import { useSessionStore } from "../shared/auth/sessionStore";
 import { isStudentRole, ROLE_NAMES, LEARNING_MANAGER_ROLES, CONTENT_REVIEW_ROLES, APPLICATION_ROLES } from "../shared/auth/roles";
 import { canTeach, isAccountSuspended, isDepartmentHead, userHome } from "../shared/auth/permissions";
 import RequireAccess from "./RequireAccess";
+import NotFoundPage from "./NotFoundPage";
 import AccountSuspendedBanner from "../features/account/components/AccountSuspendedBanner";
 import { CardLoadingSkeleton } from "../shared/ui/LoadingSkeleton";
+import { inAndroidApp } from "../shared/lib/appShell";
 
 const AdminDirectory = lazy(() => import("../features/account/pages/AdminDirectory"));
 const MySupport = lazy(() => import("../features/support/pages/MySupport"));
@@ -106,7 +108,8 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
         <AccountSuspendedBanner />
         <Routes>
           {/* Home is the guest landing page; signed-in accounts go to their own area. */}
-          <Route path="/" element={!authReady ? <RouteLoading /> : user ? <Navigate to={userHome(user)} replace /> : <Home />} />
+          {/* the marketing page is for visitors of the website; the app opens on sign-in */}
+          <Route path="/" element={!authReady ? <RouteLoading /> : user ? <Navigate to={userHome(user)} replace /> : inAndroidApp() ? <Navigate to="/login" replace /> : <Home />} />
           <Route path="/change-password" element={<RequireAccess ready={authReady}><ForcedPasswordChange /></RequireAccess>} />
           <Route path="/department" element={roleElement([ROLE_NAMES.STAFF],
             isDepartmentHead(user) && user?.schoolId ? <DepartmentWorkspace /> : <Navigate to="/assignments" replace />)} />
@@ -129,9 +132,9 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route index element={<Lab />} />
             <Route path="complaints" element={<TeacherComplaints />} />
             <Route path="library" element={<Library />} />
-            <Route path="community" element={<TeacherThemed><CommunityLibrary /></TeacherThemed>} />
+            <Route path="community" element={<TeacherThemed><CommunityLibrary inApp /></TeacherThemed>} />
             <Route path="department" element={isDepartmentHead(user) && user?.schoolId ? <DepartmentWorkspace /> : <Navigate to="/lab" replace />} />
-            <Route path="*" element={<Navigate to="/lab" replace />} />
+            <Route path="*" element={<NotFoundPage home="/lab" />} />
           </Route>
           {/* Teachers use the library inside their management area, next to submissions and complaints. */}
           <Route path="/library" element={<RequireAccess ready={authReady} roles={APPLICATION_ROLES}>{user?.role === ROLE_NAMES.MANAGER ? <Navigate to="/manager" replace /> : user?.role === ROLE_NAMES.STAFF && canTeach(user) ? <Navigate to="/lab/library" replace /> : <Library />}</RequireAccess>} />
@@ -147,19 +150,19 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route path="appeals" element={<SupportInbox schoolOnly />} />
             <Route path="reports" element={<SchoolReports />} />
             <Route path="billing" element={<SchoolBilling />} />
-            <Route path="*" element={<Navigate to="/school" replace />} />
+            <Route path="*" element={<NotFoundPage home="/school" />} />
           </Route>
           <Route path="/admin" element={roleElement([ROLE_NAMES.ADMIN], <AdminArea />)}>
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminDirectory />} />
             <Route path="appeals" element={<Navigate to="/admin/users" replace />} />
-            <Route path="*" element={<Navigate to="/admin" replace />} />
+            <Route path="*" element={<NotFoundPage home="/admin" />} />
           </Route>
           <Route path="/student" element={roleElement([ROLE_NAMES.STUDENT], <StudentArea />)}>
             <Route index element={<StudentHome />} />
             <Route path="assignments" element={<StudentTasks />} />
             <Route path="community" element={<StudentCommunity />} />
-            <Route path="*" element={<Navigate to="/student" replace />} />
+            <Route path="*" element={<NotFoundPage home="/student" />} />
           </Route>
           <Route path="/manager" element={roleElement([ROLE_NAMES.MANAGER], <AdminLayout />)}>
             <Route index element={<Admin />} />
@@ -173,6 +176,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route path="payments" element={<AdminPayments />} />
             <Route path="curriculum" element={<AdminCurriculum />} />
             <Route path="validation" element={<AdminValidation />} />
+            <Route path="*" element={<NotFoundPage home="/manager" />} />
           </Route>
           <Route path="/reviewer" element={roleElement(CONTENT_REVIEW_ROLES, <Reviewer />)}>
             <Route index element={<ReviewerHome />} />
@@ -180,7 +184,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route path="topics/:section?" element={<ReviewerTopics />} />
             <Route path="gaps" element={<ReviewerGaps />} />
             <Route path="complaints" element={<ReviewerComplaints />} />
-            <Route path="*" element={<Navigate to="/reviewer" replace />} />
+            <Route path="*" element={<NotFoundPage home="/reviewer" />} />
           </Route>
           <Route path="/curriculum" element={<RequireAccess ready={authReady} roles={APPLICATION_ROLES}><Curriculum /></RequireAccess>} />
           <Route path="/profile" element={<RequireAccess ready={authReady}><ProfilePage /></RequireAccess>} />
@@ -190,6 +194,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/signup/payment-result" element={<SchoolPaymentResult />} />
+          <Route path="*" element={!authReady ? <RouteLoading /> : <NotFoundPage home={user ? userHome(user) : "/"} />} />
         </Routes>
 
   </Suspense>;

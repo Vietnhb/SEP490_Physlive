@@ -156,6 +156,12 @@ h3:where(:not(.rt-Heading)) {
   margin: 0 auto;
   padding: 48px 0;
 }
+/* a row of choices wider than a phone scrolls sideways instead of being cut off */
+.rt-SegmentedControlRoot {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -302,6 +308,17 @@ h3:where(:not(.rt-Heading)) {
   color: var(--ink);
 }
 
+/* A link that starts the page's main task looks like the primary button. */
+a.primary {
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: #fff;
+}
+a.primary:hover {
+  background: var(--accent-hover);
+  color: #fff;
+}
+
 /* ---- Actions in tables ---- */
 .page-action,
 .table-action {
@@ -325,6 +342,20 @@ h3:where(:not(.rt-Heading)) {
 /* ---- Tables ---- */
 .table-wrap {
   overflow-x: auto;
+}
+/* Phones: a .table-stack table becomes one card per row; cells name themselves with data-label. */
+@media (max-width: 600px) {
+  .table-stack table, .table-stack tbody, .table-stack tr, .table-stack td { display: block; height: auto; }
+  .table-stack thead { display: none; }
+  .table-stack tr { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+  .table-stack td { padding: 0; border: 0; min-width: 0; overflow-wrap: anywhere; }
+  .table-stack td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .table-stack .table-stack-title { grid-column: 1 / -1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .table-stack .table-stack-action { grid-column: 1 / -1; }
+  /* Radix segmented controls are as wide as their labels (min-width: max-content); on a phone they share the row */
+  .rt-SegmentedControlRoot { max-width: 100%; min-width: 0; }
+  .rt-SegmentedControlItem { min-width: 0; }
+  .rt-SegmentedControlItemLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-inline: 6px; }
 }
 table:where(:not(.rt-TableRootTable)) {
   width: 100%;

@@ -3,7 +3,7 @@ import { useResource } from "./operationsData";
 
 type TopicSchema = { topic?: string | null; name?: string | null; lifecycleStatus?: string | null };
 export function useTopicName() {
-  const { data } = useResource<TopicSchema[]>("/schemas");
+  const { data } = useResource<TopicSchema[]>("/schemas/topic-names");
   const names = useMemo(() => {
     const result = new Map<string, string>();
     const rows = [...(data ?? [])].sort((a, b) => Number(b.lifecycleStatus === "APPROVED") - Number(a.lifecycleStatus === "APPROVED"));

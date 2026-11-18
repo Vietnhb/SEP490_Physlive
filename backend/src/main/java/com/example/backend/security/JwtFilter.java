@@ -24,6 +24,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
+    private static final String CURRENT_USER_ROUTE = "/api/user/me";
     private static final String ACCOUNT_LOCKED_MESSAGE =
             "Tài khoản đang bị khóa. Vui lòng liên hệ quản trị viên.";
     private static final String SCHOOL_DISABLED_MESSAGE =
@@ -66,7 +67,7 @@ public class JwtFilter extends OncePerRequestFilter {
                 }
                 if (isSuspended) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.setContentType("application/json");
+                    response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
                     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                     String reasonMsg = user.getSuspensionReason() != null ? " Lý do: " + user.getSuspensionReason() : "";
                     objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(
@@ -115,7 +116,7 @@ public class JwtFilter extends OncePerRequestFilter {
                         && !managerRenewalRequest
                         && !licenseActive) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.setContentType("application/json");
+                    response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
                     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
                     objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(
                             HttpServletResponse.SC_FORBIDDEN, "Gói sử dụng của trường hiện không cho phép thay đổi dữ liệu"));
@@ -134,27 +135,27 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private static boolean isManagerBillingPath(String path) {
         return path.startsWith("/api/auth/")
-                || "/api/user/me".equals(path)
+                || CURRENT_USER_ROUTE.equals(path)
                 || "/api/user/me/license".equals(path)
                 || "/api/school/billing".equals(path)
                 || path.startsWith("/api/school/billing/");
     }
 
     private static boolean isSuspendedPortalPath(String method, String path) {
-        return "GET".equals(method) && (List.of("/api/user/me", "/api/appeals/my", "/api/support/mine").contains(path)
+        return "GET".equals(method) && (List.of(CURRENT_USER_ROUTE, "/api/appeals/my", "/api/support/mine").contains(path)
                 || path.matches("/api/appeals/[0-9a-fA-F-]{36}/evidence(?:/[0-9a-fA-F-]{36})?"))
                 || "POST".equals(method) && List.of("/api/appeals", "/api/auth/logout").contains(path);
     }
 
     private static boolean isPasswordLifecyclePath(String method, String path) {
-        return "GET".equals(method) && "/api/user/me".equals(path)
+        return "GET".equals(method) && CURRENT_USER_ROUTE.equals(path)
                 || "PUT".equals(method) && "/api/user/me/password".equals(path)
                 || "POST".equals(method) && "/api/auth/logout".equals(path);
     }
 
     private void writePasswordChangeRequired(HttpServletResponse response) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType("application/json");
+        response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(HttpServletResponse.SC_FORBIDDEN,
                 "Vui lòng đổi mật khẩu khởi tạo trước khi sử dụng hệ thống.", "PASSWORD_CHANGE_REQUIRED", null));
@@ -162,7 +163,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private void writeForbidden(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-        response.setContentType("application/json");
+        response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(
                 HttpServletResponse.SC_FORBIDDEN, message));
