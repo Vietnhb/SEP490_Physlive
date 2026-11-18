@@ -133,7 +133,7 @@ export default function MySupport() {
     </div>
     <Dialog.Root open={!!selected} onOpenChange={open => { if (!open) setSelectedKey(""); }}><Dialog.Content maxWidth="900px" className={s.dialog}>
       <div className={s.dialogHeader}><div><Dialog.Title className={s.dialogTitle}>Chi tiết yêu cầu</Dialog.Title><Dialog.Description className={s.dialogDescription}>{selected?.code} · {selected?.typeLabel}</Dialog.Description></div><Dialog.Close><IconButton variant="ghost" color="gray" aria-label="Đóng chi tiết"><Cross2Icon /></IconButton></Dialog.Close></div>
-      <div className={s.dialogBody} tabIndex={0} aria-label="Nội dung chi tiết yêu cầu">
+      <div className={s.dialogBody} role="region" aria-label="Nội dung chi tiết yêu cầu">
         <h3 className={s.detailSubject}>{selected?.subject}</h3>
         <dl className={s.detailMeta}><div><dt>Thời gian gửi</dt><dd>{selected && timestamp(selected.createdAt)}</dd></div><div><dt>Trạng thái</dt><dd>{selected && <Badge color={selected.color}>{selected.statusLabel}</Badge>}</dd></div></dl>
         <section className={s.detailSection}><h3>Nội dung yêu cầu</h3><p>{selected?.content}</p></section>
