@@ -1,8 +1,6 @@
 package com.example.backend.system.account.repository;
 
 import com.example.backend.system.account.model.entity.User;
-import com.example.backend.system.school.model.entity.ClassEnrollment;
-import com.example.backend.system.school.model.entity.ClassTeacherAssignment;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +27,11 @@ public interface UserRepository extends JpaRepository<User, Integer>, org.spring
     @Query("select r.name as role, u.active as active, count(u) as total from User u left join u.role r where (:schoolId is null or u.school.id = :schoolId) group by r.name, u.active")
     List<RoleCount> accountCounts(@Param("schoolId") UUID schoolId);
 
+    /**
+     * Read on every authenticated request (JwtFilter), so the role, school and permissions it always needs come in
+     * the same statement: one round trip to the database instead of four.
+     */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"role", "school", "permissions"})
     Optional<User> findByEmail(String email);
 
     @Query("select u from User u join u.role r where lower(r.name) = lower(:roleName) and (u.active = true or u.active is null) order by u.fullName")

@@ -6,6 +6,9 @@ import type { User } from "../../../shared/auth/types";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { missingPermission, type AccountDetails } from "../model/accountDetailsModel";
 import { PERMISSION_HINTS, PERMISSION_LABELS, permissionsForRole, type PermissionCode } from "../../../shared/auth/permissions";
+import { shrinkAvatar } from "../../../shared/lib/avatarImage";
+
+const MAX_PICKED_IMAGE = 10 * 1024 * 1024;
 
 export function AccountProfileFields({ value, onChange, name, disabled, idPrefix }: Readonly<{
   value: AccountDetails; onChange: (value: Partial<AccountDetails>) => void; name: string; disabled?: boolean; idPrefix: string;
@@ -20,14 +23,14 @@ export function AccountProfileFields({ value, onChange, name, disabled, idPrefix
     event.currentTarget.value = "";
     if (!file) return;
     setUploadError("");
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 1_572_864) {
-      setUploadError("Chọn ảnh JPG, PNG hoặc WebP tối đa 1,5 MB."); return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > MAX_PICKED_IMAGE) {
+      setUploadError("Chọn ảnh JPG, PNG hoặc WebP tối đa 10 MB."); return;
     }
     setReading(true);
-    const reader = new FileReader();
-    reader.onload = () => { if (typeof reader.result === "string") onChange({ avatarUrl: reader.result }); setReading(false); };
-    reader.onerror = () => { setUploadError("Không thể đọc ảnh. Vui lòng chọn lại."); setReading(false); };
-    reader.readAsDataURL(file);
+    shrinkAvatar(file)
+      .then(avatarUrl => onChange({ avatarUrl }))
+      .catch(() => setUploadError("Không thể đọc ảnh. Vui lòng chọn lại."))
+      .finally(() => setReading(false));
   };
   return <>
     <div style={{ display: "grid", gap: 8 }}>
@@ -43,7 +46,7 @@ export function AccountProfileFields({ value, onChange, name, disabled, idPrefix
         <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={disabled || reading} onChange={chooseImage} />
       </Flex>
       <TextField.Root id={`${idPrefix}-avatar`} name="avatarUrl" size="3" type="url" placeholder="https://…" value={value.avatarUrl.startsWith("data:") ? "" : value.avatarUrl} disabled={disabled || reading} onChange={event => { setUploadError(""); onChange({ avatarUrl: event.target.value }); }} aria-label="URL ảnh đại diện" />
-      <Text size="1" color="gray">JPG, PNG, WebP · tối đa 1,5 MB</Text>
+      <Text size="1" color="gray">JPG, PNG, WebP · tối đa 10 MB, ảnh được thu nhỏ trước khi lưu</Text>
       {uploadError && <Callout.Root size="1" color="red" role="alert"><Callout.Text>{uploadError}</Callout.Text></Callout.Root>}
     </div>
   </>;

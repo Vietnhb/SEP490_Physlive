@@ -1,13 +1,15 @@
 import { useResource } from "../../../shared/hooks/operationsData";
 import type { DataPage } from "../../../shared/api/page";
 import { useRef, useState } from "react";
-import LearningIcon from "../../../shared/ui/LearningIcon";
 import { Badge, Select, Table } from "@radix-ui/themes";
 import { type ValidationRun } from "../api/operationsApi";
 import { PageHeader, Panel, Loading, ErrorNotice, Button } from "../../../shared/ui/ManagementUI";
 import tableScroll from "../../../shared/ui/TableScroll.module.css";
+import { useTopicName } from "../../../shared/hooks/useTopicName";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 export function ValidationView() {
+  const topicName = useTopicName();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -28,24 +30,22 @@ export function ValidationView() {
   };
 
   return <div className="admin-content">
-    <PageHeader title="Kiểm định mô phỏng" description="Nhật ký kết quả kiểm tra do hệ thống ghi nhận khi chạy mô phỏng; không phải trạng thái kiểm duyệt nội dung." action={<Button disabled={loading} onClick={() => void load()}><LearningIcon name="refresh" /> Làm mới</Button>} />
+    <PageHeader title="Kiểm định mô phỏng" description={`${total} lần chạy · Kết quả kiểm tra hệ thống ghi nhận khi chạy mô phỏng, kèm thông báo lỗi nếu có.`} action={<RefreshButton onClick={() => void load()} disabled={loading} />} />
     {error && <ErrorNotice error={error} onRetry={() => void load()} />}
-    {loading ? <Loading text="Đang tải các lần kiểm định…" headers={["Thời gian", "Chủ đề", "Schema", "Bộ giải", "Trạng thái", "Lỗi"]} /> : <Panel title={`${total} lần chạy`} description="Theo dõi kết quả đã lưu và thông báo lỗi của từng lần chạy. Manager có quyền xem nhật ký này.">
+    {loading ? <Loading text="Đang tải các lần kiểm định…" headers={["Thời gian", "Chủ đề", "Phiên bản chủ đề", "Trạng thái", "Lỗi"]} /> : <Panel title={`${total} lần chạy`} hideHeader>
       <Table.Root ref={tableRef} size="2" variant="ghost" className={`admin-table ${tableScroll.viewport}`}>
         <Table.Header><Table.Row>
           <Table.ColumnHeaderCell>Thời gian</Table.ColumnHeaderCell>
           <Table.ColumnHeaderCell>Chủ đề</Table.ColumnHeaderCell>
-          <Table.ColumnHeaderCell>Schema</Table.ColumnHeaderCell>
-          <Table.ColumnHeaderCell>Bộ giải</Table.ColumnHeaderCell>
+          <Table.ColumnHeaderCell>Phiên bản chủ đề</Table.ColumnHeaderCell>
           <Table.ColumnHeaderCell>Trạng thái</Table.ColumnHeaderCell>
           <Table.ColumnHeaderCell>Lỗi</Table.ColumnHeaderCell>
         </Table.Row></Table.Header>
-        <Table.Body>{visibleItems.length === 0 ? <Table.Row><Table.Cell colSpan={6} className="admin-empty-table">Chưa có lần kiểm định.</Table.Cell></Table.Row> : visibleItems.map(item => <Table.Row key={item.id}>
+        <Table.Body>{visibleItems.length === 0 ? <Table.Row><Table.Cell colSpan={5} className="admin-empty-table">Chưa có lần kiểm định.</Table.Cell></Table.Row> : visibleItems.map(item => <Table.Row key={item.id}>
           <Table.Cell>{new Date(item.createdAt).toLocaleString("vi-VN")}</Table.Cell>
-          <Table.Cell>{item.topic}</Table.Cell>
-          <Table.Cell>{item.schemaId} <small>{item.schemaVersion}</small></Table.Cell>
-          <Table.Cell>{item.solverVersion}</Table.Cell>
-          <Table.Cell><Badge color={item.passed ? "cyan" : "red"} size="2">{item.passed ? "Đạt" : "Không đạt"}</Badge></Table.Cell>
+          <Table.Cell>{topicName(item.topic) || "—"}</Table.Cell>
+          <Table.Cell>{item.schemaVersion ? `Bản ${item.schemaVersion}` : "—"}</Table.Cell>
+          <Table.Cell><Badge color={item.passed ? "green" : "red"}>{item.passed ? "Đạt" : "Không đạt"}</Badge></Table.Cell>
           <Table.Cell className={item.errorMessage ? "admin-error-cell" : undefined}>{item.errorMessage || "—"}</Table.Cell>
         </Table.Row>)}</Table.Body>
       </Table.Root>

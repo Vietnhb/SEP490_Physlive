@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PaymentAnalyticsService {
+    private static final String MONTH = "MONTH";
+    private static final String QUARTER = "QUARTER";
     private static final String PAID = "PAID";
     private static final String PENDING = "PENDING";
     private static final String REVIEW = "REQUIRES_REVIEW";
@@ -125,12 +126,12 @@ public class PaymentAnalyticsService {
                 if (year < 2000 || year > 2100) throw ApiException.badRequest("Năm phải nằm trong khoảng 2000–2100.");
                 month = start.getMonthValue();
             }
-            case "MONTH" -> {
+            case MONTH -> {
                 month = requestedMonth == null ? now.getMonthValue() : requestedMonth;
                 if (month < 1 || month > 12) throw ApiException.badRequest("Tháng phải nằm trong khoảng 1–12.");
                 start = LocalDate.of(year, month, 1);
             }
-            case "QUARTER" -> {
+            case QUARTER -> {
                 quarter = requestedQuarter == null ? ((now.getMonthValue() - 1) / 3) + 1 : requestedQuarter;
                 if (quarter < 1 || quarter > 4) throw ApiException.badRequest("Quý phải nằm trong khoảng 1–4.");
                 start = LocalDate.of(year, (quarter - 1) * 3 + 1, 1);
@@ -141,8 +142,8 @@ public class PaymentAnalyticsService {
 
         LocalDate end = switch (period) {
             case "DAY" -> start.plusDays(1);
-            case "MONTH" -> start.plusMonths(1);
-            case "QUARTER" -> start.plusMonths(3);
+            case MONTH -> start.plusMonths(1);
+            case QUARTER -> start.plusMonths(3);
             default -> start.plusYears(1);
         };
         return new PeriodRange(period, year, month, quarter, zone,
@@ -156,14 +157,14 @@ public class PaymentAnalyticsService {
             for (Instant hour = range.from(); hour.isBefore(range.to()); hour = hour.plusSeconds(3600)) {
                 trend.put(hour.toString(), new MutableRevenue());
             }
-        } else if ("MONTH".equals(range.period())) {
+        } else if (MONTH.equals(range.period())) {
             YearMonth selected = YearMonth.of(range.year(), range.month());
             for (int day = 1; day <= selected.lengthOfMonth(); day++) {
                 trend.put(selected.atDay(day).toString(), new MutableRevenue());
             }
         } else {
-            int firstMonth = "QUARTER".equals(range.period()) ? (range.quarter() - 1) * 3 + 1 : 1;
-            int monthCount = "QUARTER".equals(range.period()) ? 3 : 12;
+            int firstMonth = QUARTER.equals(range.period()) ? (range.quarter() - 1) * 3 + 1 : 1;
+            int monthCount = QUARTER.equals(range.period()) ? 3 : 12;
             for (int offset = 0; offset < monthCount; offset++) {
                 trend.put(YearMonth.of(range.year(), firstMonth + offset).toString(), new MutableRevenue());
             }
@@ -177,14 +178,14 @@ public class PaymentAnalyticsService {
             return range.from().plusSeconds(offset * 3600).toString();
         }
         ZonedDateTime local = timestamp.atZone(range.zone());
-        return "MONTH".equals(range.period()) ? local.toLocalDate().toString() : YearMonth.from(local).toString();
+        return MONTH.equals(range.period()) ? local.toLocalDate().toString() : YearMonth.from(local).toString();
     }
 
     private static String bucketLabel(String key, PeriodRange range) {
         if ("DAY".equals(range.period())) {
             return Instant.parse(key).atZone(range.zone()).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
         }
-        if ("MONTH".equals(range.period())) {
+        if (MONTH.equals(range.period())) {
             LocalDate date = LocalDate.parse(key);
             return "%02d/%02d".formatted(date.getDayOfMonth(), date.getMonthValue());
         }

@@ -3,8 +3,7 @@ import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import type { AccountPage } from "../../../shared/api/page";
 import { useState } from "react";
 import { Avatar, Badge, Button, Callout, Card, Dialog, Flex, Heading, IconButton, Select, Table, Text, TextField } from "@radix-ui/themes";
-import { ArrowRightIcon, CheckCircledIcon, Cross2Icon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, PersonIcon, ReloadIcon } from "@radix-ui/react-icons";
-import { motion } from "motion/react";
+import { ArrowRightIcon, CheckCircledIcon, Cross2Icon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { ROLE_NAMES, getRoleLabel } from "../../../shared/auth/roles";
 import type { User, AccountStatus } from "../../../shared/auth/types";
@@ -14,13 +13,14 @@ import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import ManagerAccountActions from "../components/ManagerAccountActions";
 import modal from "../../../shared/ui/ModalScroll.module.css";
+import PageActions from "../../../shared/layout/PageActions";
 
 type UserTier = "ALL" | "SYSTEM" | "SCHOOL" | "INDIVIDUAL";
 
 const USER_TIERS: Record<UserTier, { id: UserTier; label: string; roles: string[]; icon: Parameters<typeof LearningIcon>[0]["name"]; desc: string }> = {
   ALL: { id: "ALL", label: "Tất cả tài khoản", roles: [], icon: "grid", desc: "Toàn bộ tài khoản trong nền tảng" },
-  SYSTEM: { id: "SYSTEM", label: "Quản trị hệ thống", roles: [ROLE_NAMES.ADMIN, ROLE_NAMES.MANAGER], icon: "shield", desc: "Quản trị viên nền tảng và quản lý vận hành" },
-  SCHOOL: { id: "SCHOOL", label: "Trường học", roles: [ROLE_NAMES.SCHOOL, ROLE_NAMES.STAFF], icon: "book", desc: "Tài khoản đại diện trường và giáo viên bộ môn" },
+  SYSTEM: { id: "SYSTEM", label: "Tài khoản nền tảng", roles: [ROLE_NAMES.ADMIN, ROLE_NAMES.MANAGER], icon: "shield", desc: "Quản trị viên nền tảng và quản lý vận hành" },
+  SCHOOL: { id: "SCHOOL", label: "Tài khoản trường", roles: [ROLE_NAMES.SCHOOL, ROLE_NAMES.STAFF], icon: "book", desc: "Tài khoản đại diện trường và giáo viên bộ môn" },
   INDIVIDUAL: { id: "INDIVIDUAL", label: "Cá nhân", roles: [ROLE_NAMES.STUDENT, ROLE_NAMES.REVIEWER], icon: "users", desc: "Học sinh và chuyên gia thẩm định độc lập" },
 };
 
@@ -39,15 +39,25 @@ const roleColors: Record<string, "iris" | "indigo" | "amber" | "cyan" | "green" 
   ADMIN: "iris", MANAGER: "indigo", REVIEWER: "amber", SCHOOL: "cyan", STAFF: "green", STUDENT: "gray"
 };
 
+function accountStatus(user: User): AccountStatus {
+  return user.accountStatus ?? (user.active === false ? "SUSPENDED_READ_ONLY" : "ACTIVE");
+}
+
+function statusLabel(user: User) {
+  const status = accountStatus(user);
+  if (status === "SUSPENDED_READ_ONLY" || user.active === false) return "Tạm khóa (chỉ xem, không thao tác được)";
+  return status === "WARNED" ? "Đã bị cảnh báo" : "Hoạt động";
+}
+
 function accountStatusBadge(user: User) {
-  const status: AccountStatus = user.accountStatus ?? (user.active === false ? "SUSPENDED_READ_ONLY" : "ACTIVE");
+  const status = accountStatus(user);
   if (status === "SUSPENDED_READ_ONLY" || user.active === false) {
-    return <Badge color="red" variant="soft"><LockClosedIcon /> Tạm khóa (Chỉ xem)</Badge>;
+    return <Badge color="red" variant="soft"><LockClosedIcon /> Tạm khóa</Badge>;
   }
   if (status === "WARNED") {
     return <Badge color="amber" variant="soft"><ExclamationTriangleIcon /> Cảnh báo</Badge>;
   }
-  return <Badge color="cyan" variant="soft"><CheckCircledIcon /> Hoạt động</Badge>;
+  return <Badge color="green" variant="soft"><CheckCircledIcon /> Hoạt động</Badge>;
 }
 
 export default function AdminDirectory() {
@@ -94,59 +104,19 @@ export default function AdminDirectory() {
         <div className="directory-heading">
           <div>
             <Flex align="center" gap="3">
-              <Heading as="h1" size="7">Tài khoản người dùng</Heading>
-              <Badge color="amber" size="2" variant="surface">
-                <LearningIcon name="shield" /> Quản lý Manager
-              </Badge>
+              <Heading as="h1" className="admin-content-title" size="7">Tài khoản người dùng</Heading>
             </Flex>
             <Text as="p" size="2" color="gray" mt="1">
-              Tra cứu tài khoản toàn hệ thống. Admin có thể tạo và quản lý Manager; các vai trò khác chỉ được xem.
+              Tra cứu tài khoản toàn hệ thống. Bạn quản lý được tài khoản vận hành (chọn "Quản lý" ở từng dòng); các vai trò khác chỉ xem.
             </Text>
           </div>
-          {canManageManagers && <ManagerAccountActions onSaved={managerSaved} />}
+          {canManageManagers && <PageActions><ManagerAccountActions onSaved={managerSaved} /></PageActions>}
         </div>
         {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
-
-        {/* High-level Stats */}
-        <div className="directory-stats" aria-label="Thống kê tài khoản">
-          {[
-            { label: "Tổng tài khoản", value: (counts.total ?? 0), icon: <PersonIcon /> },
-            { label: "Trường học", value: tierCounts.SCHOOL, icon: <LearningIcon name="book" /> },
-            { label: "Hệ thống", value: tierCounts.SYSTEM, icon: <LearningIcon name="shield" /> },
-            { label: "Cá nhân", value: tierCounts.INDIVIDUAL, icon: <PersonIcon /> },
-          ].map((stat, i) => (
-            <motion.div key={stat.label} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * .035 }} whileHover={{ y: -2 }}>
-              <Card size="3" className="directory-stat">
-                <Flex justify="between" align="center" gap="3">
-                  <Text size="2" color="gray" weight="medium">{stat.label}</Text>
-                  <Badge color="gray" size="3" className="directory-stat-icon">{stat.icon}</Badge>
-                </Flex>
-                <Heading as="h2" size="8" mt="3">{loading ? "—" : stat.value}</Heading>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* View-Only Audit Callout */}
-        <div className="directory-readonly-notice" role="status">
-          <LockClosedIcon />
-          <span>Chọn <strong>Quản lý</strong> trên tài khoản Manager để sửa hồ sơ, đặt lại mật khẩu hoặc khóa/mở tài khoản. Các vai trò khác chỉ cho phép tra cứu.</span>
-        </div>
 
         {/* Full-width User List & Detail Panel */}
         <div className="directory-workspace">
             <Card className="directory-panel" size="1" aria-label="Danh sách tài khoản">
-              <div className="directory-panel-heading">
-                <div>
-                  <Heading as="h2" size="4">
-                    {USER_TIERS[tier].label}
-                  </Heading>
-                  <Text as="p" size="2" color="gray">
-                    {loading ? "Đang tải dữ liệu…" : `${total} / ${(counts.total ?? 0)} tài khoản`}
-                  </Text>
-                </div>
-              </div>
-
               <div className="directory-tier-tabs" role="tablist" aria-label="Lọc theo cấp bậc tài khoản">
                 {TIER_ORDER.map(key => {
                   const item = USER_TIERS[key];
@@ -181,7 +151,7 @@ export default function AdminDirectory() {
                   <Select.Content>
                     <Select.Item value="all">Tất cả vai trò</Select.Item>
                     {(tier === "ALL" ? Object.values(ROLE_NAMES) : USER_TIERS[tier].roles).map(value => (
-                      <Select.Item key={value} value={value}>{getRoleLabel(value)} ({value})</Select.Item>
+                      <Select.Item key={value} value={value}>{getRoleLabel(value)}</Select.Item>
                     ))}
                   </Select.Content>
                 </Select.Root>
@@ -190,9 +160,9 @@ export default function AdminDirectory() {
                   <Select.Trigger aria-label="Lọc trạng thái" />
                   <Select.Content>
                     <Select.Item value="all">Tất cả trạng thái</Select.Item>
-                    <Select.Item value="ACTIVE">Hoạt động (ACTIVE)</Select.Item>
-                    <Select.Item value="WARNED">Cảnh báo (WARNED)</Select.Item>
-                    <Select.Item value="SUSPENDED">Tạm khóa (SUSPENDED)</Select.Item>
+                    <Select.Item value="ACTIVE">Hoạt động</Select.Item>
+                    <Select.Item value="WARNED">Cảnh báo</Select.Item>
+                    <Select.Item value="SUSPENDED">Tạm khóa</Select.Item>
                   </Select.Content>
                 </Select.Root>
 
@@ -243,7 +213,6 @@ export default function AdminDirectory() {
                         <Table.Cell>
                           <Flex direction="column" gap="1" align="start">
                             <Badge color={roleColors[item.role]}>{getRoleLabel(item.role)}</Badge>
-                            <Text size="1" color="gray">{item.role}</Text>
                           </Flex>
                         </Table.Cell>
                         <Table.Cell><Text size="2" color="gray">{organizationLabel(item)}</Text></Table.Cell>
@@ -251,7 +220,7 @@ export default function AdminDirectory() {
                           {accountStatusBadge(item)}
                         </Table.Cell>
                         <Table.Cell>
-                          <Button variant="ghost" aria-label={`${canManageManagers && item.role === "MANAGER" ? "Quản lý Manager" : "Xem chi tiết"} ${item.fullName || item.email}`} onClick={() => openDetails(item.id)}>
+                          <Button variant="ghost" aria-label={`${canManageManagers && item.role === "MANAGER" ? "Quản lý tài khoản vận hành" : "Xem chi tiết"} ${item.fullName || item.email}`} onClick={() => openDetails(item.id)}>
                             {canManageManagers && item.role === "MANAGER" ? "Quản lý" : "Xem"} <ArrowRightIcon />
                           </Button>
                         </Table.Cell>
@@ -305,10 +274,6 @@ export default function AdminDirectory() {
                 </div>
               )}
 
-              <footer className="directory-table-footer">
-                <LearningIcon name="shield" />
-                <span>Admin quản lý tài khoản Manager · Các vai trò khác chỉ được xem</span>
-              </footer>
             </Card>
 
             {/* Open details immediately in view instead of below the full account list. */}
@@ -333,7 +298,6 @@ export default function AdminDirectory() {
                       <Heading as="h3" size="4" mt="3" mb="1">{selected.fullName || "Chưa có họ tên"}</Heading>
                       <Flex justify="center" gap="2" mt="1">
                         <Badge color={roleColors[selected.role]}>{getRoleLabel(selected.role)}</Badge>
-                        <Badge color="gray">{USER_TIERS[getUserTier(selected.role)].label.split(" ")[0]}</Badge>
                       </Flex>
                     </div>
 
@@ -343,8 +307,8 @@ export default function AdminDirectory() {
                         ["Mã tài khoản", `#${selected.id}`],
                         ["Email", selected.email],
                         ["Nhóm tài khoản", USER_TIERS[getUserTier(selected.role)].label],
-                        ["Vai trò", `${getRoleLabel(selected.role)} (${selected.role})`],
-                        ["Trạng thái", selected.accountStatus ?? (selected.active === false ? "SUSPENDED_READ_ONLY" : "ACTIVE")],
+                        ["Vai trò", getRoleLabel(selected.role)],
+                        ["Trạng thái", statusLabel(selected)],
                         ...(selected.suspensionReason ? [["Lý do tạm khóa", selected.suspensionReason]] : []),
                         ...(selected.suspendedUntil ? [["Thời hạn khóa", formatDate(selected.suspendedUntil)]] : []),
                         ["Trường / Tổ chức", organizationLabel(selected)],

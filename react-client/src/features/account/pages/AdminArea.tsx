@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Badge, Button, Card, Flex, Heading, Text, Tooltip } from "@radix-ui/themes";
-import { ArrowRightIcon, CheckCircledIcon, CrossCircledIcon, StopwatchIcon } from "@radix-ui/react-icons";
+import { Badge, Card, Flex, Heading, SegmentedControl, Text } from "@radix-ui/themes";
+import { CheckCircledIcon, CrossCircledIcon, StopwatchIcon } from "@radix-ui/react-icons";
 import type { AdminAnalytics } from "../api/userApi";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { ROLE_LABELS, type RoleType } from "../../../shared/auth/roles";
@@ -32,48 +31,29 @@ export function AdminOverviewPage() {
   const usersResource = useResource<User[]>("/admin/users");
   const analyticsResource = useResource<AdminAnalytics>("/admin/analytics");
   const users = usersResource.data ?? [];
-  const analytics = analyticsResource.data;
+  const analytics = analyticsResource.data ?? null;
   const loading = usersResource.loading || analyticsResource.loading;
-  const error = usersResource.error || analyticsResource.error || "";
+  const error = usersResource.error || "";
+  const analyticsError = analyticsResource.error || "";
 
   const managers = users.filter(item => item.role === "MANAGER");
   const locked = users.filter(item => item.active === false).length;
   const firstName = name?.trim().split(/\s+/).at(-1);
 
-  // Post Analytics breakdown computation
   const postBreakdown = analytics?.postBreakdown;
-  const currentPostStats = timeframe === "week"
-    ? (postBreakdown?.weekly ?? {
-        periodTotalPosts: analytics?.postsThisWeek ?? 8,
-        publicPosts: 0,
-        privatePosts: analytics?.postsThisWeek ?? 8,
-        deletedOrHiddenPosts: 0
-      })
-    : (postBreakdown?.monthly ?? {
-        periodTotalPosts: analytics?.postsThisMonth ?? 12,
-        publicPosts: 0,
-        privatePosts: analytics?.postsThisMonth ?? 12,
-        deletedOrHiddenPosts: 0
-      });
-
-  const totalCumulativePosts = postBreakdown?.totalCumulativePosts ?? 20;
-
-  // Cumulative All-time breakdown for Progress Bar and 3 Badges (All-time breakdown)
-  const cumulative = postBreakdown?.cumulative ?? {
-    periodTotalPosts: 20,
-    publicPosts: 1,
-    privatePosts: 16,
-    deletedOrHiddenPosts: 3,
-  };
+  const noPosts = { periodTotalPosts: 0, publicPosts: 0, privatePosts: 0, deletedOrHiddenPosts: 0 };
+  const currentPostStats = (timeframe === "week" ? postBreakdown?.weekly : postBreakdown?.monthly) ?? noPosts;
+  const totalCumulativePosts = postBreakdown?.totalCumulativePosts ?? 0;
+  // all-time breakdown behind the bar and the three counts
+  const cumulative = postBreakdown?.cumulative ?? noPosts;
 
   const cumulativeBasis = Math.max(1, totalCumulativePosts);
   const publicWidth = (cumulative.publicPosts / cumulativeBasis) * 100;
   const privateWidth = (cumulative.privatePosts / cumulativeBasis) * 100;
   const deletedWidth = (cumulative.deletedOrHiddenPosts / cumulativeBasis) * 100;
 
-  const operationsCount = timeframe === "week"
-    ? (analytics?.operationsThisWeek ?? 25)
-    : (analytics?.operationsThisMonth ?? 80);
+  const operationsCount = (timeframe === "week" ? analytics?.operationsThisWeek : analytics?.operationsThisMonth) ?? 0;
+  const measured = analytics !== null;
 
   const revenueDisplay = timeframe === "week"
     ? (analytics?.revenue.weeklyVnd ?? 0)
@@ -81,369 +61,150 @@ export function AdminOverviewPage() {
 
   if (loading) return <div className="directory-content admin-home"><DashboardLoadingSkeleton cards={5} label="Đang tải tổng quan hệ thống…" /></div>;
 
+  const timeline = analytics?.revenue.timeline ?? [];
+  const maxAmount = Math.max(1, ...timeline.map(point => point.amountVnd));
+  const hasRevenue = timeline.some(point => point.amountVnd > 0);
+  const recent = (analytics?.revenue.recentTransactions ?? []).slice(0, 4);
+  const plans = analytics?.revenue.byPlan ?? [];
+  const periodLabel = timeframe === "week" ? "tuần này" : "tháng này";
+  const postLegend = [
+    { key: "public", label: "công khai", value: cumulative.publicPosts, width: publicWidth, tone: "green" },
+    { key: "private", label: "cá nhân", value: cumulative.privatePosts, width: privateWidth, tone: "indigo" },
+    { key: "hidden", label: "đã ẩn", value: cumulative.deletedOrHiddenPosts, width: deletedWidth, tone: "red" },
+  ] as const;
+
   return (
     <div className="directory-content admin-home">
-
-      {/* Header and Toggle */}
       <div className="directory-heading">
         <div>
           <Heading as="h1" size="7">{firstName ? `Chào ${firstName}` : "Tổng quan hệ thống"}</Heading>
-          <Text as="p" size="2" color="gray" mt="1">
-            Trung tâm kiểm toán, giám sát doanh thu và theo dõi hoạt động toàn nền tảng PhysLive.
-          </Text>
+          <Text as="p" size="2" color="gray" mt="1">Doanh thu, nội dung và tài khoản trên toàn nền tảng.</Text>
         </div>
-
-        <Flex gap="3" align="center">
-          {/* Week / Month Toggle */}
-          <div style={{ display: "inline-flex", background: "var(--gray-3)", padding: "3px", borderRadius: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setTimeframe("week")}
-              style={{
-                padding: "6px 14px",
-                borderRadius: "6px",
-                border: "none",
-                fontSize: "13px",
-                fontWeight: timeframe === "week" ? 600 : 500,
-                background: timeframe === "week" ? "var(--color-panel-solid)" : "transparent",
-                color: timeframe === "week" ? "var(--accent-11)" : "var(--gray-11)",
-                boxShadow: timeframe === "week" ? "var(--shadow-xs)" : "none",
-                cursor: "pointer",
-              }}
-            >
-              Tuần này
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimeframe("month")}
-              style={{
-                padding: "6px 14px",
-                borderRadius: "6px",
-                border: "none",
-                fontSize: "13px",
-                fontWeight: timeframe === "month" ? 600 : 500,
-                background: timeframe === "month" ? "var(--color-panel-solid)" : "transparent",
-                color: timeframe === "month" ? "var(--accent-11)" : "var(--gray-11)",
-                boxShadow: timeframe === "month" ? "var(--shadow-xs)" : "none",
-                cursor: "pointer",
-              }}
-            >
-              Tháng này
-            </button>
-          </div>
-
-          <Button asChild size="3">
-            <Link to="/admin/users">Mở danh mục tài khoản <ArrowRightIcon /></Link>
-          </Button>
-        </Flex>
+        <SegmentedControl.Root size="2" value={timeframe} onValueChange={value => setTimeframe(value as "week" | "month")} aria-label="Khoảng thời gian">
+          <SegmentedControl.Item value="week">Tuần này</SegmentedControl.Item>
+          <SegmentedControl.Item value="month">Tháng này</SegmentedControl.Item>
+        </SegmentedControl.Root>
       </div>
 
       {error && <div className="ops-alert" role="alert">{error}</div>}
+      {analyticsError && <div className="ops-alert" role="alert">{analyticsError}</div>}
 
-      {/* 4 Core Metric KPI Cards */}
       <div className="directory-stats" aria-label="Chỉ số hoạt động và doanh thu">
-        {/* Doanh thu */}
-        <Card size="3" className="directory-stat" style={{ borderTop: "3px solid #10b981", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div>
-            <Flex justify="between" align="center">
-              <Text size="2" color="gray" weight="medium">Doanh thu ({timeframe === "week" ? "Tuần" : "Tháng"})</Text>
-              <Badge color="green" size="2"><LearningIcon name="shield" /></Badge>
-            </Flex>
-            <Heading as="h2" size="7" mt="3" style={{ color: "#059669" }}>
-              {loading ? "—" : `${revenueDisplay.toLocaleString("vi-VN")} ₫`}
-            </Heading>
-            <Text size="1" color="gray" mt="1">
-              Tổng tích lũy: {((analytics?.revenue.totalVnd ?? 0)).toLocaleString("vi-VN")} ₫
-            </Text>
-          </div>
+        <Card size="3" className="directory-stat admin-kpi" data-tone="green">
+          <Flex justify="between" align="center">
+            <Text size="2" color="gray" weight="medium">Doanh thu {periodLabel}</Text>
+            <Badge color="green" size="2"><LearningIcon name="shield" /></Badge>
+          </Flex>
+          <Heading as="h2" size="7" mt="3">{measured ? `${revenueDisplay.toLocaleString("vi-VN")} ₫` : "—"}</Heading>
+          <Text as="p" size="1" color="gray" mt="1">Tổng tích lũy {(analytics?.revenue.totalVnd ?? 0).toLocaleString("vi-VN")} ₫</Text>
         </Card>
 
-        {/* Số lượng bài đăng */}
-        <Card size="3" className="directory-stat" style={{ borderTop: "3px solid #6366f1", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div>
-            <Flex justify="between" align="center">
-              <Text size="2" color="gray" weight="medium">Bài đăng ({timeframe === "week" ? "Tuần" : "Tháng"})</Text>
-              <Badge color="indigo" size="2"><LearningIcon name="book" /></Badge>
-            </Flex>
-            <Heading as="h2" size="7" mt="3">
-              {loading ? "—" : <CountUp to={currentPostStats.periodTotalPosts} duration={1} />}
-            </Heading>
-            <Tooltip content={`Tổng tích lũy toàn hệ thống: ${postBreakdown?.cumulative.publicPosts ?? 1} công khai · ${postBreakdown?.cumulative.privatePosts ?? 16} cá nhân · ${postBreakdown?.cumulative.deletedOrHiddenPosts ?? 3} đã ẩn`}>
-              <Text size="1" color="gray" mt="1" style={{ cursor: "help", display: "inline-block" }}>
-                Tổng tích lũy: {totalCumulativePosts.toLocaleString("vi-VN")} bài
-              </Text>
-            </Tooltip>
+        <Card size="3" className="directory-stat admin-kpi" data-tone="indigo">
+          <Flex justify="between" align="center">
+            <Text size="2" color="gray" weight="medium">Mô phỏng mới {periodLabel}</Text>
+            <Badge color="indigo" size="2"><LearningIcon name="book" /></Badge>
+          </Flex>
+          <Heading as="h2" size="7" mt="3">{measured ? <CountUp to={currentPostStats.periodTotalPosts} duration={1} /> : "—"}</Heading>
+          <Text as="p" size="1" color="gray" mt="1">Tổng tích lũy {totalCumulativePosts.toLocaleString("vi-VN")}</Text>
+          <div className="admin-kpi__stack" role="img" aria-label={postLegend.map(item => `${item.value} ${item.label}`).join(", ")}>
+            {postLegend.map(item => item.width > 0 && <span key={item.key} data-tone={item.tone} style={{ width: `${item.width}%` }} />)}
           </div>
-
-          {/* Visual Breakdown: Stacked Bar & 3-Column Pill Grid */}
-          <div style={{ marginTop: "12px" }}>
-            {/* Stacked Progress Bar (h-1.5 / 6px, rounded-full) based on All-time Cumulative */}
-            <Tooltip content={`Tổng tích lũy: ${cumulative.publicPosts} công khai (5%), ${cumulative.privatePosts} cá nhân (80%), ${cumulative.deletedOrHiddenPosts} đã ẩn (15%)`}>
-              <div
-                style={{
-                  display: "flex",
-                  height: "6px",
-                  borderRadius: "9999px",
-                  overflow: "hidden",
-                  backgroundColor: "var(--gray-4)",
-                  width: "100%",
-                }}
-                aria-label="Tỷ lệ phân loại bài đăng toàn hệ thống"
-              >
-                {publicWidth > 0 && (
-                  <div
-                    style={{
-                      width: `${publicWidth}%`,
-                      backgroundColor: "#10b981",
-                      transition: "width 0.4s ease",
-                    }}
-                  />
-                )}
-                {privateWidth > 0 && (
-                  <div
-                    style={{
-                      width: `${privateWidth}%`,
-                      backgroundColor: "#6366f1",
-                      transition: "width 0.4s ease",
-                    }}
-                  />
-                )}
-                {deletedWidth > 0 && (
-                  <div
-                    style={{
-                      width: `${deletedWidth}%`,
-                      backgroundColor: "#f43f5e",
-                      transition: "width 0.4s ease",
-                    }}
-                  />
-                )}
-              </div>
-            </Tooltip>
-
-            {/* 3 Detail Pills (All-time breakdown: 1 Public, 16 Personal, 3 Deleted) */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "4px",
-                marginTop: "8px",
-              }}
-            >
-              {/* Công khai */}
-              <Tooltip content="Bài đăng công khai trên Thư viện cộng đồng (Public & Approved)">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    background: "rgba(16, 185, 129, 0.08)",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    borderRadius: "6px",
-                    padding: "3px 4px",
-                    cursor: "help",
-                    minWidth: 0,
-                  }}
-                  title="Bài đăng công khai trên Thư viện cộng đồng (Public & Approved)"
-                >
-                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#10b981", flexShrink: 0 }} />
-                  <span style={{ fontSize: "10px", color: "var(--gray-11)", whiteSpace: "nowrap" }}>C.khai</span>
-                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#059669", marginLeft: "auto" }}>
-                    {cumulative.publicPosts}
-                  </span>
-                </div>
-              </Tooltip>
-
-              {/* Cá nhân */}
-              <Tooltip content="Bài đăng ở chế độ cá nhân / bản nháp trong lab của user">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    background: "rgba(99, 102, 241, 0.08)",
-                    border: "1px solid rgba(99, 102, 241, 0.2)",
-                    borderRadius: "6px",
-                    padding: "3px 4px",
-                    cursor: "help",
-                    minWidth: 0,
-                  }}
-                  title="Bài đăng ở chế độ cá nhân / bản nháp trong lab của user"
-                >
-                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#6366f1", flexShrink: 0 }} />
-                  <span style={{ fontSize: "10px", color: "var(--gray-11)", whiteSpace: "nowrap" }}>C.nhân</span>
-                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#4f46e5", marginLeft: "auto" }}>
-                    {cumulative.privatePosts}
-                  </span>
-                </div>
-              </Tooltip>
-
-              {/* Đã xóa / Ẩn */}
-              <Tooltip content="Bài đăng đã bị gỡ hoặc xóa mềm (active = false)">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    background: "rgba(244, 63, 94, 0.08)",
-                    border: "1px solid rgba(244, 63, 94, 0.2)",
-                    borderRadius: "6px",
-                    padding: "3px 4px",
-                    cursor: "help",
-                    minWidth: 0,
-                  }}
-                  title="Bài đăng đã bị gỡ hoặc xóa mềm (active = false)"
-                >
-                  <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "#f43f5e", flexShrink: 0 }} />
-                  <span style={{ fontSize: "10px", color: "var(--gray-11)", whiteSpace: "nowrap" }}>Đã ẩn</span>
-                  <span style={{ fontSize: "10px", fontWeight: 700, color: "#e11d48", marginLeft: "auto" }}>
-                    {cumulative.deletedOrHiddenPosts}
-                  </span>
-                </div>
-              </Tooltip>
-            </div>
-          </div>
+          <ul className="admin-kpi__legend">
+            {postLegend.map(item => <li key={item.key} data-tone={item.tone}><strong>{item.value}</strong> {item.label}</li>)}
+          </ul>
         </Card>
 
-
-        {/* Số lượng thao tác */}
-        <Card size="3" className="directory-stat" style={{ borderTop: "3px solid #f59e0b", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div>
-            <Flex justify="between" align="center">
-              <Text size="2" color="gray" weight="medium">Thao tác ({timeframe === "week" ? "Tuần" : "Tháng"})</Text>
-              <Badge color="amber" size="2"><LearningIcon name="refresh" /></Badge>
-            </Flex>
-            <Heading as="h2" size="7" mt="3">
-              {loading ? "—" : <CountUp to={operationsCount} duration={1} />}
-            </Heading>
-            <Text size="1" color="gray" mt="1">Lượt chạy mô phỏng, nộp bài & chấm điểm</Text>
-          </div>
+        <Card size="3" className="directory-stat admin-kpi" data-tone="amber">
+          <Flex justify="between" align="center">
+            <Text size="2" color="gray" weight="medium">Thao tác {periodLabel}</Text>
+            <Badge color="amber" size="2"><LearningIcon name="refresh" /></Badge>
+          </Flex>
+          <Heading as="h2" size="7" mt="3">{measured ? <CountUp to={operationsCount} duration={1} /> : "—"}</Heading>
+          <Text as="p" size="1" color="gray" mt="1">Lượt chạy mô phỏng, nộp bài và chấm điểm</Text>
         </Card>
 
-        {/* Tổng tài khoản */}
-        <Card size="3" className="directory-stat" style={{ borderTop: "3px solid #06b6d4", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div>
-            <Flex justify="between" align="center">
-              <Text size="2" color="gray" weight="medium">Tài khoản hoạt động</Text>
-              <Badge color="cyan" size="2"><CheckCircledIcon /></Badge>
-            </Flex>
-            <Heading as="h2" size="7" mt="3">
-              {loading ? "—" : <CountUp to={users.length - locked} duration={1} />}
-            </Heading>
-            <Text size="1" color="gray" mt="1">{users.length} tài khoản · {locked} tạm khóa</Text>
-          </div>
+        <Card size="3" className="directory-stat admin-kpi" data-tone="cyan">
+          <Flex justify="between" align="center">
+            <Text size="2" color="gray" weight="medium">Tài khoản hoạt động</Text>
+            <Badge color="cyan" size="2"><CheckCircledIcon /></Badge>
+          </Flex>
+          <Heading as="h2" size="7" mt="3"><CountUp to={users.length - locked} duration={1} /></Heading>
+          <Text as="p" size="1" color="gray" mt="1">{users.length} tài khoản · {locked} tạm khóa</Text>
         </Card>
       </div>
 
-      {/* Revenue & Transaction Charts Section */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: "20px", marginTop: "24px" }}>
-        {/* Biểu đồ doanh thu và xu hướng */}
+      <div className="admin-home__charts">
         <Card size="3">
-          <Flex justify="between" align="center" mb="3">
-            <div>
-              <Heading as="h2" size="4">Biểu đồ doanh thu & hoạt động</Heading>
-              <Text size="1" color="gray">Truy vấn thời gian thực từ bảng school_payments và hoạt động mô phỏng</Text>
+          <Heading as="h2" size="4">Doanh thu 4 tuần gần nhất</Heading>
+          <Text as="p" size="1" color="gray">Chỉ tính giao dịch đã thanh toán</Text>
+
+          {hasRevenue ? (
+            <div className="admin-chart" role="img" aria-label={timeline.map(point => `${point.period}: ${point.amountVnd.toLocaleString("vi-VN")} ₫`).join("; ")}>
+              {timeline.map(point => (
+                <div key={point.period} className="admin-chart__col">
+                  <Text size="1" weight="bold" color={point.amountVnd > 0 ? undefined : "gray"}>
+                    {point.amountVnd > 0 ? `${(point.amountVnd / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr` : "—"}
+                  </Text>
+                  <span className="admin-chart__bar" data-empty={point.amountVnd === 0 || undefined} style={{ height: `${point.amountVnd > 0 ? Math.max(8, (point.amountVnd / maxAmount) * 100) : 2}%` }} />
+                  <Text size="1" color="gray">{point.period}</Text>
+                </div>
+              ))}
             </div>
-            <Badge color="indigo">Theo {timeframe === "week" ? "Tuần" : "Tháng"}</Badge>
-          </Flex>
-
-          {/* Timeline visualization */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", alignItems: "end", height: "160px", padding: "16px 0 8px", borderBottom: "1px solid var(--gray-4)" }}>
-            {(() => {
-              const timelinePoints = analytics?.revenue.timeline ?? [
-                { period: "Tuần 1", amountVnd: 490000000, posts: 3, operations: 15 },
-                { period: "Tuần 2", amountVnd: 0, posts: 6, operations: 24 },
-                { period: "Tuần 3", amountVnd: 0, posts: 3, operations: 28 },
-                { period: "Tuần này", amountVnd: 0, posts: 8, operations: 40 },
-              ];
-              const maxAmt = Math.max(1, ...timelinePoints.map(pt => pt.amountVnd));
-              return timelinePoints.map(pt => {
-                const heightPct = pt.amountVnd > 0 ? Math.min(100, Math.max(25, (pt.amountVnd / maxAmt) * 100)) : 10;
-
-                return (
-                  <div key={pt.period} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", height: "100%", justifyContent: "flex-end" }}>
-                    <Text size="1" color={pt.amountVnd > 0 ? "indigo" : "gray"} weight={pt.amountVnd > 0 ? "bold" : "medium"}>{(pt.amountVnd / 1000000).toFixed(1)}M</Text>
-                    <div style={{ width: "100%", maxWidth: "42px", height: `${heightPct}%`, background: pt.amountVnd > 0 ? "var(--accent-9)" : "var(--accent-4)", borderRadius: "6px 6px 0 0", transition: "height .4s ease" }} />
-                    <Text size="1" color="gray">{pt.period}</Text>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-
-
-          {/* Revenue by Plan breakdown */}
-          <div style={{ marginTop: "16px" }}>
-            <Text size="2" weight="bold" color="gray" mb="2" as="div">DOANH THU THEO GÓI BẢN QUYỀN</Text>
-            <div style={{ display: "grid", gap: "10px" }}>
-              {(analytics?.revenue.byPlan ?? [
-                { planCode: "STANDARD", name: "Gói Tiêu chuẩn", amountVnd: 12000000, count: 4 },
-                { planCode: "PRO", name: "Gói Chuyên nghiệp", amountVnd: 18000000, count: 3 },
-                { planCode: "ENTERPRISE", name: "Gói Mở rộng / Trường học", amountVnd: 25000000, count: 2 },
-              ]).map(p => {
-                const total = analytics?.revenue.totalVnd || 55000000;
-                const pct = Math.round((p.amountVnd / total) * 100);
-                return (
-                  <div key={p.planCode}>
-                    <Flex justify="between" align="center" mb="1">
-                      <Text size="2" weight="medium">{p.name}</Text>
-                      <Text size="2" weight="bold">{p.amountVnd.toLocaleString("vi-VN")} ₫ ({p.count} giao dịch)</Text>
-                    </Flex>
-                    <div style={{ height: "6px", background: "var(--gray-3)", borderRadius: "999px", overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent-9)", borderRadius: "inherit" }} />
-                    </div>
-                  </div>
-                );
-              })}
+          ) : (
+            <div className="admin-chart admin-chart--empty">
+              <Text size="2" color="gray">{measured ? "Chưa có giao dịch nào được thanh toán trong 4 tuần qua." : "Chưa tải được số liệu."}</Text>
             </div>
+          )}
+
+          <Heading as="h3" size="2" mt="4" mb="2">Theo gói</Heading>
+          <div className="admin-plans">
+            {plans.length === 0 && <Text size="2" color="gray">{measured ? "Chưa có giao dịch đã thanh toán." : "—"}</Text>}
+            {plans.map(plan => {
+              const total = analytics?.revenue.totalVnd ?? 0;
+              const pct = total ? Math.round((plan.amountVnd / total) * 100) : 0;
+              return (
+                <div key={plan.planCode}>
+                  <Flex justify="between" align="baseline" gap="3" mb="1">
+                    <Text size="2" weight="medium">{plan.name}</Text>
+                    <Text size="2"><strong>{plan.amountVnd.toLocaleString("vi-VN")} ₫</strong> <Text color="gray">· {plan.count} giao dịch</Text></Text>
+                  </Flex>
+                  <span className="admin-home__bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
-        {/* Trạng thái giao dịch & Giao dịch mới nhất */}
         <Card size="3">
-          <Heading as="h2" size="4" mb="1">Trạng thái giao dịch</Heading>
-          <Text size="1" color="gray" mb="3" as="p">Tỷ lệ thanh toán từ Supabase school_payments</Text>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "18px" }}>
-            <div style={{ padding: "10px", borderRadius: "8px", background: "var(--green-2, #ecfdf5)", textAlign: "center" }}>
-              <CheckCircledIcon style={{ color: "#059669", width: 20, height: 20 }} />
-              <div style={{ fontSize: "18px", fontWeight: "bold", color: "#059669", marginTop: "4px" }}>
-                {analytics?.revenue.paidCount ?? 8}
-              </div>
-              <Text size="1" color="gray">Đã thanh toán</Text>
-            </div>
-            <div style={{ padding: "10px", borderRadius: "8px", background: "var(--amber-2, #fffbeb)", textAlign: "center" }}>
-              <StopwatchIcon style={{ color: "#d97706", width: 20, height: 20 }} />
-              <div style={{ fontSize: "18px", fontWeight: "bold", color: "#d97706", marginTop: "4px" }}>
-                {analytics?.revenue.pendingCount ?? 2}
-              </div>
-              <Text size="1" color="gray">Chờ thanh toán</Text>
-            </div>
-            <div style={{ padding: "10px", borderRadius: "8px", background: "var(--red-2, #fef2f2)", textAlign: "center" }}>
-              <CrossCircledIcon style={{ color: "#dc2626", width: 20, height: 20 }} />
-              <div style={{ fontSize: "18px", fontWeight: "bold", color: "#dc2626", marginTop: "4px" }}>
-                {analytics?.revenue.failedCount ?? 1}
-              </div>
-              <Text size="1" color="gray">Thất bại</Text>
-            </div>
+          <Heading as="h2" size="4">Giao dịch</Heading>
+          <Text as="p" size="1" color="gray" mb="3">Theo kết quả thanh toán</Text>
+          <div className="admin-tx-status">
+            <div data-tone="green"><CheckCircledIcon /><strong>{analytics?.revenue.paidCount ?? "—"}</strong><span>Đã thanh toán</span></div>
+            <div data-tone="amber"><StopwatchIcon /><strong>{analytics?.revenue.pendingCount ?? "—"}</strong><span>Chờ thanh toán</span></div>
+            <div data-tone="red"><CrossCircledIcon /><strong>{analytics?.revenue.failedCount ?? "—"}</strong><span>Thất bại</span></div>
           </div>
 
-          <Heading as="h3" size="3" mb="2">Giao dịch gần nhất</Heading>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "10px" }}>
-            {(analytics?.revenue.recentTransactions ?? []).slice(0, 4).map(tx => (
-              <li key={tx.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px", borderBottom: "1px solid var(--gray-4)" }}>
-                <div>
-                  <Text size="2" weight="bold" as="div">{tx.schoolName}</Text>
-                  <Text size="1" color="gray">{tx.planCode} · {new Date(tx.createdAt).toLocaleDateString("vi-VN")}</Text>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <Text size="2" weight="bold" as="div">{tx.amountVnd.toLocaleString("vi-VN")} ₫</Text>
-                  <Badge color={tx.status === "PAID" ? "green" : (tx.status === "FAILED" ? "red" : "amber")} size="1" variant="soft">
-                    {tx.status === "PAID" ? "Đã thanh toán" : (tx.status === "FAILED" ? "Thất bại" : "Chờ thanh toán")}
-                  </Badge>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <Heading as="h3" size="2" mt="4" mb="2">Gần nhất</Heading>
+          {recent.length === 0 ? (
+            <Text size="2" color="gray">Chưa có giao dịch nào.</Text>
+          ) : (
+            <ul className="admin-home__managers">
+              {recent.map(tx => (
+                <li key={tx.id}>
+                  <span>
+                    <strong>{tx.schoolName}</strong>
+                    <small>{tx.planName} · {new Date(tx.createdAt).toLocaleDateString("vi-VN")}</small>
+                  </span>
+                  <span className="admin-tx-amount">
+                    <strong>{tx.amountVnd.toLocaleString("vi-VN")} ₫</strong>
+                    <Badge color={tx.status === "PAID" ? "green" : (tx.status === "FAILED" ? "red" : "amber")} size="1" variant="soft">
+                      {tx.status === "PAID" ? "Đã thanh toán" : (tx.status === "FAILED" ? "Thất bại" : "Chờ thanh toán")}
+                    </Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
 
@@ -461,7 +222,7 @@ export function AdminOverviewPage() {
                   <span className="admin-home__bar" aria-hidden="true">
                     <span style={{ width: `${share}%` }} />
                   </span>
-                  <strong>{loading ? "—" : count}</strong>
+                  <strong>{count}</strong>
                 </li>
               );
             })}
@@ -473,7 +234,7 @@ export function AdminOverviewPage() {
           {loading ? (
             <Text size="2" color="gray">Đang tải…</Text>
           ) : managers.length === 0 ? (
-            <Text size="2" color="gray">Chưa có tài khoản MANAGER nào.</Text>
+            <Text size="2" color="gray">Chưa có tài khoản vận hành nào.</Text>
           ) : (
             <ul className="admin-home__managers">
               {managers.slice(0, 6).map(item => (

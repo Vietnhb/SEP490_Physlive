@@ -1,7 +1,7 @@
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useState, type FormEvent } from "react";
 import { Badge, Button, Callout, Dialog, Select, Switch, TextField } from "@radix-ui/themes";
-import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
 import { createCurriculumNode, toggleCurriculum, type CurriculumTree, type CurriculumTopic, type CurriculumModule } from "../api/curriculumApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { topicLabel } from "../../../shared/lib/topicLabel";
@@ -11,8 +11,10 @@ import { extractGradeNumber, formatTopicCode, formatGradeCode, formatLessonCode 
 import { PageHeader, Loading, ErrorNotice, FormField } from "../../../shared/ui/ManagementUI";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import s from "./CurriculumView.module.css";
+import { compareCodeUnits } from "../../../shared/lib/compareText";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
-const normalize = (value: string) => value.toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+const normalize = (value: string) => value.toLocaleLowerCase("vi").normalize("NFD").replaceAll(/[\u0300-\u036f]/g, "").replaceAll("đ", "d");
 const lessonCount = (topic: CurriculumTopic) => topic.modules.reduce((sum, module) => sum + module.levels.reduce((count, level) => count + level.lessons.length, 0), 0);
 const matches = (query: string, ...values: (string | LocalizedName)[]) => normalize(values.flatMap(value => typeof value === "string" ? [value] : Object.values(value)).join(" ")).includes(query);
 
@@ -60,12 +62,12 @@ export function CurriculumView() {
   const topics = (tree?.topics ?? []).map((topic, index) => ({ topic, code: formatTopicCode(index + 1) }));
   const visibleTopics = topics.filter(({ topic, code }) => topic.modules.some(module => filterLevels(module, topic, code, search, grade).length || (grade === "ALL" && matches(search, topic.name, code, module.name))) || (grade === "ALL" && matches(search, topic.name, code)));
   const selected = visibleTopics.find(({ topic }) => topic.id === selectedId) ?? visibleTopics[0];
-  const grades = [...new Set(topics.flatMap(({ topic }) => topic.modules.flatMap(module => module.levels.map(level => extractGradeNumber(level.name)))))].sort();
+  const grades = [...new Set(topics.flatMap(({ topic }) => topic.modules.flatMap(module => module.levels.map(level => extractGradeNumber(level.name)))))].sort(compareCodeUnits);
   const parentOptions = curriculumParentOptions(kind, tree);
 
   return <div className="admin-content">
     <PageHeader title="Chương trình học" description="Tra cứu và quản lý chủ đề, chương và bài học."
-      action={<div className={s.headerActions}><Button variant="outline" disabled={loading || busy} onClick={() => void load()}><ReloadIcon />Làm mới</Button><Button disabled={loading || busy} onClick={() => { setFormError(""); setShowCreate(true); }}><PlusIcon />Thêm nội dung</Button></div>} />
+      action={<div className={s.headerActions}><RefreshButton onClick={() => void load()} disabled={loading || busy} /><Button disabled={loading || busy} onClick={() => { setFormError(""); setShowCreate(true); }}><PlusIcon />Thêm nội dung</Button></div>} />
     {error && <ErrorNotice error={error} onRetry={() => void load()} />}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {loading && !tree ? <Loading text="Đang tải chương trình học…" /> : <section className={s.workspace} aria-label="Danh mục chương trình học" aria-busy={loading}>

@@ -1,4 +1,6 @@
 import { usePendingSupport } from "../../../shared/hooks/usePendingSupport";
+import { adminPlans } from "../../billing/api/billingApi";
+import { usePlanNames } from "../../billing/hooks/usePlanNames";
 import { useEffect, useState } from "react";
 import { DropdownMenu, IconButton } from "@radix-ui/themes";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +10,7 @@ import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppS
 
 /** MANAGER area: platform operations. Every menu item is its own route under /manager. */
 export default function AdminLayout() {
+  const planName = usePlanNames(adminPlans);
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [notificationError, setNotificationError] = useState(false);
@@ -39,7 +42,7 @@ export default function AdminLayout() {
 
   const bell = <DropdownMenu.Root><DropdownMenu.Trigger><IconButton variant="ghost" color="gray" aria-label="Thông báo trường đăng ký gói"><LearningIcon name="bell" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Content align="end" sideOffset={8}>
     <DropdownMenu.Label>Đăng ký & thanh toán của trường</DropdownMenu.Label><DropdownMenu.Separator />
-    {notificationError ? <p>Không thể tải thông báo.</p> : notifications.length === 0 ? <p>Chưa có đăng ký đã thanh toán.</p> : notifications.map(item => <DropdownMenu.Item key={item.id} onSelect={() => navigate("/manager/schools")}><strong>{item.schoolName}</strong><span>{item.planCode} · {item.amountVnd.toLocaleString("vi-VN")} ₫{item.status === "REQUIRES_REVIEW" ? " · Cần đối soát" : ""}</span><small>{new Date(item.paidAt).toLocaleString("vi-VN")}</small></DropdownMenu.Item>)}
+    {notificationError ? <p>Không thể tải thông báo.</p> : notifications.length === 0 ? <p>Chưa có đăng ký đã thanh toán.</p> : notifications.map(item => <DropdownMenu.Item key={item.id} onSelect={() => navigate("/manager/schools")}><strong>{item.schoolName}</strong><span>{planName(item.planCode)} · {item.amountVnd.toLocaleString("vi-VN")} ₫{item.status === "REQUIRES_REVIEW" ? " · Cần đối soát" : ""}</span><small>{new Date(item.paidAt).toLocaleString("vi-VN")}</small></DropdownMenu.Item>)}
   </DropdownMenu.Content></DropdownMenu.Root>;
 
   return <AppSidebarLayout id="manager" subtitle="Vận hành" home="/manager" groups={groups} actions={bell} contentClassName="admin-shell" />;

@@ -5,6 +5,7 @@ import { changePassword, updateAvatar, updateProfile } from "../api/userApi";
 import type { User } from "../../../shared/auth/types";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import LearningIcon from "../../../shared/ui/LearningIcon";
+import { shrinkAvatar } from "../../../shared/lib/avatarImage";
 import "../styles/profile.css";
 import { getRoleLabel } from "../../../shared/auth/roles";
 
@@ -42,16 +43,17 @@ function ProfileContent({ user }: Readonly<{ user: User }>) {
   const handleAvatar = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > 1_500_000) { setError("Avatar phải là ảnh và dung lượng tối đa 1.5 MB."); return; }
-    const reader = new FileReader();
-    reader.onload = async () => {
-      if (typeof reader.result !== "string") return;
-      setUploading(true); setError("");
-      try { const updated = await updateAvatar(reader.result); setAvatarUrl(updated.avatarUrl ?? reader.result); setUser(updated); setMessage("Cập nhật ảnh đại diện thành công."); }
+    event.target.value = "";
+    if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) { setError("Avatar phải là ảnh và dung lượng tối đa 10 MB."); return; }
+    setUploading(true); setError("");
+    void (async () => {
+      let image: string;
+      try { image = await shrinkAvatar(file); }
+      catch { setError("Không thể đọc ảnh. Vui lòng chọn ảnh khác."); setUploading(false); return; }
+      try { const updated = await updateAvatar(image); setAvatarUrl(updated.avatarUrl ?? image); setUser(updated); setMessage("Cập nhật ảnh đại diện thành công."); }
       catch (err: unknown) { setError(apiError(err, "Không thể cập nhật ảnh đại diện.")); }
       finally { setUploading(false); }
-    };
-    reader.readAsDataURL(file);
+    })();
   };
 
   return <div className="profile-page">

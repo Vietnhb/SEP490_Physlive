@@ -1,7 +1,9 @@
+import RowActions from "../../../shared/ui/RowActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useRef, useState } from "react";
 import { updateSupportItem, type SupportItem, type SupportKind, type SupportStatus } from "../api/supportApi";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) {
   const [actionError, setError] = useState("");
@@ -37,14 +39,14 @@ export default function AdminSupport({ kind }: Readonly<{ kind: SupportKind }>) 
   return <div className="admin-content">
     <section className="admin-panel">
       {notice && <p role="status">{notice}</p>}
-      <div className="admin-panel-heading"><div><h2>{kind === "FEEDBACK" ? "Phản hồi" : "Tin nhắn"}</h2></div><button className="admin-secondary-button" type="button" onClick={() => void load()}>Làm mới</button></div>
+      <div className="admin-panel-heading"><div><h2>{kind === "FEEDBACK" ? "Phản hồi" : "Tin nhắn"}</h2></div><RefreshButton onClick={() => void load()} /></div>
       {error && <p className="admin-error-banner" role="alert">{error}</p>}
       {loading ? <TableLoadingSkeleton label="Đang tải yêu cầu hỗ trợ…" headers={["Người gửi", "Tiêu đề", "Trạng thái", "Ngày tạo", "Thao tác"]} /> : <div className="admin-table-scroll"><table className="admin-table">
-        <thead><tr><th>Người gửi</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày tạo</th><th /></tr></thead>
+        <thead><tr><th>Người gửi</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead>
         <tbody>{items.length === 0 ? <tr><td colSpan={5}>Chưa có yêu cầu.</td></tr> : items.map((item) => <tr key={item.id}>
           <td><strong>{item.senderName}</strong><small>{item.senderEmail}</small></td><td>{item.subject}<p className="admin-cell-muted">{item.content}</p></td>
           <td><span className={`status-pill ${item.status === "RESOLVED" ? "pass" : item.status === "READ" ? "info" : "warning"}`}>{({ OPEN: "Mới", READ: "Đã xem", RESOLVED: "Đã xử lý" } as Record<string, string>)[item.status] ?? item.status}</span></td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td>
-          <td><button className="admin-inline-button" type="button" onClick={() => { setSelected(item); setResponse(item.adminResponse ?? ""); }}>Xem</button></td>
+          <td><RowActions subject={item.subject ?? String(item.id)} actions={[{ label: "Xem", onSelect: () => { setSelected(item); setResponse(item.adminResponse ?? ""); } }]} /></td>
         </tr>)}</tbody>
       </table></div>}
     </section>

@@ -23,6 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AccountAppealService {
+    private static final String ACCOUNT_NOT_FOUND = "Không tìm thấy tài khoản.";
+    private static final String MANAGER = "MANAGER";
+    private static final String PENDING = "PENDING";
+    private static final String SCHOOL = "SCHOOL";
     private final AccountAppealRepository appealRepository;
     private final UserRepository userRepository;
     private final CurrentUserService currentUser;
@@ -39,14 +43,14 @@ public class AccountAppealService {
             java.util.function.Consumer<AccountAppeal> saveEvidence) {
         if (authentication == null) throw ApiException.unauthorized("Vui lòng đăng nhập.");
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản."));
+                .orElseThrow(() -> ApiException.notFound(ACCOUNT_NOT_FOUND));
         user = userRepository.findByIdForUpdate(user.getId())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản."));
-        if (Set.of("MANAGER", "ADMIN").contains(role(user)))
+                .orElseThrow(() -> ApiException.notFound(ACCOUNT_NOT_FOUND));
+        if (Set.of(MANAGER, "ADMIN").contains(role(user)))
             throw ApiException.forbidden("Vui lòng liên hệ quản trị viên hệ thống để mở lại tài khoản.");
         if (!user.isSuspendedReadOnly() || user.getSuspensionId() == null)
             throw ApiException.conflict("Tài khoản không có quyết định tạm khóa hợp lệ.");
-        if (appealRepository.existsByUserIdAndSuspensionIdAndStatus(user.getId(), user.getSuspensionId(), "PENDING"))
+        if (appealRepository.existsByUserIdAndSuspensionIdAndStatus(user.getId(), user.getSuspensionId(), PENDING))
             throw ApiException.conflict("Bạn đã có yêu cầu đang chờ xử lý cho lần khóa này.");
 
         AccountAppeal appeal = new AccountAppeal();
@@ -59,7 +63,7 @@ public class AccountAppealService {
         appeal.setSuspendedBy(user.getDeactivatedBy());
         appeal.setSuspendedAt(user.getDeactivatedAt());
         appeal.setCreatedAt(Instant.now());
-        appeal.setStatus("PENDING");
+        appeal.setStatus(PENDING);
         AccountAppeal saved = appealRepository.save(appeal);
         saveEvidence.accept(saved);
         changes.changed("/api/appeals");
@@ -69,7 +73,7 @@ public class AccountAppealService {
     public List<AppealResponse> myAppeals(Authentication authentication) {
         if (authentication == null) throw ApiException.unauthorized("Vui lòng đăng nhập.");
         User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản."));
+                .orElseThrow(() -> ApiException.notFound(ACCOUNT_NOT_FOUND));
         return appealRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(appeal -> response(appeal, user)).toList();
     }
@@ -86,10 +90,10 @@ public class AccountAppealService {
         AccountAppeal appeal = appealRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy yêu cầu."));
         User target = userRepository.findByIdForUpdate(appeal.getUser().getId())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy tài khoản."));
+                .orElseThrow(() -> ApiException.notFound(ACCOUNT_NOT_FOUND));
         if (!canHandle(actor, appeal, target))
             throw ApiException.forbidden("Bạn không có quyền xử lý yêu cầu này hoặc quyết định khóa đã thay đổi.");
-        if (!"PENDING".equals(appeal.getStatus())) throw ApiException.conflict("Yêu cầu đã được xử lý.");
+        if (!PENDING.equals(appeal.getStatus())) throw ApiException.conflict("Yêu cầu đã được xử lý.");
         if (request == null || request.status() == null || request.resolutionNote() == null || request.resolutionNote().isBlank())
             throw ApiException.badRequest("Vui lòng nhập kết quả và lý do xử lý.");
         String status = request.status().trim().toUpperCase(Locale.ROOT);
@@ -104,7 +108,7 @@ public class AccountAppealService {
 
     private User requireHandler() {
         User actor = currentUser.requireCurrentUser();
-        if (!Set.of("SCHOOL", "MANAGER").contains(role(actor)))
+        if (!Set.of(SCHOOL, MANAGER).contains(role(actor)))
             throw ApiException.forbidden("Không có quyền xem yêu cầu mở khóa.");
         return actor;
     }
@@ -118,9 +122,9 @@ public class AccountAppealService {
     }
 
     private boolean canView(User actor, AccountAppeal appeal) {
-        if (Set.of("ADMIN", "MANAGER").contains(role(appeal.getUser()))) return false;
-        if ("MANAGER".equals(role(actor))) return true;
-        return "SCHOOL".equals(role(actor)) && actor.getSchool() != null
+        if (Set.of("ADMIN", MANAGER).contains(role(appeal.getUser()))) return false;
+        if (MANAGER.equals(role(actor))) return true;
+        return SCHOOL.equals(role(actor)) && actor.getSchool() != null
                 && actor.getSchool().getId().equals(appeal.getSchoolId())
                 && Set.of("STAFF", "STUDENT").contains(role(appeal.getUser()));
     }
@@ -136,8 +140,8 @@ public class AccountAppealService {
     private boolean canHandle(User actor, AccountAppeal appeal, User target) {
         if (!canView(actor, appeal) || actor.getId().equals(target.getId()) || !currentSuspension(appeal, target)
                 || !Objects.equals(appeal.getSuspensionScope(), target.getSuspensionScope())) return false;
-        if ("SYSTEM".equals(appeal.getSuspensionScope())) return "MANAGER".equals(role(actor));
-        return "SCHOOL".equals(appeal.getSuspensionScope()) && "SCHOOL".equals(role(actor))
+        if ("SYSTEM".equals(appeal.getSuspensionScope())) return MANAGER.equals(role(actor));
+        return SCHOOL.equals(appeal.getSuspensionScope()) && SCHOOL.equals(role(actor))
                 && target.getSchool() != null && actor.getSchool().getId().equals(target.getSchool().getId());
     }
 
@@ -150,7 +154,7 @@ public class AccountAppealService {
         AppealResponse value = AppealResponse.from(appeal);
         return new AppealResponse(value.id(), value.userId(), value.userEmail(), value.userName(), value.reason(),
                 value.content(), value.status(), value.resolutionNote(), value.createdAt(), value.resolvedAt(), value.authority(),
-                "PENDING".equals(appeal.getStatus()) && canHandle(actor, appeal, appeal.getUser()),
+                PENDING.equals(appeal.getStatus()) && canHandle(actor, appeal, appeal.getUser()),
                 currentSuspension(appeal, appeal.getUser()));
     }
 

@@ -1,3 +1,4 @@
+import RowActions from "../../../shared/ui/RowActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { AppealEvidenceGallery } from "../components/AppealEvidence";
 import { useRef, useState } from "react";
@@ -7,6 +8,7 @@ import { apiMessage } from "../../../shared/lib/apiError";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import "../../support/styles/support-pages.css";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 const APPEAL_STATUS = { PENDING: "Chờ xử lý", APPROVED: "Đã duyệt mở khóa", REJECTED: "Đã từ chối" };
 
@@ -41,14 +43,14 @@ export default function AccountAppeals() {
     finally { lock.current = false; setBusy(false); }
   };
   return <main className="support-page">
-    <Flex justify="between" align="center" wrap="wrap" gap="3"><div><h1>Khiếu nại tài khoản</h1><p>Các đơn thuộc phạm vi tài khoản bạn được quản lý.</p></div><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>Làm mới</Button></Flex>
+    <Flex justify="between" align="center" wrap="wrap" gap="3"><div><h1>Khiếu nại tài khoản</h1><p>Các đơn thuộc phạm vi tài khoản bạn được quản lý.</p></div><RefreshButton onClick={() => void load()} disabled={loading || busy} /></Flex>
     {notice && <p role="status" className="support-success">{notice}</p>}
     {!selected && error && <p role="alert" className="admin-error-banner">{error}</p>}
     <section className="support-panel">
       <Flex gap="3" wrap="wrap" mb="4"><TextField.Root aria-label="Tìm khiếu nại" placeholder="Tìm tên, email hoặc tiêu đề…" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
         <Select.Root value={filter} onValueChange={value => { setFilter(value); setPage(1); }}><Select.Trigger aria-label="Trạng thái đơn" /><Select.Content><Select.Item value="ALL">Tất cả trạng thái</Select.Item>{Object.entries(APPEAL_STATUS).map(([value, label]) => <Select.Item key={value} value={value}>{label}</Select.Item>)}</Select.Content></Select.Root></Flex>
       {loading ? <TableLoadingSkeleton headers={["Người gửi", "Nội dung", "Trạng thái", "Ngày gửi", "Thao tác"]} /> : <div className="support-scroll"><table className="support-table"><thead><tr><th>Người gửi</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>
-        {filtered.slice((currentPage - 1) * 10, currentPage * 10).map(item => <tr key={item.id}><td>{item.userName}<small>{item.userEmail}</small></td><td>{item.reason}</td><td><Badge color={item.status === "PENDING" ? "orange" : item.status === "APPROVED" ? "green" : "red"}>{APPEAL_STATUS[item.status]}</Badge></td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td><Button size="1" variant="soft" onClick={() => { setSelected(item); setNote(""); setError(""); }}>Xem đơn</Button></td></tr>)}
+        {filtered.slice((currentPage - 1) * 10, currentPage * 10).map(item => <tr key={item.id}><td>{item.userName}<small>{item.userEmail}</small></td><td>{item.reason}</td><td><Badge color={item.status === "PENDING" ? "orange" : item.status === "APPROVED" ? "green" : "red"}>{APPEAL_STATUS[item.status]}</Badge></td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td><RowActions subject={item.userEmail} actions={[{ label: "Xem", onSelect: () => { setSelected(item); setNote(""); setError(""); } }]} /></td></tr>)}
         {filtered.length === 0 && <tr><td colSpan={5}>Không có đơn phù hợp.</td></tr>}
       </tbody></table></div>}
       <Flex justify="between" align="center" mt="4" wrap="wrap" gap="2"><span>{filtered.length} đơn</span><Flex align="center" gap="3"><Button size="1" variant="soft" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</Button><span>Trang {currentPage}/{pages}</span><Button size="1" variant="soft" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>Sau</Button></Flex></Flex>

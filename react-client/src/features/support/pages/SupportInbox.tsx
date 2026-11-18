@@ -1,3 +1,5 @@
+import { PageHeader } from "../../../shared/ui/ManagementUI";
+import RowActions from "../../../shared/ui/RowActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { AppealEvidenceGallery } from "../../account/components/AppealEvidence";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
@@ -10,6 +12,7 @@ import { apiMessage } from "../../../shared/lib/apiError";
 import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import "../styles/support-pages.css";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 const KINDS = { COMPLAINT: "Báo lỗi mô phỏng", MESSAGE: "Yêu cầu hỗ trợ", FEEDBACK: "Góp ý", ACCOUNT: "Yêu cầu mở khóa" };
 const STATUS: Record<string, string> = { OPEN: "Chờ xử lý", READ: "Đang xử lý", RESOLVED: "Đã hoàn tất", PENDING: "Chờ xử lý", APPROVED: "Đã duyệt mở khóa", REJECTED: "Đã từ chối" };
@@ -64,22 +67,22 @@ export default function SupportInbox({ schoolOnly = false }: { schoolOnly?: bool
     } catch (err) { setError(apiMessage(err, "Không thể cập nhật yêu cầu.")); }
     finally { lock.current = false; setBusy(false); }
   };
-  return <main className="support-page support-page--manager"><Flex justify="between" align="center" gap="3" wrap="wrap"><header><h1>{schoolOnly ? "Yêu cầu mở khóa" : "Yêu cầu hỗ trợ"}</h1><p>{schoolOnly ? "Xem xét yêu cầu của giáo viên, học sinh do nhà trường tạm khóa." : "Xử lý hỗ trợ và quyết định khóa cấp hệ thống; theo dõi đơn do School và Reviewer xử lý."}</p></header><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>Làm mới</Button></Flex>
+  return <main className="support-page support-page--manager"><PageHeader title={schoolOnly ? "Yêu cầu mở khóa" : "Yêu cầu hỗ trợ"} description={schoolOnly ? "Xem xét yêu cầu của giáo viên, học sinh do nhà trường tạm khóa." : "Xử lý hỗ trợ và quyết định khóa cấp hệ thống; theo dõi đơn do nhà trường và người kiểm duyệt xử lý."} action={<RefreshButton onClick={() => void load()} disabled={loading || busy} />} />
     {notice && <p role="status" className="support-success">{notice}</p>}{(error || resource.error) && !selected && <p role="alert" className="admin-error-banner">{error || resource.error}</p>}
     <section className="support-panel"><Flex gap="3" wrap="wrap" mb="4">
       <TextField.Root aria-label="Tìm yêu cầu" placeholder="Tìm tên, email, tiêu đề…" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
       {!schoolOnly && <Select.Root value={kind} onValueChange={value => { setKind(value); setPage(1); }}><Select.Trigger aria-label="Loại yêu cầu" /><Select.Content><Select.Item value="ALL">Tất cả loại yêu cầu</Select.Item>{Object.entries(KINDS).map(([value, label]) => <Select.Item value={value} key={value}>{label}</Select.Item>)}</Select.Content></Select.Root>}
-      {!schoolOnly && <Select.Root value={handler} onValueChange={value => { setHandler(value as Handler); setPage(1); }}><Select.Trigger aria-label="Bên xử lý" /><Select.Content><Select.Item value="ALL">Tất cả bên xử lý</Select.Item><Select.Item value="MANAGER">Manager quản lý</Select.Item><Select.Item value="SCHOOL">School quản lý</Select.Item><Select.Item value="REVIEWER">Reviewer quản lý</Select.Item></Select.Content></Select.Root>}
+      {!schoolOnly && <Select.Root value={handler} onValueChange={value => { setHandler(value as Handler); setPage(1); }}><Select.Trigger aria-label="Bên xử lý" /><Select.Content><Select.Item value="ALL">Tất cả bên xử lý</Select.Item><Select.Item value="MANAGER">Vận hành quản lý</Select.Item><Select.Item value="SCHOOL">Nhà trường quản lý</Select.Item><Select.Item value="REVIEWER">Kiểm duyệt quản lý</Select.Item></Select.Content></Select.Root>}
       <Select.Root value={status} onValueChange={value => { setStatus(value); setPage(1); }}><Select.Trigger aria-label="Trạng thái" /><Select.Content><Select.Item value="ALL">Tất cả trạng thái</Select.Item><Select.Item value="TODO">Chưa hoàn tất</Select.Item><Select.Item value="DONE">Đã hoàn tất</Select.Item></Select.Content></Select.Root>
     </Flex>
     {loading ? <TableLoadingSkeleton headers={["Người gửi", "Loại", "Tiêu đề", "Trạng thái", "Ngày gửi", "Thao tác"]} /> : <div className="support-scroll"><table className="support-table"><thead><tr><th>Người gửi</th><th>Loại</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>
-      {filtered.map(item => <tr key={item.key}><td>{item.sender}<small>{item.email}</small></td><td>{KINDS[item.kind]}</td><td>{item.subject}</td><td><Badge color={done(item) ? "green" : "orange"}>{STATUS[item.status]}</Badge>{item.kind === "COMPLAINT" && <small>Reviewer xử lý</small>}{item.appeal && <small>{item.appeal.authority === "SCHOOL" ? "School xử lý" : "Cấp hệ thống"}</small>}</td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td><Button size="1" variant="soft" onClick={() => { setSelectedKey(item.key); setResponse(item.response ?? ""); setError(""); }}>Xem yêu cầu</Button></td></tr>)}
+      {filtered.map(item => <tr key={item.key}><td>{item.sender}<small>{item.email}</small></td><td>{KINDS[item.kind]}</td><td>{item.subject}</td><td><Badge color={done(item) ? "green" : "orange"}>{STATUS[item.status]}</Badge>{item.kind === "COMPLAINT" && <small>Người kiểm duyệt xử lý</small>}{item.appeal && <small>{item.appeal.authority === "SCHOOL" ? "Nhà trường xử lý" : "Cấp hệ thống"}</small>}</td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td><RowActions subject={item.subject} actions={[{ label: "Xem", onSelect: () => { setSelectedKey(item.key); setResponse(item.response ?? ""); setError(""); } }]} /></td></tr>)}
       {total === 0 && <tr><td colSpan={6}>Không có yêu cầu phù hợp.</td></tr>}
     </tbody></table></div>}
     <Flex justify="between" align="center" mt="4" gap="3" wrap="wrap"><span>{total} yêu cầu</span><Flex align="center" gap="3"><Button size="1" variant="soft" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</Button><span>Trang {currentPage}/{pages}</span><Button size="1" variant="soft" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>Sau</Button></Flex></Flex></section>
     <Dialog.Root open={!!selected} onOpenChange={open => { if (!open && !lock.current) setSelectedKey(""); }}><Dialog.Content maxWidth="700px" className={modal.dialog}><div className={modal.body}>
       <Dialog.Title>{selected?.subject}</Dialog.Title><Dialog.Description>{selected?.sender} · {selected?.email}</Dialog.Description><p><Badge>{selected ? KINDS[selected.kind] : ""}</Badge> {selected ? STATUS[selected.status] : ""}</p><p className="support-body">{selected?.content}</p>
-      {selected && !canProcess && <p>Chỉ xem. {selected.kind === "COMPLAINT" ? "Reviewer tiếp nhận và xử lý trực tiếp báo lỗi mô phỏng." : selected.appeal?.authority === "SCHOOL" ? "School chịu trách nhiệm xem xét quyết định khóa này." : "Yêu cầu không thuộc quyền xử lý hoặc quyết định khóa đã thay đổi."}</p>}
+      {selected && !canProcess && <p>Chỉ xem. {selected.kind === "COMPLAINT" ? "Người kiểm duyệt tiếp nhận và xử lý trực tiếp báo lỗi mô phỏng." : selected.appeal?.authority === "SCHOOL" ? "Nhà trường chịu trách nhiệm xem xét quyết định khóa này." : "Yêu cầu không thuộc quyền xử lý hoặc quyết định khóa đã thay đổi."}</p>}
       {selected?.response && <div className="support-panel"><strong>Phản hồi{selected.support?.responderName ? ` (${selected.support.responderName})` : ""}</strong><p className="support-body">{selected.response}</p></div>}
       {selected?.appeal && <AppealEvidenceGallery key={selected.appeal.id} appealId={selected.appeal.id} />}
       {error && <p role="alert" className="admin-error-banner">{error}</p>}

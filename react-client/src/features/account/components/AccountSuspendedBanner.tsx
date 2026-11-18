@@ -96,7 +96,7 @@ export default function AccountSuspendedBanner() {
           </Flex>
 
           <Dialog.Description size="2" mb="4">
-            Gửi yêu cầu xem xét mở khóa. School xử lý quyết định khóa của nhà trường; Manager xử lý quyết định khóa cấp hệ thống. Mỗi tài khoản chỉ có một đơn đang chờ.
+            Gửi yêu cầu xem xét mở khóa. Nhà trường xử lý quyết định khóa của nhà trường; Bộ phận vận hành xử lý quyết định khóa cấp hệ thống. Mỗi tài khoản chỉ có một đơn đang chờ.
           </Dialog.Description>
 
           {notice && (

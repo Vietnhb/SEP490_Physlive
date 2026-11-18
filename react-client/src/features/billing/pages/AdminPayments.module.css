@@ -160,7 +160,7 @@
   .mobilePaymentHeading > div > span { color: var(--admin-muted); font-size: 11px; }
   .mobilePayment dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0; }
   .mobilePayment dl > div { min-width: 0; }
-  .mobilePayment dt { margin-bottom: 3px; color: var(--admin-muted); font-size: 10px; text-transform: uppercase; }
+  .mobilePayment dt { margin-bottom: 3px; color: var(--admin-muted); font-size: 12px; text-transform: uppercase; }
   .mobilePayment dd { margin: 0; overflow-wrap: anywhere; color: var(--admin-heading); font-size: 12px; }
   .mobileEmpty { padding: 32px 15px; color: var(--admin-muted); text-align: center; }
 }

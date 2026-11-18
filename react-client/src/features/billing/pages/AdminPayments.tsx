@@ -6,6 +6,7 @@ import { Button as ThemeButton, Select, TextField } from "@radix-ui/themes";
 import { apiMessage } from "../../../shared/lib/apiError";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { ErrorNotice } from "../../../shared/ui/ManagementUI";
+import PageActions from "../../../shared/layout/PageActions";
 import {
   reconcileAdminPayment,
   type AdminPayment,
@@ -15,6 +16,9 @@ import {
   type PaymentStatus,
 } from "../api/billingApi";
 import styles from "./AdminPayments.module.css";
+import { usePlanNames } from "../hooks/usePlanNames";
+import { adminPlans } from "../api/billingApi";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 const STATUS_CONFIG: Record<PaymentStatus, { label: string; className: string; color: string }> = {
   PAID: { label: "Đã thanh toán", className: styles.paid, color: "#059669" },
@@ -101,10 +105,11 @@ function RevenueTrendChart({ data }: Readonly<{ data: PaymentAnalytics["trend"] 
 }
 
 function PackageRevenueChart({ data, total }: Readonly<{ data: PaymentAnalytics["packages"]; total: number }>) {
+  const planName = usePlanNames(adminPlans);
   if (data.length === 0) return <div className={styles.chartEmpty}><LearningIcon name="chart" /><strong>Chưa có doanh thu theo gói</strong><span>Không có giao dịch thành công trong kỳ.</span></div>;
   const max = Math.max(...data.map(item => item.revenueVnd), 1);
   return <div className={styles.packageList}>{data.map(item => <div key={item.planCode} className={styles.packageRow}>
-    <div><strong>{item.planCode}</strong><span>{item.transactions} giao dịch · {total === 0 ? 0 : Math.round((item.revenueVnd / total) * 100)}%</span></div>
+    <div><strong>{planName(item.planCode)}</strong><span>{item.transactions} giao dịch · {total === 0 ? 0 : Math.round((item.revenueVnd / total) * 100)}%</span></div>
     <div className={styles.packageValue}>{formatVnd(item.revenueVnd)}</div>
     <div className={styles.barTrack}><span style={{ width: `${Math.max(3, (item.revenueVnd / max) * 100)}%` }} /></div>
   </div>)}</div>;
@@ -126,6 +131,7 @@ function StatusDonut({ data }: Readonly<{ data: PaymentAnalytics["statuses"] }>)
 }
 
 export default function AdminPayments() {
+  const planName = usePlanNames(adminPlans);
   const [initialNow] = useState(() => new Date());
   const [period, setPeriod] = useState<PaymentPeriod>("YEAR");
   const [year, setYear] = useState(initialNow.getFullYear());
@@ -183,7 +189,7 @@ export default function AdminPayments() {
           {period === "QUARTER" && <Select.Root value={String(quarter)} onValueChange={value => setQuarter(Number(value))}><Select.Trigger aria-label="Chọn quý" /><Select.Content>{QUARTERS.map(value => <Select.Item key={value} value={String(value)}>Quý {value}</Select.Item>)}</Select.Content></Select.Root>}
           {period !== "DAY" && <Select.Root value={String(year)} onValueChange={value => setYear(Number(value))}><Select.Trigger aria-label="Chọn năm" /><Select.Content>{years.map(value => <Select.Item key={value} value={String(value)}>{value}</Select.Item>)}</Select.Content></Select.Root>}
         </div>
-        <ThemeButton type="button" variant="surface" size="2" disabled={loading} onClick={() => void load()}><LearningIcon name="refresh" />Làm mới</ThemeButton>
+        <PageActions><RefreshButton onClick={() => void load()} disabled={loading} /></PageActions>
       </div>
     </header>
 
@@ -218,11 +224,11 @@ export default function AdminPayments() {
           <div className={`${styles.desktopTable} admin-table-scroll`}><table className={`${styles.table} admin-table`}><thead><tr><th>Trường học</th><th>Người đại diện</th><th>Gói dịch vụ</th><th className={styles.amountColumn}>Số tiền</th><th>Trạng thái</th><th>Thời gian</th><th>Thao tác</th></tr></thead><tbody>
             {visibleItems.length === 0 ? <tr><td colSpan={7} className="admin-empty-table">Không có giao dịch phù hợp với bộ lọc hiện tại.</td></tr> : visibleItems.map(item => {
               const status = normalizeStatus(item.status); const config = STATUS_CONFIG[status]; const relevantTime = status === "PAID" && item.paidAt ? item.paidAt : item.createdAt;
-              return <tr key={item.id}><td><strong>{item.schoolName || "Chưa xác định"}</strong><small className={styles.secondary}>Mã: {item.id.slice(0, 8).toUpperCase()}</small></td><td>{item.managerEmail || "—"}</td><td><strong>{item.planCode}</strong><small className={styles.secondary}>{PURPOSE_LABELS[item.purpose] ?? item.purpose}</small></td><td className={styles.amountColumn}><strong>{formatVnd(item.amountVnd)}</strong></td><td><span className={`${styles.status} ${config.className}`}>{config.label}</span></td><td><span>{new Date(relevantTime).toLocaleString("vi-VN")}</span><small className={styles.secondary}>{status === "PAID" && item.paidAt ? "Đã thanh toán" : "Khởi tạo"}</small></td><td>{status === "PENDING" ? <ThemeButton type="button" size="2" variant="soft" color="gray" loading={reconcilingId === item.id} disabled={reconcilingId !== null} onClick={() => void reconcile(item.id)}>Đối soát</ThemeButton> : <span className={styles.noAction}>—</span>}</td></tr>;
+              return <tr key={item.id}><td><strong>{item.schoolName || "Chưa xác định"}</strong><small className={styles.secondary}>Mã: {item.id.slice(0, 8).toUpperCase()}</small></td><td>{item.managerEmail || "—"}</td><td><strong>{planName(item.planCode)}</strong><small className={styles.secondary}>{PURPOSE_LABELS[item.purpose] ?? item.purpose}</small></td><td className={styles.amountColumn}><strong>{formatVnd(item.amountVnd)}</strong></td><td><span className={`${styles.status} ${config.className}`}>{config.label}</span></td><td><span>{new Date(relevantTime).toLocaleString("vi-VN")}</span><small className={styles.secondary}>{status === "PAID" && item.paidAt ? "Đã thanh toán" : "Khởi tạo"}</small></td><td>{status === "PENDING" ? <ThemeButton type="button" size="2" variant="ghost" loading={reconcilingId === item.id} disabled={reconcilingId !== null} onClick={() => void reconcile(item.id)}>Đối soát</ThemeButton> : <span className={styles.noAction}>—</span>}</td></tr>;
             })}
           </tbody></table></div>
 
-          <div className={styles.mobileList}>{visibleItems.length === 0 ? <div className={styles.mobileEmpty}>Không có giao dịch phù hợp.</div> : visibleItems.map(item => { const status = normalizeStatus(item.status); const config = STATUS_CONFIG[status]; const relevantTime = status === "PAID" && item.paidAt ? item.paidAt : item.createdAt; return <article key={item.id} className={styles.mobilePayment}><div className={styles.mobilePaymentHeading}><div><strong>{item.schoolName || "Chưa xác định"}</strong><span>{item.managerEmail || "—"}</span></div><span className={`${styles.status} ${config.className}`}>{config.label}</span></div><dl><div><dt>Gói</dt><dd>{item.planCode} · {PURPOSE_LABELS[item.purpose] ?? item.purpose}</dd></div><div><dt>Số tiền</dt><dd>{formatVnd(item.amountVnd)}</dd></div><div><dt>Thời gian</dt><dd>{new Date(relevantTime).toLocaleString("vi-VN")}</dd></div><div><dt>Mã</dt><dd>{item.id.slice(0, 8).toUpperCase()}</dd></div></dl>{status === "PENDING" && <ThemeButton type="button" size="2" variant="soft" color="gray" loading={reconcilingId === item.id} disabled={reconcilingId !== null} onClick={() => void reconcile(item.id)}>Đối soát giao dịch</ThemeButton>}</article>; })}</div>
+          <div className={styles.mobileList}>{visibleItems.length === 0 ? <div className={styles.mobileEmpty}>Không có giao dịch phù hợp.</div> : visibleItems.map(item => { const status = normalizeStatus(item.status); const config = STATUS_CONFIG[status]; const relevantTime = status === "PAID" && item.paidAt ? item.paidAt : item.createdAt; return <article key={item.id} className={styles.mobilePayment}><div className={styles.mobilePaymentHeading}><div><strong>{item.schoolName || "Chưa xác định"}</strong><span>{item.managerEmail || "—"}</span></div><span className={`${styles.status} ${config.className}`}>{config.label}</span></div><dl><div><dt>Gói</dt><dd>{planName(item.planCode)} · {PURPOSE_LABELS[item.purpose] ?? item.purpose}</dd></div><div><dt>Số tiền</dt><dd>{formatVnd(item.amountVnd)}</dd></div><div><dt>Thời gian</dt><dd>{new Date(relevantTime).toLocaleString("vi-VN")}</dd></div><div><dt>Mã</dt><dd>{item.id.slice(0, 8).toUpperCase()}</dd></div></dl>{status === "PENDING" && <ThemeButton type="button" size="2" variant="soft" color="gray" loading={reconcilingId === item.id} disabled={reconcilingId !== null} onClick={() => void reconcile(item.id)}>Đối soát giao dịch</ThemeButton>}</article>; })}</div>
 
           <div className="admin-table-pagination"><span aria-live="polite">{total === 0 ? "0 giao dịch" : `Hiển thị ${pageStart + 1}–${Math.min(pageStart + pageSize, total)} / ${total} giao dịch`}</span><div><label>Số dòng/trang<Select.Root size="2" value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); }}><Select.Trigger aria-label="Số giao dịch trên mỗi trang" /><Select.Content>{PAGE_SIZES.map(size => <Select.Item key={size} value={String(size)}>{size}</Select.Item>)}</Select.Content></Select.Root></label><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</ThemeButton><span>Trang {currentPage}/{pageCount}</span><ThemeButton type="button" size="2" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</ThemeButton></div></div>
         </>}

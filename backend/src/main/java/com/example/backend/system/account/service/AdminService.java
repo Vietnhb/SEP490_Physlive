@@ -22,6 +22,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AdminService {
+    private static final String ACCOUNT_STATUS = "accountStatus";
+    private static final String ACTIVE = "ACTIVE";
+    private static final String ACTIVE_ATTRIBUTE = "active";
+    private static final String SCHOOL = "SCHOOL";
+    private static final String STAFF = "STAFF";
+    private static final String STUDENT = "STUDENT";
+    private static final String SUSPENDED_READ_ONLY = "SUSPENDED_READ_ONLY";
+    private static final String SYSTEM = "SYSTEM";
+    private static final String USER_NOT_FOUND = "Không tìm thấy người dùng";
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -46,7 +55,7 @@ public class AdminService {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
             if (schoolId != null) {
                 predicates.add(cb.equal(root.get("school").get("id"), schoolId));
-                predicates.add(root.get("role").get("name").in(java.util.List.of("SCHOOL", "STAFF", "STUDENT")));
+                predicates.add(root.get("role").get("name").in(java.util.List.of(SCHOOL, STAFF, STUDENT)));
             }
             if (firstUserId != null && cq != null && cq.getResultType() != Long.class && cq.getResultType() != long.class) {
                 cq.orderBy(cb.asc(cb.<Integer>selectCase().when(cb.equal(root.get("id"), firstUserId), 0).otherwise(1)),
@@ -58,15 +67,15 @@ public class AdminService {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
             if (role != null && !role.isBlank() && !role.equals("ALL")) predicates.add(cb.equal(root.get("role").get("name"), role));
             var tierRoles = switch (tier == null ? "ALL" : tier) {
-                case "SYSTEM" -> java.util.List.of("ADMIN", "MANAGER");
-                case "SCHOOL" -> java.util.List.of("SCHOOL", "STAFF");
-                case "INDIVIDUAL" -> java.util.List.of("STUDENT", "REVIEWER");
+                case SYSTEM -> java.util.List.of("ADMIN", "MANAGER");
+                case SCHOOL -> java.util.List.of(SCHOOL, STAFF);
+                case "INDIVIDUAL" -> java.util.List.of(STUDENT, "REVIEWER");
                 default -> java.util.List.<String>of();
             };
             if (!tierRoles.isEmpty()) predicates.add(root.get("role").get("name").in(tierRoles));
-            if ("SUSPENDED_READ_ONLY".equals(status) || "SUSPENDED".equals(status)) predicates.add(cb.or(cb.isFalse(root.get("active")), cb.equal(root.get("accountStatus"), "SUSPENDED_READ_ONLY")));
-            else if ("WARNED".equals(status)) predicates.add(cb.equal(root.get("accountStatus"), "WARNED"));
-            else if ("ACTIVE".equals(status)) predicates.add(cb.and(cb.or(cb.isTrue(root.get("active")), cb.isNull(root.get("active"))), cb.or(cb.isNull(root.get("accountStatus")), cb.equal(root.get("accountStatus"), "ACTIVE"))));
+            if (SUSPENDED_READ_ONLY.equals(status) || "SUSPENDED".equals(status)) predicates.add(cb.or(cb.isFalse(root.get(ACTIVE_ATTRIBUTE)), cb.equal(root.get(ACCOUNT_STATUS), SUSPENDED_READ_ONLY)));
+            else if ("WARNED".equals(status)) predicates.add(cb.equal(root.get(ACCOUNT_STATUS), "WARNED"));
+            else if (ACTIVE.equals(status)) predicates.add(cb.and(cb.or(cb.isTrue(root.get(ACTIVE_ATTRIBUTE)), cb.isNull(root.get(ACTIVE_ATTRIBUTE))), cb.or(cb.isNull(root.get(ACCOUNT_STATUS)), cb.equal(root.get(ACCOUNT_STATUS), ACTIVE))));
             if (query != null && !query.isBlank()) {
                 String needle = "%" + query.trim().toLowerCase(java.util.Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
                 var school = root.join("school", jakarta.persistence.criteria.JoinType.LEFT);
@@ -83,7 +92,7 @@ public class AdminService {
             result = userRepository.findAll(scope.and(filters), request.withPage(Math.max(0, result.getTotalPages() - 1)));
         java.util.Map<String, Long> counts = new java.util.HashMap<>();
         for (var count : userRepository.accountCounts(schoolId)) {
-            if (schoolId != null && !java.util.Set.of("SCHOOL", "STAFF", "STUDENT").contains(count.getRole())) continue;
+            if (schoolId != null && !java.util.Set.of(SCHOOL, STAFF, STUDENT).contains(count.getRole())) continue;
             counts.merge(count.getRole() == null ? "UNKNOWN" : count.getRole(), count.getTotal(), Long::sum);
             counts.merge("total", count.getTotal(), Long::sum);
             if (Boolean.FALSE.equals(count.getActive())) counts.merge("suspended", count.getTotal(), Long::sum);
@@ -189,26 +198,27 @@ public class AdminService {
             throw ApiException.conflict("Bạn không thể khóa tài khoản của chính mình");
         }
         User user = userRepository.findByIdForUpdate(id)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy người dùng"));
+                .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
         requireManage(user.getRole().getName(), user.getSchool());
         if (active && Boolean.FALSE.equals(user.getActive())) requireStudentSeat(user.getRole().getName(), user.getSchool());
         if (active && RoleName.SCHOOL.matches(user.getRole().getName()))
             roleValidationService.validateSingleSchoolManager(user.getSchool().getId(), user.getId());
         User actor = currentUserService.requireCurrentUser();
         boolean schoolActor = actor.getRole() != null && RoleName.SCHOOL.matches(actor.getRole().getName());
-        if (schoolActor && user.isSuspendedReadOnly() && !"SCHOOL".equals(user.getSuspensionScope()))
+        if (schoolActor && user.isSuspendedReadOnly() && !SCHOOL.equals(user.getSuspensionScope()))
             throw ApiException.forbidden("Tài khoản bị khóa ở cấp hệ thống. School không có quyền thay đổi quyết định này.");
         if (actor.getRole() != null && RoleName.MANAGER.matches(actor.getRole().getName())
-                && user.isSuspendedReadOnly() && "SCHOOL".equals(user.getSuspensionScope()))
+                && user.isSuspendedReadOnly() && SCHOOL.equals(user.getSuspensionScope()))
             throw ApiException.forbidden("Tài khoản do School tạm khóa. Manager chỉ được xem; nhà trường chịu trách nhiệm mở lại.");
         if (!active && (reason == null || reason.isBlank())) throw ApiException.badRequest("Vui lòng nhập lý do tạm khóa.");
         if (!active && reason.length() > 2000) throw ApiException.badRequest("Lý do quá dài.");
-        if (!active && user.isSuspendedReadOnly() && java.util.Objects.equals(user.getSuspensionScope(), schoolActor ? "SCHOOL" : "SYSTEM"))
+        String actorScope = schoolActor ? SCHOOL : SYSTEM;
+        if (!active && user.isSuspendedReadOnly() && java.util.Objects.equals(user.getSuspensionScope(), actorScope))
             throw ApiException.conflict("Tài khoản đã bị khóa ở cấp quản lý này.");
-        user.setAccountStatus(active ? "ACTIVE" : "SUSPENDED_READ_ONLY");
+        user.setAccountStatus(active ? ACTIVE : SUSPENDED_READ_ONLY);
         user.setSuspensionReason(active ? null : reason.trim());
         user.setSuspendedUntil(null);
-        user.setSuspensionScope(active ? null : schoolActor ? "SCHOOL" : "SYSTEM");
+        user.setSuspensionScope(active ? null : actorScope);
         user.setSuspensionId(active ? null : java.util.UUID.randomUUID());
         user.setActive(active);
         user.setDeactivatedAt(active ? null : java.time.Instant.now());
@@ -219,7 +229,7 @@ public class AdminService {
     @Transactional
     public UserStatusResponse resetPassword(Integer id, String newPassword) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy người dùng"));
+                .orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
         requireManage(user.getRole().getName(), user.getSchool());
         validatePassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -228,8 +238,8 @@ public class AdminService {
     }
 
     private UserStatusResponse toUser(User user) {
-        String status = user.getAccountStatus() != null ? user.getAccountStatus()
-                : (!Boolean.FALSE.equals(user.getActive()) ? "ACTIVE" : "SUSPENDED_READ_ONLY");
+        boolean enabled = !Boolean.FALSE.equals(user.getActive());
+        String status = java.util.Objects.requireNonNullElse(user.getAccountStatus(), enabled ? ACTIVE : SUSPENDED_READ_ONLY);
         return new UserStatusResponse(user.getId(), user.getEmail(), user.getFullName(),
                 user.getRole() == null ? "UNKNOWN" : user.getRole().getName(), !Boolean.FALSE.equals(user.getActive()),
                 user.getInstitutionId(), user.getLastLogin(), user.getDateOfBirth(), user.getAvatarUrl(),
@@ -241,7 +251,7 @@ public class AdminService {
 
     @Transactional
     public UserStatusResponse updateUser(Integer id, UpdateManagedUserRequest request) {
-        User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy người dùng"));
+        User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound(USER_NOT_FOUND));
         requireManage(user.getRole().getName(), user.getSchool());
         Role role = roleRepository.findByName(request.role().trim().toUpperCase(java.util.Locale.ROOT))
                 .orElseThrow(() -> ApiException.badRequest("Vai trò không được hỗ trợ"));

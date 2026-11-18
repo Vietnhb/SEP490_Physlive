@@ -49,8 +49,8 @@ export function OverviewView() {
 
         <Panel title="Phân bổ tài khoản" description={`Ba nhóm bao phủ toàn bộ ${total} tài khoản.`}>
           <div className="admin-breakdown-list">
-            <div><Text>Quản trị hệ thống</Text><Badge color="gray" size="2">{systemAccounts}</Badge></div>
-            <div><Text>Trường học</Text><Badge color="gray" size="2">{schoolAccounts}</Badge></div>
+            <div><Text>Tài khoản nền tảng</Text><Badge color="gray" size="2">{systemAccounts}</Badge></div>
+            <div><Text>Tài khoản trường</Text><Badge color="gray" size="2">{schoolAccounts}</Badge></div>
             <div><Text>Cá nhân</Text><Badge color="gray" size="2">{individualAccounts}</Badge></div>
           </div>
         </Panel>

@@ -26,7 +26,10 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(String email) {
-        return toResponse(findCurrent(email));
+        // the account was just read and checked by JwtFilter for this same request; reading it again only costs time
+        User checked = currentUserService.currentUserOrNull();
+        boolean same = checked != null && checked.getEmail() != null && checked.getEmail().equalsIgnoreCase(normalizeEmail(email));
+        return toResponse(same ? checked : findCurrent(email));
     }
 
     @Transactional(readOnly = true)

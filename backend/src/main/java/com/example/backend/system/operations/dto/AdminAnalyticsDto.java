@@ -40,6 +40,6 @@ public record AdminAnalyticsDto(
 
     public record PlanRevenue(String planCode, String name, long amountVnd, long count) {}
     public record TimelinePoint(String period, long amountVnd, long posts, long operations) {}
-    public record TransactionRow(UUID id, String schoolName, String planCode, long amountVnd, String status, Instant createdAt) {}
+    public record TransactionRow(UUID id, String schoolName, String planCode, String planName, long amountVnd, String status, Instant createdAt) {}
 }
 
