@@ -24,7 +24,7 @@ services:
     depends_on: { postgres: { condition: service_healthy } }
   web:
     build: ./react-client
-    ports: ["5173:80"]
+    ports: ["5173:8080"]
     depends_on: [backend]
 volumes:
   physlive-postgres:

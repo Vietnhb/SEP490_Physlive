@@ -47,6 +47,9 @@ android {
     buildTypes {
         release {
             if (releaseKeyFile.exists()) signingConfig = signingConfigs.getByName("upload")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

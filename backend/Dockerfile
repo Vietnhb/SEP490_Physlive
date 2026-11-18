@@ -8,7 +8,9 @@ COPY src src
 RUN ./mvnw -q -DskipTests package
 
 FROM eclipse-temurin:21-jre
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
 WORKDIR /app
-COPY --from=build /build/target/*.jar app.jar
+COPY --from=build --chown=app:app /build/target/*.jar app.jar
+USER app
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
