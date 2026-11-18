@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class LibraryService {
+    private static final String FOLDER_NOT_FOUND = "Không tìm thấy thư mục thư viện";
     private static final String LIBRARY_ITEM_NOT_FOUND = "Không tìm thấy mục thư viện";
     private static final Set<LibraryModerationStatus> PUBLISHED_STATUSES = Set.of(
             LibraryModerationStatus.APPROVED, LibraryModerationStatus.FEATURED);
@@ -47,7 +48,7 @@ public class LibraryService {
             throw ApiException.conflict("Chỉ có thể lưu mô phỏng đã kiểm định");
         }
         LibraryFolder folder = folderRepository.findByIdAndOwnerIdAndActiveTrue(request.folderId(), user.getId())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy thư mục thư viện"));
+                .orElseThrow(() -> ApiException.notFound(FOLDER_NOT_FOUND));
         Lesson lesson = lessonRepository.findById(request.lessonId())
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy bài học"));
         if (!lesson.getLevel().getModule().getTopic().matchesCode(specification.getTopic())) {
@@ -88,7 +89,7 @@ public class LibraryService {
                 .filter(item -> isPublishedFor(user, item))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy mục trong thư viện chia sẻ"));
         LibraryFolder folder = folderRepository.findByIdAndOwnerIdAndActiveTrue(folderId, user.getId())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy thư mục thư viện"));
+                .orElseThrow(() -> ApiException.notFound(FOLDER_NOT_FOUND));
         // the clone is the teacher's own: a copy of the whole saved simulation, so changing it never touches the original
         var simulation = copier.copyFor(user, source.getSimulation());
         LibraryItem copy = new LibraryItem();
@@ -168,7 +169,7 @@ public class LibraryService {
                 .filter(value -> value.isActive() && value.getOwner().getId().equals(user.getId()))
                 .orElseThrow(() -> ApiException.notFound(LIBRARY_ITEM_NOT_FOUND));
         LibraryFolder folder = folderRepository.findByIdAndOwnerIdAndActiveTrue(folderId, user.getId())
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy thư mục thư viện"));
+                .orElseThrow(() -> ApiException.notFound(FOLDER_NOT_FOUND));
         item.setFolder(folder);
         return toResponse(libraryRepository.save(item));
     }

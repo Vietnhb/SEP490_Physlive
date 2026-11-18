@@ -1,7 +1,7 @@
 import SimulationThumb from "./SimulationThumb";
 import { useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Dialog, IconButton, SegmentedControl, Select, Spinner, TextField, Theme } from "@radix-ui/themes";
-import { ArrowTopRightIcon, ChevronRightIcon, Cross2Icon, MagnifyingGlassIcon, PauseIcon, PlayIcon, ReaderIcon, ResetIcon, StarFilledIcon } from "@radix-ui/react-icons";
+import { ChevronRightIcon, Cross2Icon, MagnifyingGlassIcon, PauseIcon, PlayIcon, ReaderIcon, ResetIcon, StarFilledIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import PhysicsScene from "../../simulation/components/BackendSimulationView";
 import SavedScene from "../../simulation/components/SavedScene";
@@ -27,6 +27,10 @@ type Props = {
   /** Offer a copy of the open simulation for the viewer's own library. */
   canClone?: boolean;
   onRetry?: () => void;
+  /** A page that already has its own main heading shows this one as a section heading. */
+  headingLevel?: "h1" | "h2";
+  /** The area's breadcrumb already names the page: the heading stays for screen readers only. */
+  titleHidden?: boolean;
 };
 
 type Accent = "indigo" | "cyan" | "amber";
@@ -114,7 +118,7 @@ function CatalogNav({ catalog, selection, total, counts, onSelect }: Readonly<Ca
   </nav>;
 }
 
-export function ResourceDiscovery({ items, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
+export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = false, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
   const [selection, setSelection] = useState<CatalogSelection>({});
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<LibraryScope>("ALL");
@@ -150,7 +154,7 @@ export function ResourceDiscovery({ items, curriculum = null, generated = null, 
   const resetFilters = () => { setQuery(""); setSelection({}); setScope("ALL"); };
 
   return <Theme asChild accentColor="indigo" grayColor="slate" radius="large" scaling="100%" hasBackground={false}><motion.section className={styles.discovery} aria-label="Kho cộng đồng" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={transition}>
-    <header className={styles.pageHeading}><div><h1>Kho mô phỏng</h1><p>Khám phá mô phỏng vật lý được chia sẻ để quan sát, thực hành và củng cố bài học.</p></div><Badge size="2" variant="soft">{loading || error ? "Đang cập nhật" : `${scopedItems.length} mô phỏng khả dụng`}</Badge></header>
+    <header className={titleHidden ? "sr-only" : styles.pageHeading}><div>{headingLevel === "h1" ? <h1>Kho cộng đồng</h1> : <h2>Kho cộng đồng</h2>}<p>Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay.</p></div>{!titleHidden && !loading && !error && <Badge size="2" variant="soft">{scopedItems.length} mô phỏng</Badge>}</header>
     <div className={`${styles.layout} ${curriculum ? "" : styles.withoutCatalog}`}>
       <div className={styles.results}>
         <div className={styles.toolbar}>
@@ -180,7 +184,7 @@ export function ResourceDiscovery({ items, curriculum = null, generated = null, 
                 {path?.lesson && <p className={styles.lesson}>Bài học: {path.lesson}</p>}
                 <div className={styles.resourceFooter}>
                   <div className={styles.author}><Avatar size="1" color={accent} radius="full" fallback={(item.sharedByName || "GV").trim().charAt(0).toUpperCase()} /><div><strong>{item.sharedByName || "Giáo viên"}</strong><span>{item.visibility === "PUBLIC" ? item.schoolName || "PhysLive" : "Trong trường"}</span></div></div>
-                  <Button size="2" variant="soft" onClick={event => { returnFocusRef.current = event.currentTarget; onOpen(item); }} aria-label={`Mở ${item.title}`}>Mở <ArrowTopRightIcon /></Button>
+                  <Button size="2" variant="soft" onClick={event => { returnFocusRef.current = event.currentTarget; onOpen(item); }} aria-label={`Xem ${item.title}`}><PlayIcon />Xem</Button>
                 </div>
               </div>
             </SpotlightCard>

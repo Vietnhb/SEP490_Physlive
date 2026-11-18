@@ -3,7 +3,6 @@ package com.example.backend.system.library.repository;
 import com.example.backend.system.library.model.entity.LibraryItem;
 import com.example.backend.system.library.model.enums.LibraryModerationStatus;
 import com.example.backend.system.library.model.enums.Visibility;
-import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -12,7 +11,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -76,10 +74,22 @@ public interface LibraryItemRepository extends JpaRepository<LibraryItem, UUID> 
     @EntityGraph(attributePaths = {"specification", "owner", "owner.school"})
     @Query("select i from LibraryItem i where i.visibility = com.example.backend.system.library.model.enums.Visibility.SHARED and i.moderationStatus = :status and i.owner.school.id = :schoolId and (i.active = true or i.moderationStatus = com.example.backend.system.library.model.enums.LibraryModerationStatus.REMOVED) order by i.createdAt asc")
     List<LibraryItem> findSchoolModerationItems(@Param("schoolId") UUID schoolId, @Param("status") LibraryModerationStatus status);
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    /**
+     * The item, locked for this transaction, with its owner and specification. Only the item row is locked:
+     * a JPA lock on the joined query made Hibernate lock the owner, their school and the specification too,
+     * one database round trip each, and made every like on a school's items wait on that school's row.
+     */
+    default Optional<LibraryItem> findByIdForUpdate(UUID id) {
+        lockRow(id);
+        return findWithRelationsById(id);
+    }
+
+    @Query(value = "select 1 from library_items where id = :id for update", nativeQuery = true)
+    Optional<Integer> lockRow(@Param("id") UUID id);
+
     @EntityGraph(attributePaths = {"specification", "owner", "owner.school"})
     @Query("select i from LibraryItem i where i.id = :id")
-    Optional<LibraryItem> findByIdForUpdate(@Param("id") UUID id);
+    Optional<LibraryItem> findWithRelationsById(@Param("id") UUID id);
     Optional<LibraryItem> findBySimulationIdAndOwnerId(UUID simulationId, Integer ownerId);
     @EntityGraph(attributePaths = {"simulation", "simulation.specification", "owner", "owner.school"})
     Optional<LibraryItem> findFirstBySimulationId(UUID simulationId);
@@ -149,6 +159,12 @@ public interface LibraryItemRepository extends JpaRepository<LibraryItem, UUID> 
     boolean existsByFolderIdAndActiveTrue(UUID folderId);
 
     long countByFolderIdAndActiveTrue(UUID folderId);
+
+    interface FolderCount { UUID getFolderId(); long getTotal(); }
+
+    /** Active items per folder, for a whole folder list in one statement. */
+    @Query("select i.folder.id as folderId, count(i) as total from LibraryItem i where i.folder.id in :folderIds and i.active = true group by i.folder.id")
+    List<FolderCount> countActiveByFolderIds(@Param("folderIds") java.util.Collection<UUID> folderIds);
 
     @Query("select i from LibraryItem i where i.visibility in :visibilities and i.moderationStatus = :status and (i.active = true or i.moderationStatus = com.example.backend.system.library.model.enums.LibraryModerationStatus.REMOVED) order by i.createdAt asc")
     List<LibraryItem> findByVisibilityInAndModerationStatusOrderByCreatedAtAsc(@Param("visibilities") java.util.Set<Visibility> visibilities, @Param("status") LibraryModerationStatus status);

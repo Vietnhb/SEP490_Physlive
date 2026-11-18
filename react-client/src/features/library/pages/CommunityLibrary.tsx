@@ -10,7 +10,8 @@ import "../../assignments/styles/assignment-flow.css";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { canTeach } from "../../../shared/auth/permissions";
 
-export default function CommunityLibrary() {
+/** inApp: inside a signed-in area, where the page is a working list and not a showcase. */
+export default function CommunityLibrary({ inApp = false }: Readonly<{ inApp?: boolean }>) {
   const library = useCommunityLibrary();
   const user = useSessionStore(state => state.user);
   // Real numbers from what is currently shared; nothing here is a marketing figure.
@@ -21,17 +22,18 @@ export default function CommunityLibrary() {
   ], [library.items]);
   return (
     <PageContainer className={`community-library-page ${styles.page}`}>
-      <header className={styles.hero}>
+      {!inApp && <header className={styles.hero}>
         <DotField gap={22} radius={120} activeColor="var(--accent)" />
         <div className={styles.heroCopy}>
           <h1><SplitWords text="Kho cộng đồng" stagger={0.06} /></h1>
-          <p>Mô phỏng Vật lý do giáo viên chia sẻ, đã qua kiểm duyệt. Chọn theo lớp và bài học, mở ra là chạy thử được ngay.</p>
+          <p>Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay.</p>
         </div>
         {(library.loading || library.items.length > 0) && <dl className={styles.stats}>
           {stats.map(stat => <div key={stat.label}><dd>{library.loading ? "—" : <CountUp to={stat.value} duration={1.2} />}</dd><dt>{stat.label}</dt></div>)}
         </dl>}
-      </header>
+      </header>}
       <ResourceDiscovery
+        headingLevel={inApp ? "h1" : "h2"}
         {...library}
         allowSchoolScope={Boolean(user)}
         canClone={canTeach(user)}

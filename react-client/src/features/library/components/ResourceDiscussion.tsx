@@ -3,6 +3,7 @@ import { Avatar, Badge, Button, IconButton, Spinner, TextArea } from "@radix-ui/
 import { ChatBubbleIcon, HeartFilledIcon, HeartIcon, PaperPlaneIcon, TrashIcon } from "@radix-ui/react-icons";
 import { commentOnLibrary, deleteLibraryComment, libraryDiscussion, reactToLibrary, type LibraryDiscussion } from "../api/libraryApi";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 import { appendDiscussionPage } from "../model/discussionModel";
 import styles from "./ResourceDiscussion.module.css";
 
@@ -15,6 +16,7 @@ export function ResourceDiscussion({ resourceId }: Readonly<{ resourceId: string
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>("load");
   const controllerRef = useRef<AbortController | null>(null);
+  const likePending = useRef(false);
   const canInteract = Boolean(user && discussion?.canInteract);
 
   useEffect(() => {
@@ -26,6 +28,10 @@ export function ResourceDiscussion({ resourceId }: Readonly<{ resourceId: string
       .finally(() => { if (!controller.signal.aborted) setBusy(null); });
     return () => controller.abort();
   }, [resourceId]);
+  // comments and reactions from other people arrive while the discussion is open; a comment being written is kept
+  useApiRefresh([`/api/library/${resourceId}/discussion`], () => libraryDiscussion(resourceId, 0)
+    .then(data => setDiscussion(current => current && current.page > 0 ? { ...data, page: current.page, hasMore: current.hasMore, comments: [...data.comments, ...current.comments.filter(comment => !data.comments.some(fresh => fresh.id === comment.id))] } : data))
+    .catch(() => undefined));
 
   async function perform(kind: string, action: (signal: AbortSignal) => Promise<void>, message: string) {
     const signal = controllerRef.current?.signal;
@@ -57,12 +63,20 @@ export function ResourceDiscussion({ resourceId }: Readonly<{ resourceId: string
     }, "Chưa gửi được bình luận. Vui lòng thử lại.");
   }
 
+  // the heart flips at once and the request runs behind it; a failed request puts it back
   function toggleLike() {
-    if (!canInteract || !discussion) return;
-    void perform("like", async signal => {
-      const reaction = await reactToLibrary(resourceId, !discussion.liked, signal);
-      if (!signal.aborted) setDiscussion(current => current && { ...current, ...reaction });
-    }, "Chưa cập nhật được lượt thích.");
+    const signal = controllerRef.current?.signal;
+    if (!canInteract || !discussion || likePending.current || !signal || signal.aborted) return;
+    const liked = !discussion.liked;
+    const flip = (to: boolean) => setDiscussion(current => current && current.liked !== to
+      ? { ...current, liked: to, likes: Math.max(0, current.likes + (to ? 1 : -1)) } : current);
+    likePending.current = true;
+    setError("");
+    flip(liked);
+    reactToLibrary(resourceId, liked, signal)
+      .then(reaction => { if (!signal.aborted) setDiscussion(current => current && { ...current, ...reaction }); })
+      .catch(() => { if (!signal.aborted) { flip(!liked); setError("Chưa cập nhật được lượt thích."); } })
+      .finally(() => { likePending.current = false; });
   }
 
   function remove(commentId: string) {
@@ -83,7 +97,7 @@ export function ResourceDiscussion({ resourceId }: Readonly<{ resourceId: string
     <div className={styles.heading}>
       <h3><ChatBubbleIcon /> Bình luận {discussion && <Badge color="gray" variant="soft">{discussion.commentCount}</Badge>}</h3>
       {discussion && (canInteract
-        ? <Button size="2" variant={discussion.liked ? "soft" : "outline"} color={discussion.liked ? "crimson" : "gray"} aria-pressed={discussion.liked} onClick={toggleLike} disabled={Boolean(busy)}>{busy === "like" ? <Spinner /> : discussion.liked ? <HeartFilledIcon /> : <HeartIcon />} {discussion.likes} Thích</Button>
+        ? <Button size="2" variant={discussion.liked ? "soft" : "outline"} color={discussion.liked ? "crimson" : "gray"} aria-pressed={discussion.liked} onClick={toggleLike} disabled={busy === "load"}>{discussion.liked ? <HeartFilledIcon /> : <HeartIcon />} {discussion.likes} Thích</Button>
         : <span className={styles.likes}><HeartIcon aria-hidden="true" /> {discussion.likes} lượt thích</span>)}
     </div>
     {canInteract && discussion && <form className={styles.composer} onSubmit={submit}>
