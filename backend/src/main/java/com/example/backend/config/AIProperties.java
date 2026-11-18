@@ -33,7 +33,8 @@ public record AIProperties(Provider provider, Visual visual) {
             int maxCompletionTokens, String reasoningEffort) {
         public Visual {
             apiKey = clean(apiKey);
-            provider = clean(provider).isEmpty() ? "openai_compatible" : provider.trim().toLowerCase(java.util.Locale.ROOT);
+            String chosenProvider = clean(provider);
+            provider = chosenProvider.isEmpty() ? "openai_compatible" : chosenProvider.toLowerCase(java.util.Locale.ROOT);
             model = required(model, "AI visual model");
             requireHttpUrl(baseUrl, "AI visual base URL");
             requirePositive(readTimeout, "AI visual read timeout");

@@ -21,6 +21,18 @@ import org.springframework.stereotype.Component;
 @Component
 @lombok.extern.slf4j.Slf4j
 public class AIClient {
+    private static final String CHAT_COMPLETIONS = "chat/completions";
+    private static final String CHOICES = "choices";
+    private static final String CONTENT = "content";
+    private static final String ERROR = "error";
+    private static final String JSON_OBJECT = "json_object";
+    private static final String MESSAGE = "message";
+    private static final String MESSAGES = "messages";
+    private static final String MODEL = "model";
+    private static final String RESPONSE_FORMAT = "response_format";
+    private static final String SCENE_OPERATION = "SCENE";
+    private static final String SYSTEM = "system";
+    private static final String TEMPERATURE = "temperature";
     private final AIProperties ai;
     private final JevProperties jev;
     private final ObjectMapper json;
@@ -40,7 +52,7 @@ public class AIClient {
 
     public JsonNode route(String state, JsonNode questions) {
         ObjectNode body = json.createObjectNode();
-        body.put("model", jev.model());
+        body.put(MODEL, jev.model());
         body.put("state", state);
         body.set("questions", questions);
         if (body.toString().length() > jev.maximumPromptCharacters())
@@ -53,15 +65,15 @@ public class AIClient {
             throw ApiException.unavailable("Dịch vụ phân tích AI chưa được cấu hình");
         try {
             ObjectNode body = json.createObjectNode();
-            body.put("model", ai.provider().textModel());
-            body.put("temperature", ai.provider().understandingTemperature());
-            var messages = body.putArray("messages");
-            messages.addObject().put("role", "system").put("content", prompt.get());
-            messages.addObject().put("role", "user").put("content", json.writeValueAsString(input));
-            body.set("response_format", json.createObjectNode().put("type", "json_object"));
-            JsonNode completion = post("MODEL", endpoint(ai.provider().baseUrl(), "chat/completions"), ai.provider().apiKey(),
+            body.put(MODEL, ai.provider().textModel());
+            body.put(TEMPERATURE, ai.provider().understandingTemperature());
+            var messages = body.putArray(MESSAGES);
+            messages.addObject().put("role", SYSTEM).put(CONTENT, prompt.get());
+            messages.addObject().put("role", "user").put(CONTENT, json.writeValueAsString(input));
+            body.set(RESPONSE_FORMAT, json.createObjectNode().put("type", JSON_OBJECT));
+            JsonNode completion = post("MODEL", endpoint(ai.provider().baseUrl(), CHAT_COMPLETIONS), ai.provider().apiKey(),
                     body, ai.provider().readTimeout());
-            return json.readTree(completion.path("choices").path(0).path("message").path("content").asText(""));
+            return json.readTree(completion.path(CHOICES).path(0).path(MESSAGE).path(CONTENT).asText(""));
         } catch (IOException ex) {
             throw ApiException.internal("Không thể chuẩn bị yêu cầu phân tích mô phỏng");
         }
@@ -73,21 +85,21 @@ public class AIClient {
         try {
             String dataUrl = "data:" + mediaType + ";base64," + Base64.getEncoder().encodeToString(bytes);
             ObjectNode body = json.createObjectNode();
-            body.put("model", ai.provider().visionModel());
-            body.put("temperature", ai.provider().understandingTemperature());
-            var messages = body.putArray("messages");
-            messages.addObject().put("role", "system").put("content", prompt.get());
+            body.put(MODEL, ai.provider().visionModel());
+            body.put(TEMPERATURE, ai.provider().understandingTemperature());
+            var messages = body.putArray(MESSAGES);
+            messages.addObject().put("role", SYSTEM).put(CONTENT, prompt.get());
             ObjectNode user = messages.addObject();
             user.put("role", "user");
-            var content = user.putArray("content");
+            var content = user.putArray(CONTENT);
             content.addObject().put("type", "text").put("text", context == null || context.isBlank()
                     ? "Transcribe the image."
                     : "Transcribe the image. User context, only to help read unclear symbols: " + context);
             content.addObject().put("type", "image_url").putObject("image_url").put("url", dataUrl);
-            body.set("response_format", json.createObjectNode().put("type", "json_object"));
-            JsonNode completion = post("OCR", endpoint(ai.provider().baseUrl(), "chat/completions"), ai.provider().apiKey(),
+            body.set(RESPONSE_FORMAT, json.createObjectNode().put("type", JSON_OBJECT));
+            JsonNode completion = post("OCR", endpoint(ai.provider().baseUrl(), CHAT_COMPLETIONS), ai.provider().apiKey(),
                     body, ai.provider().readTimeout());
-            return json.readTree(completion.path("choices").path(0).path("message").path("content").asText(""));
+            return json.readTree(completion.path(CHOICES).path(0).path(MESSAGE).path(CONTENT).asText(""));
         } catch (IOException ex) {
             throw ApiException.upstream("Kết quả nhận dạng ảnh không hợp lệ");
         }
@@ -102,8 +114,8 @@ public class AIClient {
         try {
             boolean openRouter = "openrouter".equalsIgnoreCase(ai.visual().provider());
             ObjectNode body = json.createObjectNode();
-            body.put("model", ai.visual().model());
-            body.put("temperature", ai.visual().temperature());
+            body.put(MODEL, ai.visual().model());
+            body.put(TEMPERATURE, ai.visual().temperature());
             // OpenRouter normalises max_tokens across providers; reasoning tokens count
             // toward it.
             body.put(openRouter ? "max_tokens" : "max_completion_tokens", ai.visual().maxCompletionTokens());
@@ -120,56 +132,60 @@ public class AIClient {
             // it once, in response_format, instead of twice.
             String withContract = system + "\n\nRESPONSE CONTRACT (JSON Schema):\n" + contract;
             String user = json.writeValueAsString(input);
-            var messages = body.putArray("messages");
-            messages.addObject().put("role", "system").put("content", withContract);
-            messages.addObject().put("role", "user").put("content", user);
+            var messages = body.putArray(MESSAGES);
+            messages.addObject().put("role", SYSTEM).put(CONTENT, withContract);
+            messages.addObject().put("role", "user").put(CONTENT, user);
             // Providers may opt out of response_format; the contract remains in
             // the prompt and the response is parsed and validated server-side.
             JsonNode completion;
             if (ai.visual().supportsResponseFormat()) {
                 ObjectNode structured = body.deepCopy();
-                ObjectNode format = structured.putObject("response_format");
+                ObjectNode format = structured.putObject(RESPONSE_FORMAT);
                 if (ai.visual().strictStructuredOutput()) {
-                    var strictMessages = structured.putArray("messages");
-                    strictMessages.addObject().put("role", "system").put("content", system);
-                    strictMessages.addObject().put("role", "user").put("content", user);
+                    var strictMessages = structured.putArray(MESSAGES);
+                    strictMessages.addObject().put("role", SYSTEM).put(CONTENT, system);
+                    strictMessages.addObject().put("role", "user").put(CONTENT, user);
                     format.put("type", "json_schema");
                     format.putObject("json_schema").put("name", "simulation_visual").put("strict", true).set("schema",
                             contract);
                 } else
-                    format.put("type", "json_object");
+                    format.put("type", JSON_OBJECT);
                 // Route only to endpoints that honour structured output (free models have many
                 // hosts).
                 if (openRouter)
                     structured.putObject("provider").put("require_parameters", true);
-                try {
-                    completion = post("SCENE", endpoint(ai.visual().baseUrl(), "chat/completions"), ai.visual().apiKey(), structured,
-                            ai.visual().readTimeout());
-                } catch (ApiException ex) {
-                    // No endpoint accepts the structured-output parameters: fall back to the
-                    // prompt-level contract, which is still parsed and validated below.
-                    String message = String.valueOf(ex.getMessage());
-                    if (!(message.contains("HTTP 400") || message.contains("HTTP 404") || message.contains("HTTP 422")))
-                        throw ex;
-                    completion = post("SCENE", endpoint(ai.visual().baseUrl(), "chat/completions"), ai.visual().apiKey(), body, ai.visual().readTimeout());
-                }
+                completion = postStructured(structured, body);
             } else {
-                completion = post("SCENE", endpoint(ai.visual().baseUrl(), "chat/completions"), ai.visual().apiKey(), body, ai.visual().readTimeout());
+                completion = post(SCENE_OPERATION, endpoint(ai.visual().baseUrl(), CHAT_COMPLETIONS), ai.visual().apiKey(), body, ai.visual().readTimeout());
             }
-            JsonNode choice = completion.path("choices").path(0);
+            JsonNode choice = completion.path(CHOICES).path(0);
             if ("length".equals(choice.path("finish_reason").asText()))
                 throw ApiException.upstream("Cảnh minh họa AI chưa được tạo đầy đủ. Vui lòng thử lại hoặc rút gọn mô tả");
-            if (completion.has("error") && choice.isMissingNode()) {
-                log.warn("Visual AI provider error: {}", completion.path("error").path("message")
+            if (completion.has(ERROR) && choice.isMissingNode()) {
+                log.warn("Visual AI provider error: {}", completion.path(ERROR).path(MESSAGE)
                         .asText("unknown").replace(ai.visual().apiKey(), "[redacted]"));
                 throw ApiException.upstream("Dịch vụ tạo cảnh minh họa AI gặp lỗi. Vui lòng thử lại.");
             }
-            JsonNode result = parseModelJson(choice.path("message").path("content"));
-            if (result == null || !result.isObject())
-                throw ApiException.upstream("Phản hồi của dịch vụ AI không đúng định dạng");
-            return result;
+            // parseModelJson returns a JSON object or throws
+            return parseModelJson(choice.path(MESSAGE).path(CONTENT));
         } catch (IOException ex) {
             throw ApiException.upstream("Dữ liệu cảnh minh họa của AI không hợp lệ");
+        }
+    }
+
+    /**
+     * Asks with the structured-output parameters. Where no endpoint accepts them, asks again with the prompt-level
+     * contract alone, which is still parsed and validated afterwards.
+     */
+    private JsonNode postStructured(ObjectNode structured, ObjectNode plain) {
+        URI uri = endpoint(ai.visual().baseUrl(), CHAT_COMPLETIONS);
+        try {
+            return post(SCENE_OPERATION, uri, ai.visual().apiKey(), structured, ai.visual().readTimeout());
+        } catch (ApiException ex) {
+            String message = String.valueOf(ex.getMessage());
+            if (!(message.contains("HTTP 400") || message.contains("HTTP 404") || message.contains("HTTP 422")))
+                throw ex;
+            return post(SCENE_OPERATION, uri, ai.visual().apiKey(), plain, ai.visual().readTimeout());
         }
     }
 
@@ -203,12 +219,14 @@ public class AIClient {
     private JsonNode parseJsonObject(String text) throws IOException {
         String trimmed = text == null ? "" : text.trim();
         if (trimmed.startsWith("```"))
-            trimmed = trimmed.replaceFirst("^```[a-zA-Z0-9_-]*\\s*", "").replaceFirst("\\s*```\\s*$", "");
+            trimmed = com.example.backend.common.text.CodeText.withoutClosingFence(com.example.backend.common.text.CodeText.withoutOpeningFence(trimmed,
+                    c -> c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-'));
         JsonNode result;
         try {
             result = json.readTree(trimmed);
         } catch (IOException direct) {
-            int first = trimmed.indexOf('{'), last = trimmed.lastIndexOf('}');
+            int first = trimmed.indexOf('{');
+            int last = trimmed.lastIndexOf('}');
             if (first < 0 || last <= first)
                 throw direct;
             result = json.readTree(trimmed.substring(first, last + 1));
@@ -221,18 +239,16 @@ public class AIClient {
     private JsonNode askGeminiInteraction(JsonNode input, String system, JsonNode contract) {
         try {
             ObjectNode body = json.createObjectNode();
-            body.put("model", ai.visual().model());
+            body.put(MODEL, ai.visual().model());
             body.put("store", false);
             body.put("input", system + "\n\nUSER_INPUT_JSON:\n" + json.writeValueAsString(input));
-            ObjectNode format = body.putObject("response_format");
+            ObjectNode format = body.putObject(RESPONSE_FORMAT);
             format.put("type", "text");
             format.put("mime_type", "application/json");
             format.set("schema", contract);
-            JsonNode completion = post("SCENE", ai.visual().baseUrl(), ai.visual().apiKey(), body, ai.visual().readTimeout(), true);
-            JsonNode result = parseJsonObject(geminiInteractionText(completion));
-            if (result == null || !result.isObject())
-                throw ApiException.upstream("Phản hồi của dịch vụ AI không đúng định dạng");
-            return result;
+            JsonNode completion = post(SCENE_OPERATION, ai.visual().baseUrl(), ai.visual().apiKey(), body, ai.visual().readTimeout(), true);
+            // parseJsonObject returns a JSON object or throws
+            return parseJsonObject(geminiInteractionText(completion));
         } catch (IOException ex) {
             throw ApiException.upstream("Dữ liệu cảnh minh họa của AI không hợp lệ");
         }
@@ -242,15 +258,13 @@ public class AIClient {
         JsonNode steps = completion.path("steps");
         if (steps.isArray()) {
             for (JsonNode step : steps) {
-                if (!"model_output".equals(step.path("type").asText()))
-                    continue;
-                JsonNode content = step.path("content");
-                if (!content.isArray())
-                    continue;
-                for (JsonNode part : content) {
-                    String text = part.path("text").asText("");
-                    if (!text.isBlank())
-                        return text;
+                JsonNode content = step.path(CONTENT);
+                if ("model_output".equals(step.path("type").asText()) && content.isArray()) {
+                    for (JsonNode part : content) {
+                        String text = part.path("text").asText("");
+                        if (!text.isBlank())
+                            return text;
+                    }
                 }
             }
         }
@@ -276,29 +290,37 @@ public class AIClient {
             HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(payload))).build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                String detail = "";
-                try {
-                    String message = json.readTree(response.body()).path("error").path("message").asText("")
-                            .replace(apiKey, "[redacted]");
-                    if (!message.isBlank()) detail = ": " + message.substring(0, Math.min(400, message.length()));
-                } catch (IOException ignored) {
-                    // Provider errors need not be JSON; never return the raw response body.
-                }
-                log.warn("AI provider returned HTTP {}{}", response.statusCode(), detail);
+                log.warn("AI provider returned HTTP {}{}", response.statusCode(), errorDetail(response.body(), apiKey));
                 throw ApiException.upstream("Yêu cầu đến dịch vụ AI thất bại với mã HTTP " + response.statusCode() + ". Vui lòng thử lại.");
             }
             JsonNode answer = json.readTree(response.body());
-            if (meter != null) {
-                try { meter.record(operation, tokensUsed(answer, request, response.body())); }
-                // the answer is paid for already; a count that cannot be written must not lose it
-                catch (RuntimeException failure) { log.warn("AI_USAGE_NOT_RECORDED {}", failure.getMessage()); }
-            }
+            if (meter != null) recordUsage(operation, answer, request, response.body());
             return answer;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw ApiException.unavailable("Yêu cầu AI bị gián đoạn. Vui lòng thử lại");
         } catch (IOException ex) {
             throw ApiException.upstream("Không thể hoàn tất yêu cầu AI. Vui lòng thử lại");
+        }
+    }
+
+    /** The provider's own error message for the log, without the key; empty where the body holds none. */
+    private String errorDetail(String body, String apiKey) {
+        try {
+            String message = json.readTree(body).path(ERROR).path(MESSAGE).asText("").replace(apiKey, "[redacted]");
+            return message.isBlank() ? "" : ": " + message.substring(0, Math.min(400, message.length()));
+        } catch (IOException ignored) {
+            // Provider errors need not be JSON; never return the raw response body.
+            return "";
+        }
+    }
+
+    private void recordUsage(String operation, JsonNode answer, HttpRequest request, String body) {
+        try {
+            meter.recordUsage(operation, tokensUsed(answer, request, body));
+        } catch (RuntimeException failure) {
+            // the answer is paid for already; a count that cannot be written must not lose it
+            log.warn("AI_USAGE_NOT_RECORDED {}", failure.getMessage());
         }
     }
 
@@ -309,12 +331,12 @@ public class AIClient {
         if (usage.path("prompt_tokens").canConvertToLong() || usage.path("completion_tokens").canConvertToLong())
             return usage.path("prompt_tokens").asLong(0) + usage.path("completion_tokens").asLong(0);
         if (answer.path("usageMetadata").path("totalTokenCount").canConvertToLong()) return answer.path("usageMetadata").path("totalTokenCount").asLong();
-        long sent = request.bodyPublisher().map(publisher -> publisher.contentLength()).orElse(0L);
+        long sent = request.bodyPublisher().map(HttpRequest.BodyPublisher::contentLength).orElse(0L);
         return Math.max(1, (Math.max(0, sent) + (body == null ? 0 : body.length())) / 4);
     }
 
     private URI endpoint(URI base, String path) {
-        String value = base.toString().replaceAll("/+$", "");
+        String value = com.example.backend.common.text.CodeText.withoutTrailingSlashes(base.toString());
         return URI.create(value + "/" + path);
     }
 

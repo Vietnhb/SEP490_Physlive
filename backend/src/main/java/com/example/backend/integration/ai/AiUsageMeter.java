@@ -6,5 +6,5 @@ public interface AiUsageMeter {
     void requireAllowance();
 
     /** What one provider call used, in provider tokens, and what it was for. */
-    void record(String operation, long tokens);
+    void recordUsage(String operation, long tokens);
 }
