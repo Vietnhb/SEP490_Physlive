@@ -13,6 +13,8 @@ const QUICK_DESCRIPTIONS = [
   { label: "Mạch điện nối tiếp và song song", text: "Một nguồn điện có suất điện động 12 V và điện trở trong 1 Ω được nối với mạch ngoài gồm điện trở R1 = 4 Ω mắc nối tiếp với cụm hai điện trở R2 = 6 Ω và R3 = 3 Ω mắc song song với nhau. Hãy mô phỏng cường độ dòng điện trong mạch chính và dòng điện qua từng điện trở R2, R3." },
 ];
 
+const savedAt = (iso: string) => new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+
 export default function SimulationInspector({ experiment, explanation, save, library, onSelectExample, readoutsRef }: Readonly<Pick<SimulationWorkspaceModel, "experiment" | "explanation" | "save" | "library"> & { onSelectExample: (description: string) => void; readoutsRef?: Ref<HTMLDivElement> }>) {
   const { simulation, values, validation, updateParameter, resetParameters } = experiment;
   const { intent, revision, setRevision, handleRevision } = explanation;
@@ -179,7 +181,7 @@ export default function SimulationInspector({ experiment, explanation, save, lib
                     disabled={busy || Boolean(library.openingId)} aria-current={currentSimulationId === item.simulationId ? "true" : undefined}
                     onClick={() => void library.onOpen(item)}>
                     <Icon name="play" /><span><strong>{item.title}</strong>
-                      <small>{library.openingId === item.id ? "Đang mở…" : library.topicName?.(item.topic) || "Mở mô phỏng đã lưu"}</small></span>
+                      <small>{library.openingId === item.id ? "Đang mở…" : <>{library.topicName?.(item.topic) || "Mở mô phỏng đã lưu"} · <time dateTime={item.createdAt}>{savedAt(item.createdAt)}</time></>}</small></span>
                   </button>)}
                 </div> : <p className="simulation-muted">Chưa có mô phỏng đã lưu. Các bài mới sẽ xuất hiện ở đây sau khi lưu.</p>}
             </section>}

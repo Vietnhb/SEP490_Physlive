@@ -45,9 +45,17 @@
 .library-share-option small { color: var(--muted); font-size: 12px; line-height: 1.4; white-space: normal; }
 .library-share-option em { flex: 0 0 auto; margin-left: auto; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-style: normal; font-weight: 600; }
 .library-action-popover button.library-share-option[aria-current="true"]:disabled { opacity: 1; cursor: default; }
-.library-share-tag { font-weight: 600; color: var(--accent); }
-.library-share-tag[data-state="PENDING"] { color: var(--warning, #b25e09); }
-.library-share-tag[data-state="REJECTED"] { color: var(--danger); }
+/* Library row: the topic, then a small badge saying who sees the item (none for a private one). */
+.learn-library-items button small.library-item-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.library-item-meta > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-share-tag {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border-radius: 999px;
+  color: var(--accent); background: var(--accent-soft); font-size: 11px; font-weight: 600; line-height: 17px;
+}
+.library-share-tag::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.library-share-tag[data-state="FEATURED"] { color: #a16207; background: color-mix(in srgb, #eab308 18%, transparent); }
+.library-share-tag[data-state="PENDING"] { color: var(--warning, #b25e09); background: color-mix(in srgb, var(--warning, #b25e09) 14%, transparent); }
+.library-share-tag[data-state="REJECTED"] { color: var(--danger, #e5484d); background: color-mix(in srgb, var(--danger, #e5484d) 12%, transparent); }
 
 /* "Thông tin" view of a library item */
 .library-info { display: grid; gap: 8px; margin: 4px 0 6px; padding: 0 10px; }

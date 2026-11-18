@@ -16,8 +16,22 @@ type Props = {
   onBusyChange: (busy: boolean) => void;
 };
 
+const TITLE_LENGTH = 100;
+
+/**
+ * A short name proposed from the description: its first paragraph (what the teacher wrote; corrections are appended
+ * below it), cut at a word boundary. The teacher can rename it before saving.
+ */
+const suggestedTitle = (description: string) => {
+  const first = description.split(/\n\s*\n/)[0].replaceAll(/\s+/g, " ").trim();
+  if (first.length <= TITLE_LENGTH) return first;
+  const cut = first.slice(0, TITLE_LENGTH);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > TITLE_LENGTH / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+};
+
 export default function SaveSimulationPanel({ simulation, parameters, folders, onFolder, onSaved, onClose, onBusyChange }: Props) {
-  const [title, setTitle] = useState(simulation.description.slice(0, 160));
+  const [title, setTitle] = useState(() => suggestedTitle(simulation.description));
   const [folderId, setFolderId] = useState(folders[0]?.id ?? "");
   const [folderName, setFolderName] = useState("");
   const [lessonId, setLessonId] = useState("");

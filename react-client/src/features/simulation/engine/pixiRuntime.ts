@@ -67,7 +67,8 @@ async function start(message) {
   setData(message);
   app = new PIXI.Application();
   await app.init({canvas: message.canvas, width: message.width, height: message.height, resolution: message.dpr || 1,
-    backgroundAlpha: 0, antialias: true, preference: 'webgl', autoStart: false});
+    // at twice the CSS pixels edges are already smooth; multisampling there only costs phones frame time
+    backgroundAlpha: 0, antialias: (message.dpr || 1) < 2, preference: 'webgl', autoStart: false});
   const svgTexture = (svg, options = {}) => {
     if (typeof svg !== 'string' || !svg.trim()) return Promise.reject(Error('api.svgTexture(svg) expects SVG markup.'));
     const id = ++nextAsset;
@@ -269,7 +270,7 @@ addEventListener('message', ({source, data}) => {
     worker.onerror = event => stop(event.message || 'PixiJS worker failed.');
     lastHeartbeat = Date.now();
     const offscreen = canvas.transferControlToOffscreen();
-    worker.postMessage({...data, canvas: offscreen, width: innerWidth, height: innerHeight, dpr: Math.min(3, devicePixelRatio || 1),
+    worker.postMessage({...data, canvas: offscreen, width: innerWidth, height: innerHeight, dpr: Math.min(2, devicePixelRatio || 1),
       bundle: undefined, runtime: undefined}, [offscreen]);
   } else worker?.postMessage(data);
 });

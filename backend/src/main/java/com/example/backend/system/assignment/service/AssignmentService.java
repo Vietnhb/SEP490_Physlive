@@ -44,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AssignmentService {
+    private static final String NOT_ASSIGNED_TO_STUDENT = "Bài tập chưa được giao cho học sinh này";
     private static final String MEASUREMENT = "MEASUREMENT";
     private static final String EXPECTED_VALUE = "expectedValue";
     private static final String TOLERANCE = "tolerance";
@@ -220,14 +221,17 @@ public class AssignmentService {
             throw ApiException.forbidden("Tài khoản không có quyền giảng dạy.");
         java.util.Map<UUID, Assignment> visible = new java.util.LinkedHashMap<>();
         assignmentRepository.findByTeacherIdOrderByCreatedAtDesc(teacher.getId()).forEach(item -> visible.put(item.getId(), item));
+        // the teacher's active class links, already loaded here, answer "does this teacher teach the class" for every row
+        Set<UUID> taughtClassIds = new java.util.HashSet<>();
         classTeacherAssignments.findActiveByTeacherId(teacher.getId()).forEach(link -> {
             SchoolClass classroom = link.getSchoolClass();
+            taughtClassIds.add(classroom.getId());
             if (teacher.getSchool() != null && teacher.getSchool().getId().equals(classroom.getSchool().getId()))
                 assignmentRepository.findBySchoolClassIdOrderByAssignedAtDesc(classroom.getId()).forEach(item -> visible.put(item.getId(), item));
         });
-        return visible.values().stream().filter(item -> canReadAssignment(teacher, item))
+        return visible.values().stream().filter(item -> canManageAssignment(teacher, item, taughtClassIds::contains))
                 .sorted(java.util.Comparator.comparing(Assignment::getAssignedAt).reversed())
-                .map(this::toResponse).toList();
+                .map(item -> toResponse(item, teacher, null, true)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -248,12 +252,21 @@ public class AssignmentService {
     @Transactional(readOnly = true)
     public List<AssignmentResponse> forStudent() {
         User student = currentUserService.requireCurrentUser();
+        List<Assignment> assigned = assignmentRepository.findByAssignedStudentIdsContaining(student.getId());
+        if (assigned.isEmpty()) return List.of();
+        boolean viewerIsStudent = student.getRole() != null && RoleName.STUDENT.matches(student.getRole().getName());
+        // the student's own submissions for all of them in one query, instead of one query per assignment
+        java.util.Map<UUID, AssignmentSubmission> own = submissionRepository
+                .findByStudentIdAndAssignmentIdIn(student.getId(), assigned.stream().map(Assignment::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(submission -> submission.getAssignment().getId(),
+                        submission -> submission, (first, second) -> first));
         // A closed assignment stays visible to students who handed it in, so their score and feedback are not lost.
-        return assignmentRepository.findByAssignedStudentIdsContaining(student.getId()).stream()
+        return assigned.stream()
                 .filter(item -> item.getStatus() == AssignmentStatus.ACTIVE
-                        || submissionRepository.findByAssignmentIdAndStudentId(item.getId(), student.getId())
-                                .map(submission -> submission.getCompletedAt() != null).orElse(false))
-                .map(this::toResponse).toList();
+                        || own.containsKey(item.getId()) && own.get(item.getId()).getCompletedAt() != null)
+                .map(item -> toResponse(item, student, viewerIsStudent ? own.get(item.getId()) : null,
+                        canManageAssignment(student, item)))
+                .toList();
     }
 
     @Transactional(readOnly = true, noRollbackFor = Exception.class)
@@ -262,7 +275,7 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
         if (!assignment.getAssignedStudentIds().contains(student.getId())) {
-            throw ApiException.forbidden("Bài tập chưa được giao cho học sinh này");
+            throw ApiException.forbidden(NOT_ASSIGNED_TO_STUDENT);
         }
         if (requiresPrediction(assignment) && !submissionRepository.existsByAssignmentIdAndStudentId(assignmentId, student.getId())) {
             throw ApiException.forbidden("Vui lòng nộp dự đoán trước khi xem mô phỏng");
@@ -288,7 +301,7 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
         if (!assignment.getAssignedStudentIds().contains(student.getId())) {
-            throw ApiException.forbidden("Bài tập chưa được giao cho học sinh này");
+            throw ApiException.forbidden(NOT_ASSIGNED_TO_STUDENT);
         }
         if (requiresPrediction(assignment) && !submissionRepository.existsByAssignmentIdAndStudentId(assignmentId, student.getId())) {
             throw ApiException.forbidden("Vui lòng nộp dự đoán trước khi điều chỉnh mô phỏng");
@@ -314,7 +327,7 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
         if (!assignment.getAssignedStudentIds().contains(student.getId())) {
-            throw ApiException.forbidden("Bài tập chưa được giao cho học sinh này");
+            throw ApiException.forbidden(NOT_ASSIGNED_TO_STUDENT);
         }
         AssignmentSubmission submission = submissionRepository.findByAssignmentIdAndStudentId(assignmentId, student.getId()).orElse(null);
         if (assignment.getStatus() != com.example.backend.system.assignment.model.enums.AssignmentStatus.ACTIVE)
@@ -346,7 +359,7 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
         if (!assignment.getAssignedStudentIds().contains(student.getId()))
-            throw ApiException.forbidden("Bài tập chưa được giao cho học sinh này");
+            throw ApiException.forbidden(NOT_ASSIGNED_TO_STUDENT);
         if (assignment.getStatus() != com.example.backend.system.assignment.model.enums.AssignmentStatus.ACTIVE)
             throw ApiException.badRequest("Bài tập đã đóng, không nhận thêm bài làm.");
         AssignmentSubmission submission = submissionRepository.findByAssignmentIdAndStudentId(assignmentId, student.getId()).orElse(null);
@@ -520,6 +533,11 @@ public class AssignmentService {
         User current = currentUserService.requireCurrentUser();
         AssignmentSubmission ownSubmission = current.getRole() != null && RoleName.STUDENT.matches(current.getRole().getName())
                 ? submissionRepository.findByAssignmentIdAndStudentId(item.getId(), current.getId()).orElse(null) : null;
+        return toResponse(item, current, ownSubmission, canManageAssignment(current, item));
+    }
+
+    /** {@code ownSubmission} is the viewer's own submission when the viewer is a student, otherwise null. */
+    private AssignmentResponse toResponse(Assignment item, User current, AssignmentSubmission ownSubmission, boolean canManage) {
         boolean predictionSubmitted = ownSubmission != null;
         return new AssignmentResponse(item.getId(), item.getLibraryItem() == null ? null : item.getLibraryItem().getId(),
                 item.getLibraryItem() == null ? null : item.getLibraryItem().getTitle(),
@@ -535,7 +553,7 @@ public class AssignmentService {
                         ? null : item.getGradingCriteria(), item.getMaxScore(), item.isAutoGrade(),
                 ownSubmission == null ? null : ownSubmission.getScore(), ownSubmission == null ? null : ownSubmission.getFeedback(),
                 ownSubmission == null ? null : ownSubmission.getGradingStatus(), ownSubmission != null && ownSubmission.isRetryAllowed(),
-                ownSubmission == null ? null : ownSubmission.getPredictions(), canManageAssignment(current, item),
+                ownSubmission == null ? null : ownSubmission.getPredictions(), canManage,
                 item.getTeacher().getId(), item.getTeacher().getFullName());
     }
 
@@ -603,13 +621,19 @@ public class AssignmentService {
     }
 
     private boolean canManageAssignment(User actor, Assignment assignment) {
+        return canManageAssignment(actor, assignment, classId ->
+                classTeacherAssignments.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(classId, actor.getId()));
+    }
+
+    /** {@code teachesClass} tells whether the actor holds an active teaching link to a class. */
+    private boolean canManageAssignment(User actor, Assignment assignment, java.util.function.Predicate<UUID> teachesClass) {
         if (actor.getRole() != null && RoleName.MANAGER.matches(actor.getRole().getName())) return true;
         if (!isTeachingStaff(actor)) return false;
         SchoolClass classroom = assignment.getSchoolClass();
         if (classroom == null) return assignment.getTeacher().getId().equals(actor.getId());
         return Boolean.TRUE.equals(classroom.getIsActive()) && actor.getSchool() != null
                 && actor.getSchool().getId().equals(classroom.getSchool().getId())
-                && classTeacherAssignments.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(classroom.getId(), actor.getId());
+                && teachesClass.test(classroom.getId());
     }
 
     private static boolean isTeachingStaff(User actor) {

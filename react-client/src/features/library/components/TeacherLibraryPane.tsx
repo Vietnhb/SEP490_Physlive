@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { LibraryFolder, LibraryItem } from "../../../shared/types/physlive";
 import Icon from "../../../shared/ui/LearningIcon";
 import LibraryFolderView from "./LibraryFolder";
+import { useTopicName } from "../../../shared/hooks/useTopicName";
 
 type Props = {
   folders: LibraryFolder[];
@@ -21,10 +22,11 @@ export default function TeacherLibraryPane({ folders, items, currentSimulationId
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
+  const topicName = useTopicName();
   const normalizedQuery = query.trim().toLocaleLowerCase("vi");
   const visibleItems = useMemo(() => normalizedQuery
-    ? items.filter(item => `${item.title} ${item.topic ?? ""}`.toLocaleLowerCase("vi").includes(normalizedQuery))
-    : items, [items, normalizedQuery]);
+    ? items.filter(item => `${item.title} ${topicName(item.topic)}`.toLocaleLowerCase("vi").includes(normalizedQuery))
+    : items, [items, normalizedQuery, topicName]);
   const grouped = useMemo(() => new Map(folders.map(folder => [folder.id, visibleItems.filter(item => item.folderId === folder.id)])), [folders, visibleItems]);
   const unassignedItems = useMemo(() => visibleItems.filter(item => !item.folderId), [visibleItems]);
   const visibleFolders = useMemo(() => normalizedQuery

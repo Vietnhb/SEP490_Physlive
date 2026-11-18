@@ -89,28 +89,127 @@
   outline: 2px solid var(--accent-line);
 }
 
-.simulation-source-tabs,
 .simulation-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 9px;
 }
 
-.simulation-source-tabs {
-  margin: 17px 0 20px;
+/* One box for every kind of description: an attached photo, the text (LaTeX included) and the attach bar. */
+.simulation-composer {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
 }
 
-.simulation-source-tabs button {
-  min-width: 88px;
-  border: 1px solid var(--line);
-  color: var(--accent);
-  background: var(--bg);
-}
-
-.simulation-source-tabs button.selected {
+.simulation-composer:focus-within {
   border-color: var(--accent);
-  color: var(--accent);
+  outline: 2px solid var(--accent-line);
+}
+
+.simulation-card .simulation-composer textarea,
+.simulation-card .simulation-composer textarea:focus {
+  border: 0;
+  border-radius: 12px 12px 0 0;
+  outline: 0;
+  background: transparent;
+}
+
+.simulation-composer__image {
+  position: relative;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 12px 12px 0;
+}
+
+.simulation-composer__image img {
+  display: block;
+  max-width: 100%;
+  max-height: 180px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.simulation-composer__image button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(15 23 42 / 70%);
+  cursor: pointer;
+}
+
+.simulation-composer__image button .learn-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.simulation-composer__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.simulation-card label.simulation-composer__attach {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.simulation-composer__attach:hover {
   background: var(--accent-soft);
+}
+
+.simulation-composer__attach .learn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.simulation-composer__attach input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* the learning shell makes every button transparent; the main action of the box stays a filled button */
+.learning-app .simulation-card button.simulation-composer__send,
+.simulation-card button.simulation-composer__send {
+  min-height: 36px;
+  margin-left: auto;
+  padding: 7px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  color: #fff;
+  background: var(--accent);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.learning-app .simulation-card button.simulation-composer__send:disabled,
+.simulation-card button.simulation-composer__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .simulation-actions {
@@ -137,42 +236,6 @@
   border-color: var(--accent);
   color: white;
   background: var(--accent);
-}
-
-.simulation-image-drop {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  min-height: 150px;
-  padding: 20px;
-  border: 2px dashed var(--accent);
-  border-radius: 14px;
-  background: var(--surface-2);
-}
-
-.simulation-image-drop img {
-  display: block;
-  max-width: 220px;
-  max-height: 160px;
-  border-radius: 7px;
-  object-fit: contain;
-}
-
-.simulation-file-label {
-  position: relative;
-  padding: 9px 13px;
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  background: white;
-  cursor: pointer;
-}
-
-.simulation-file-label input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
 }
 
 .simulation-recognized-text,

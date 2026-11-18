@@ -1,3 +1,4 @@
+import FallbackHeading from "../../../shared/layout/FallbackHeading";
 import { useState } from "react";
 import LearningHeader from "../../../shared/layout/LearningHeader";
 import Icon from "../../../shared/ui/LearningIcon";
@@ -22,6 +23,7 @@ export default function SimulationWorkspace() {
       <LearningHeader onNewSimulation={!canManageLearningContent || libraryCollapsed ? input.reset : undefined} libraryCollapsed={libraryCollapsed}
         onToggleLibrary={canManageLearningContent ? () => setLibraryCollapsed(value => !value) : undefined} />
       <main className="learn-workspace" id="learning-workspace">
+        <FallbackHeading title="Mô phỏng" />
         <div className="learn-top-area" aria-hidden="true" />
         <nav className="learn-mobile-nav" aria-label="Chuyển vùng học tập">
           <button type="button" aria-pressed={mobilePanel === "observe"} onClick={() => setMobilePanel("observe")}>

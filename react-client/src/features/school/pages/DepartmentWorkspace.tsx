@@ -9,6 +9,7 @@ import { useResource } from "../../../shared/hooks/operationsData";
 import academic from "../../../shared/layout/AcademicChrome.module.css";
 import styles from "./DepartmentWorkspace.module.css";
 import "../../reviewer/styles/reviewer.css";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 
 type Assignment = { id: string; title: string; className: string | null; schoolYear: string | null; teacherId: number; teacherName: string; studentCount: number; status: string; assignedAt: string; dueAt: string | null };
 type AssignmentPage = { content: Assignment[]; totalElements: number; totalPages: number; number: number };
@@ -22,7 +23,7 @@ function SchoolAssignments({ schoolId }: { schoolId: string }) {
   const teachers = [...new Map(items.map(item => [item.teacherId, item.teacherName])).entries()];
   const rows = items.filter(item => (teacher === "ALL" || String(item.teacherId) === teacher) && `${item.title} ${item.teacherName} ${item.className ?? ""}`.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")));
   return <Card size="3">
-    <div className={styles.heading}><Heading as="h2" size="5">Phân công bài tập</Heading><Button variant="soft" color="gray" onClick={resource.refresh}>Làm mới</Button></div>
+    <div className={styles.heading}><Heading as="h2" size="5">Phân công bài tập</Heading><RefreshButton onClick={resource.refresh} /></div>
     <LoadState {...resource} headers={["Bài tập", "Giáo viên", "Lớp", "Học sinh", "Hạn nộp"]} />
     <div className={styles.filters}><TextField.Root aria-label="Tìm bài tập trong trang" placeholder="Tìm bài tập, lớp hoặc giáo viên trong trang" value={query} onChange={event => setQuery(event.target.value)} /><Select.Root value={teacher} onValueChange={setTeacher}><Select.Trigger aria-label="Giáo viên trong trang" /><Select.Content><Select.Item value="ALL">Tất cả giáo viên trong trang</Select.Item>{teachers.map(([id, name]) => <Select.Item key={id} value={String(id)}>{name}</Select.Item>)}</Select.Content></Select.Root></div>
     {!resource.loading && <div className={styles.table}><Table.Root variant="surface"><Table.Header><Table.Row><Table.ColumnHeaderCell>Bài tập</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Giáo viên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Lớp</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Học sinh</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Hạn nộp</Table.ColumnHeaderCell></Table.Row></Table.Header><Table.Body>{rows.map(item => <Table.Row key={item.id}><Table.RowHeaderCell>{item.title}<div><Badge color={item.status === "ACTIVE" ? "indigo" : "gray"} mt="2">{item.status === "ACTIVE" ? "Đang giao" : "Đã đóng"}</Badge></div></Table.RowHeaderCell><Table.Cell>{item.teacherName}</Table.Cell><Table.Cell>{item.className || "Giao trực tiếp"}<small className={styles.muted}>{item.schoolYear}</small></Table.Cell><Table.Cell>{item.studentCount}</Table.Cell><Table.Cell>{item.dueAt ? new Date(item.dueAt).toLocaleString("vi-VN") : "Không giới hạn"}</Table.Cell></Table.Row>)}{rows.length === 0 && <Table.Row><Table.Cell colSpan={5}>Chưa có bài tập phù hợp.</Table.Cell></Table.Row>}</Table.Body></Table.Root></div>}

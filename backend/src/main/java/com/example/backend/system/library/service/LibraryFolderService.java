@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class LibraryFolderService {
+    private static final String DUPLICATE_FOLDER_NAME = "Đã có thư mục thư viện trùng tên";
     private final LibraryFolderRepository folderRepository;
     private final LibraryItemRepository itemRepository;
     private final CurrentUserService currentUserService;
@@ -25,8 +26,14 @@ public class LibraryFolderService {
     @Transactional(readOnly = true)
     public List<LibraryFolders.Response> mine() {
         User owner = currentUserService.requireCurrentUser();
-        return folderRepository.findByOwnerIdAndActiveTrueOrderByNameAsc(owner.getId()).stream()
-                .map(this::toResponse)
+        List<LibraryFolder> folders = folderRepository.findByOwnerIdAndActiveTrueOrderByNameAsc(owner.getId());
+        if (folders.isEmpty()) return List.of();
+        // one counting statement for all folders, not one per folder
+        java.util.Map<UUID, Long> counts = new java.util.HashMap<>();
+        itemRepository.countActiveByFolderIds(folders.stream().map(LibraryFolder::getId).toList())
+                .forEach(row -> counts.put(row.getFolderId(), row.getTotal()));
+        return folders.stream()
+                .map(folder -> toResponse(folder, counts.getOrDefault(folder.getId(), 0L)))
                 .toList();
     }
 
@@ -36,7 +43,7 @@ public class LibraryFolderService {
         String name = normalizedName(request.name());
         String nameKey = nameKey(name);
         if (folderRepository.existsByOwnerIdAndActiveTrueAndNameKey(owner.getId(), nameKey)) {
-            throw ApiException.conflict("Đã có thư mục thư viện trùng tên");
+            throw ApiException.conflict(DUPLICATE_FOLDER_NAME);
         }
         LibraryFolder folder = new LibraryFolder();
         folder.setOwner(owner);
@@ -45,7 +52,7 @@ public class LibraryFolderService {
         try {
             return toResponse(folderRepository.saveAndFlush(folder));
         } catch (DataIntegrityViolationException exception) {
-            throw ApiException.conflict("Đã có thư mục thư viện trùng tên");
+            throw ApiException.conflict(DUPLICATE_FOLDER_NAME);
         }
     }
 
@@ -56,14 +63,14 @@ public class LibraryFolderService {
         String name = normalizedName(request.name());
         String nameKey = nameKey(name);
         if (folderRepository.existsByOwnerIdAndActiveTrueAndNameKeyAndIdNot(owner.getId(), nameKey, id)) {
-            throw ApiException.conflict("Đã có thư mục thư viện trùng tên");
+            throw ApiException.conflict(DUPLICATE_FOLDER_NAME);
         }
         folder.setName(name);
         folder.setNameKey(nameKey);
         try {
             return toResponse(folderRepository.saveAndFlush(folder));
         } catch (DataIntegrityViolationException exception) {
-            throw ApiException.conflict("Đã có thư mục thư viện trùng tên");
+            throw ApiException.conflict(DUPLICATE_FOLDER_NAME);
         }
     }
 
@@ -93,8 +100,11 @@ public class LibraryFolderService {
     }
 
     private LibraryFolders.Response toResponse(LibraryFolder folder) {
-        return new LibraryFolders.Response(folder.getId(), folder.getName(),
-                itemRepository.countByFolderIdAndActiveTrue(folder.getId()),
+        return toResponse(folder, itemRepository.countByFolderIdAndActiveTrue(folder.getId()));
+    }
+
+    private LibraryFolders.Response toResponse(LibraryFolder folder, long itemCount) {
+        return new LibraryFolders.Response(folder.getId(), folder.getName(), itemCount,
                 folder.getCreatedAt(), folder.getUpdatedAt());
     }
 }

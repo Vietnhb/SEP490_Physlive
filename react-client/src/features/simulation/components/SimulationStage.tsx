@@ -13,14 +13,14 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
   const [complaintOpen, setComplaintOpen] = useState(false);
   const [visualFeedback, setVisualFeedback] = useState("");
   const {
-    sourceMode, setSourceMode, text, setText, sourceFile, previewUrl, busy, error, acceptImage,
+    text, setText, sourceFile, previewUrl, busy, error, acceptImage, removeImage,
     recognition, correction, setCorrection, editingRecognition, setEditingRecognition, recognitionLowConfidence,
     intent, revision, setRevision, normalize, handleRecognition, handleRevision, generate, reset,
   } = input;
   const { simulation, liveTimeline, presentation, runValues, sandboxKey, validation, renderError, setRenderError, restartPreview, recomputing } = preview;
   // "Báo lỗi" and "Dựng lại" live in the authored player's toolbar.
   const stageActions = <>
-    {complaint && <button type="button" className="sim-action" title="Báo cho Manager khi mô phỏng sai" onClick={() => setComplaintOpen(true)}><Icon name="message" />Báo lỗi</button>}
+    {complaint && <button type="button" className="sim-action" title="Báo lỗi khi mô phỏng sai" onClick={() => setComplaintOpen(true)}><Icon name="message" />Báo lỗi</button>}
     <button type="button" className="sim-action" title="Dựng lại cảnh và phát từ đầu" onClick={restartPreview}><Icon name="reset" />Dựng lại</button>
     <button type="button" className="sim-action" title="Phóng to mô phỏng (Esc để thoát)" aria-label="Phóng to mô phỏng toàn màn hình"
       onClick={event => {
@@ -99,75 +99,46 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
 
             {!recognition && !intent && (
               <section className="simulation-card simulation-entry">
-                <h2>Bạn muốn mô phỏng tình huống nào?</h2>
-                <p className="simulation-muted">Mô tả tình huống bằng lời của bạn, dán một bài tập, hoặc chụp ảnh từ sách. Nếu mô tả chưa rõ, hệ thống sẽ hỏi lại trước khi dựng.</p>
-                <div className="simulation-source-tabs" role="group" aria-label="Cách mô tả tình huống">
-                  {(["TEXT", "LATEX", "IMAGE"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      className={sourceMode === mode ? "selected" : ""}
-                      aria-pressed={sourceMode === mode}
-                      onClick={() => setSourceMode(mode)}
-                    >
-                      {mode === "TEXT" ? "Gõ mô tả" : mode === "LATEX" ? "Công thức LaTeX" : "Ảnh chụp"}
-                    </button>
-                  ))}
-                </div>
+                <h2 id="simulation-entry-title">Bạn muốn mô phỏng tình huống nào?</h2>
 
                 <form onSubmit={normalize}>
-                  {sourceMode === "IMAGE" && (
-                    <div className="simulation-image-drop">
-                      {previewUrl ? (
-                        <img src={previewUrl} alt="Ảnh đã chọn" />
-                      ) : (
-                        <p>Kéo thả hoặc dán ảnh PNG, JPEG, WebP (tối đa 8 MB), hoặc chọn tệp.</p>
-                      )}
-                      <label className="simulation-file-label">
-                        Chọn ảnh
+                  {/* one place for every kind of description: text, pasted LaTeX, or a photo with an optional note */}
+                  <div className="simulation-composer">
+                    {previewUrl && (
+                      <figure className="simulation-composer__image">
+                        <img src={previewUrl} alt="Ảnh đề bài đã thêm" />
+                        <button type="button" aria-label="Bỏ ảnh" title="Bỏ ảnh" onClick={removeImage}><Icon name="close" /></button>
+                      </figure>
+                    )}
+                    <textarea
+                      id="simulation-input"
+                      value={text}
+                      onChange={(event) => setText(event.target.value)}
+                      rows={sourceFile ? 2 : 4}
+                      aria-labelledby="simulation-entry-title"
+                      placeholder={sourceFile ? "Ghi chú thêm (không bắt buộc)" : "Nhập hoặc dán đề bài…"}
+                    />
+                    <div className="simulation-composer__bar">
+                      <label className="simulation-composer__attach">
+                        <Icon name="camera" />
+                        {sourceFile ? "Đổi ảnh" : "Thêm ảnh"}
                         <input
                           type="file"
                           accept="image/png,image/jpeg,image/webp"
                           onChange={(event) => {
                             const file = event.target.files?.[0];
                             if (file) acceptImage(file);
+                            event.target.value = "";
                           }}
                         />
                       </label>
-                      {sourceFile && <span>{sourceFile.name}</span>}
+                      <button
+                        className="simulation-primary-button simulation-composer__send"
+                        disabled={busy || (!sourceFile && !text.trim())}
+                      >
+                        {busy ? "Đang đọc…" : "Tiếp tục"}
+                      </button>
                     </div>
-                  )}
-                  <label htmlFor="simulation-input">
-                    {sourceMode === "IMAGE"
-                      ? "Ghi chú thêm (không bắt buộc)"
-                      : sourceMode === "LATEX"
-                      ? "Dán LaTeX"
-                      : "Mô tả tình huống vật lý"}
-                  </label>
-                  <textarea
-                    id="simulation-input"
-                    value={text}
-                    onChange={(event) => setText(event.target.value)}
-                    rows={sourceMode === "IMAGE" ? 3 : 5}
-                    placeholder={
-                      sourceMode === "IMAGE"
-                        ? "Thông tin bổ sung nếu cần"
-                        : sourceMode === "LATEX"
-                        ? "Dán nội dung LaTeX mô tả tình huống"
-                        : "Ví dụ: Một vật được ném ngang từ độ cao 20 m với vận tốc 15 m/s, bỏ qua sức cản không khí."
-                    }
-                  />
-                  <div className="simulation-actions">
-                    <button
-                      className="simulation-primary-button"
-                      disabled={
-                        busy ||
-                        (sourceMode === "IMAGE" && !sourceFile) ||
-                        (sourceMode !== "IMAGE" && !text.trim())
-                      }
-                    >
-                      {busy ? "Đang đọc mô tả…" : "Tiếp tục"}
-                    </button>
                   </div>
                 </form>
               </section>

@@ -53,5 +53,5 @@ export function filterLibrary(items: LibraryItem[], paths: Map<string, LessonPat
 }
 
 function normalizeSearch(value: string): string {
-  return value.toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+  return value.toLocaleLowerCase("vi").normalize("NFD").replaceAll(/[\u0300-\u036f]/g, "").replaceAll("đ", "d");
 }

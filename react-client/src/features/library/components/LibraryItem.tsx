@@ -1,7 +1,7 @@
 import { memo } from "react";
 import type { LibraryFolder, LibraryItem as LibraryItemModel } from "../../../shared/types/physlive";
 import LibraryItemActions from "./LibraryItemActions";
-import { shareStatus } from "../model/shareStatus";
+import { shareBadge } from "../model/shareStatus";
 import { useTopicName } from "../../../shared/hooks/useTopicName";
 
 /** Drag payload type: the id of the library item being moved to another folder. */
@@ -24,6 +24,7 @@ const LibraryItem = memo(function LibraryItem({
   onOpen,
 }: Props) {
   const topicName = useTopicName();
+  const badge = shareBadge(item);
   return (
     <div className="learn-library-item" draggable title="Kéo vào một thư mục để chuyển"
       onDragStart={event => {
@@ -37,7 +38,10 @@ const LibraryItem = memo(function LibraryItem({
         onClick={() => void onOpen(item)}
       >
         <span>{opening ? "Đang mở…" : item.title}</span>
-        <small>{topicName(item.topic) || "Vật lý"}{item.visibility !== "PERSONAL" && <> · <span className="library-share-tag" data-state={item.moderationStatus}>{item.visibility === "PUBLIC" ? "Cộng đồng" : "Trường"}: {shareStatus(item).toLocaleLowerCase("vi")}</span></>}</small>
+        <small className="library-item-meta">
+          <span>{topicName(item.topic) || "Vật lý"}</span>
+          {badge && <span className="library-share-tag" data-state={badge.state} title={badge.title} aria-label={badge.title}>{badge.label}</span>}
+        </small>
       </button>
       <LibraryItemActions item={item} folders={folders} />
     </div>

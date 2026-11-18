@@ -125,6 +125,14 @@ export function useSimulationWorkspace(libraryState: LibraryWorkspaceState) {
     setSourceMode("IMAGE");
   };
 
+  // one input for every kind of description: without a photo the typed text (LaTeX included) is the description
+  const removeImage = () => {
+    setSourceFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setSourceMode("TEXT");
+  };
+
   const onPaste = (event: ClipboardEvent) => {
     const file = Array.from(event.clipboardData?.files ?? []).find((item) =>
       IMAGE_MIME_TYPES.has(item.type),
@@ -406,7 +414,7 @@ export function useSimulationWorkspace(libraryState: LibraryWorkspaceState) {
       topicName: libraryState.topicName,
     },
     input: {
-      sourceMode, setSourceMode, text, setText, sourceFile, previewUrl, busy, error, acceptImage,
+      sourceMode, setSourceMode, text, setText, sourceFile, previewUrl, busy, error, acceptImage, removeImage,
       recognition, correction, setCorrection, editingRecognition, setEditingRecognition, recognitionLowConfidence,
       intent, revision, setRevision, normalize, handleRecognition, handleRevision, generate, reset,
     },

@@ -35,7 +35,7 @@
 .assignment-type-grid button small { color: var(--muted); font-size: 11px; line-height: 1.45; }
 .assignment-history-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 0 14px; }
 .assignment-history-filters label { min-width: 0; }
-.assignment-history-filters label > span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
+.assignment-history-filters label > span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .05em; }
 .assignment-history-filters select { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 12px; }
 .assignment-history-context { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 8px 0; color: var(--muted); font-size: 11px; }
 .assignment-simulation-chip { padding: 4px 7px; border-radius: 999px; background: var(--success-soft); color: var(--success); font-weight: 700; }

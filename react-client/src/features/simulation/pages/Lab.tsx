@@ -99,18 +99,18 @@ export default function Lab() {
             <span className="lab-summary-label">Tổng quan</span>
             <div className="lab-summary-items">
               <div className="lab-summary-item">
-                <strong>{records.length}</strong>
+                <strong>{loading && records.length === 0 ? "—" : records.length}</strong>
                 <span>Bài đã giao</span>
               </div>
               <div className="lab-summary-item">
                 <strong className="lab-summary-success">
-                  {submissionsLoading ? "—" : totals.submitted}
+                  {submissionsLoading || (loading && records.length === 0) ? "—" : totals.submitted}
                 </strong>
                 <span>Đã nộp</span>
               </div>
               <div className="lab-summary-item">
                 <strong className="lab-summary-warning">
-                  {submissionsLoading ? "—" : totals.pending}
+                  {submissionsLoading || (loading && records.length === 0) ? "—" : totals.pending}
                 </strong>
                 <span>Chưa nộp</span>
               </div>

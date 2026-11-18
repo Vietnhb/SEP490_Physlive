@@ -161,6 +161,8 @@
   border-radius: 10px;
   color: var(--lab-ink);
   background: transparent;
+  justify-content: stretch;
+  justify-items: start;
   text-align: left;
   cursor: pointer;
 }
@@ -450,12 +452,10 @@
 }
 
 .lab-student-cell strong {
-  overflow: hidden;
   color: var(--lab-ink);
   font-size: 13px;
   font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .lab-student-cell small {
@@ -516,11 +516,15 @@
 }
 
 .lab-answer-cell small {
+  display: -webkit-box;
+  overflow: hidden;
   color: var(--lab-muted);
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .lab-answer-cell b {

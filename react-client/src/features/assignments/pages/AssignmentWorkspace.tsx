@@ -1,3 +1,4 @@
+import FallbackHeading from "../../../shared/layout/FallbackHeading";
 import { lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { Theme } from "@radix-ui/themes";
@@ -15,6 +16,7 @@ export default function AssignmentWorkspace() {
   return (
     <div className="learning-app">
       <LearningHeader />
+      <FallbackHeading title="Giao bài" />
       {canTeach(user) ? (
         <Suspense fallback={<main className="route-loading" aria-busy="true" />}>
           {/* the assignment studio is built with Radix Themes; the rest of the learning shell is plain CSS */}

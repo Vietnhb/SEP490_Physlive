@@ -67,7 +67,7 @@ export default function SvgPixiScene({ program, timeline, parameters, parameterI
     timeoutMs: Number(import.meta.env.VITE_SIMULATION_RUNTIME_TIMEOUT_MS || 15000),
   }), []);
   const html = useMemo(() => {
-    const script = PIXI_BRIDGE.replace(/<\/script/gi, "<\\/script");
+    const script = PIXI_BRIDGE.replaceAll(/<\/script/gi, "<\\/script");
     return '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'nonce-'
       + nonce + '\' \'unsafe-eval\'; worker-src blob:; img-src blob: data:; style-src \'unsafe-inline\'; connect-src \'none\'; font-src \'none\';">'
       + '<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}canvas{display:block;width:100%;height:100%;touch-action:none}</style>'

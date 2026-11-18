@@ -117,7 +117,7 @@ function Chart({ group, duration, time, onSeek, values }: Readonly<{ group: Grou
 }
 
 function interpolate(points: Array<[number, number]>, t: number) {
-  if (!points.length) return NaN;
+  if (!points.length) return Number.NaN;
   if (t <= points[0][0]) return points[0][1];
   for (let i = 1; i < points.length; i++) if (points[i][0] >= t) {
     const [t0, v0] = points[i - 1], [t1, v1] = points[i];

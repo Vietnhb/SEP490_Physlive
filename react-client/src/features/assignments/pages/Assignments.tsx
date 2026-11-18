@@ -1,3 +1,4 @@
+import { useConfirm } from "../../../shared/ui/useConfirm";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -25,6 +26,7 @@ export default function Assignments({
   workspaceLayout = false,
 }: Readonly<Props>) {
   const user = useSessionStore((state) => state.user);
+  const [confirm, confirmDialog] = useConfirm();
   const { folders, libraryItems, libraryLoading, libraryError, retryLibrary, setFolders } = useTeacherLibrary();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryLibraryItemId = searchParams.get("libraryItemId") ?? "";
@@ -234,7 +236,7 @@ export default function Assignments({
 
   const handleToggleOpen = async (assignment: Assignment) => {
     const closing = assignment.status === "ACTIVE";
-    if (closing && !window.confirm(`Đóng bài “${assignment.title}”? Học sinh chưa nộp sẽ không nộp được nữa. Bạn có thể mở lại sau.`)) return;
+    if (closing && !(await confirm({ title: "Đóng bài tập", message: `Đóng bài “${assignment.title}”? Học sinh chưa nộp sẽ không nộp được nữa. Bạn có thể mở lại sau.`, confirmLabel: "Đóng bài" }))) return;
     setError("");
     try {
       const updated = await setAssignmentOpen(assignment.id, !closing);
@@ -382,6 +384,7 @@ export default function Assignments({
             onToggleOpen={assignment => void handleToggleOpen(assignment)}
         />
       </aside>}
+      {confirmDialog}
     </div>
   );
 }
