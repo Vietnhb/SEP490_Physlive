@@ -51,7 +51,7 @@ export function asText(n: Node, fallback?: string): string {
 export function asDouble(n: Node, fallback = 0): number {
   if (typeof n === "number") return n;
   if (typeof n === "boolean") return n ? 1 : 0;
-  if (typeof n === "string") { const t = n.trim(); const v = t === "" ? NaN : Number(t); return Number.isNaN(v) && t !== "NaN" ? fallback : v; }
+  if (typeof n === "string") { const t = n.trim(); const v = t === "" ? Number.NaN : Number(t); return Number.isNaN(v) && t !== "NaN" ? fallback : v; }
   return fallback;
 }
 
@@ -98,7 +98,7 @@ export function javaInt(x: number): number {
 }
 
 /** Math.signum: the sign of a double, NaN stays NaN. */
-export const signum = (x: number) => Number.isNaN(x) ? NaN : x > 0 ? 1 : x < 0 ? -1 : x;
+export const signum = (x: number) => Number.isNaN(x) ? Number.NaN : x > 0 ? 1 : x < 0 ? -1 : x;
 
 export const MIN_NORMAL = 2.2250738585072014e-308;
 export const MAX_VALUE = Number.MAX_VALUE;
@@ -107,7 +107,7 @@ const buffer = new DataView(new ArrayBuffer(8));
 
 /** Math.ulp: the distance from x to the next larger double in magnitude. */
 export function ulp(x: number): number {
-  if (!Number.isFinite(x)) return Number.isNaN(x) ? NaN : Infinity;
+  if (!Number.isFinite(x)) return Number.isNaN(x) ? Number.NaN : Infinity;
   buffer.setFloat64(0, Math.abs(x));
   const exponent = (buffer.getUint32(0) >>> 20) & 0x7ff;
   return exponent === 0 ? Number.MIN_VALUE : Math.pow(2, exponent - 1075);

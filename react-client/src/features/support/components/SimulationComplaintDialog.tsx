@@ -4,6 +4,7 @@ import axios from "axios";
 import { mySupportItems, submitSimulationComplaint, type SimulationComplaint } from "../api/supportApi";
 import { COMPLAINT_STATUS } from "../model/complaintStatus";
 import "../styles/complaints.css";
+import { useApiRefresh } from "../../../shared/hooks/useApiRefresh";
 
 const REASONS = [
   "Kết quả tính toán sai",
@@ -35,12 +36,14 @@ export default function SimulationComplaintDialog({ simulationId, description, p
   const [history, setHistory] = useState<SimulationComplaint[] | null>(null);
   const hasSimulation = Boolean(description?.trim());
 
+  const [historyTick, setHistoryTick] = useState(0);
+  useApiRefresh(["/api/support/mine"], () => setHistoryTick(value => value + 1));
   useEffect(() => {
     let active = true;
     mySupportItems().then(items => { if (active) setHistory(items.filter(item => item.kind === "COMPLAINT")); })
       .catch(() => { if (active) setHistory([]); });
     return () => { active = false; };
-  }, []);
+  }, [historyTick]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", escape);
@@ -57,7 +60,7 @@ export default function SimulationComplaintDialog({ simulationId, description, p
       const created = await submitSimulationComplaint(reason, content.slice(0, 10000), simulationId);
       setHistory(current => [created, ...(current ?? [])]);
       setDetail("");
-      setNotice("Đã gửi báo lỗi đến Manager. Kết quả xử lý sẽ hiển thị tại đây.");
+      setNotice("Đã gửi báo lỗi đến người kiểm duyệt. Kết quả xử lý sẽ hiển thị tại đây.");
     } catch (cause) {
       const message = axios.isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
       setError(message || "Chưa gửi được khiếu nại. Vui lòng thử lại.");
@@ -67,7 +70,7 @@ export default function SimulationComplaintDialog({ simulationId, description, p
   return createPortal(<div className="complaint-overlay" onPointerDown={event => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="complaint-dialog" data-history-only={historyOnly || undefined} role="dialog" aria-modal="true" aria-labelledby="complaint-title">
       <header className="complaint-dialog__head">
-        <div><h2 id="complaint-title">{historyOnly ? "Khiếu nại đã gửi" : "Báo lỗi mô phỏng"}</h2><p>{historyOnly ? "Theo dõi trạng thái và phản hồi. Để gửi báo lỗi mới, mở mô phỏng rồi bấm “Báo lỗi” phía trên khung mô phỏng." : "Reviewer tiếp nhận trực tiếp và kiểm tra chuyên môn. Manager chỉ theo dõi kết quả. Phản hồi sẽ hiện trong mục Khiếu nại đã gửi."}</p></div>
+        <div><h2 id="complaint-title">{historyOnly ? "Khiếu nại đã gửi" : "Báo lỗi mô phỏng"}</h2><p>{historyOnly ? "Theo dõi trạng thái và phản hồi. Để gửi báo lỗi mới, mở mô phỏng rồi bấm “Báo lỗi” phía trên khung mô phỏng." : "Người kiểm duyệt tiếp nhận trực tiếp và kiểm tra chuyên môn. Bộ phận vận hành chỉ theo dõi kết quả. Phản hồi sẽ hiện trong mục Khiếu nại đã gửi."}</p></div>
         <button type="button" className="complaint-close" aria-label="Đóng" onClick={onClose}>×</button>
       </header>
       {!historyOnly && <form className="complaint-form" onSubmit={submit}>
@@ -95,7 +98,7 @@ export default function SimulationComplaintDialog({ simulationId, description, p
             <div className="complaint-item__top"><strong>{item.subject}</strong><span className="complaint-status" data-status={item.status}>{COMPLAINT_STATUS[item.status]}</span></div>
             <time dateTime={item.createdAt}>Gửi lúc {new Date(item.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</time>
             <p className="complaint-item__body">{item.content.split("\n— Đề bài —")[0].trim()}</p>
-            {item.reviewerReferred && <p className="complaint-item__meta">Reviewer tiếp nhận và kiểm tra.</p>}
+            {item.reviewerReferred && <p className="complaint-item__meta">Người kiểm duyệt tiếp nhận và kiểm tra.</p>}
             {item.adminResponse && <p className="complaint-item__answer"><b>Phản hồi{item.responderName ? ` (${item.responderName})` : ""}</b>{item.adminResponse}</p>}
           </article>)}
       </div>

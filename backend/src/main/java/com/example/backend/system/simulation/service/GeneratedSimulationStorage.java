@@ -30,6 +30,12 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import static com.example.backend.system.physics.model.SpecKeys.PARAMETERS;
+import static com.example.backend.system.physics.model.SpecKeys.SIMULATION_SPEC;
+import static com.example.backend.system.physics.model.SpecKeys.SOLVER_TIMELINE;
+import static com.example.backend.system.physics.model.SpecKeys.VALIDATION;
+import static com.example.backend.system.physics.model.SpecKeys.VISUAL_DESIGN;
+import static com.example.backend.system.physics.model.SpecKeys.VISUAL_PROGRAM;
 
 /** Stores the generated scene and verified timeline in the existing library/run model. */
 @Service
@@ -53,23 +59,23 @@ public class GeneratedSimulationStorage {
         // a simulation built from the laws of several topics belongs to a lesson of any of them
         var lessonTopic = lesson.getLevel().getModule().getTopic();
         boolean ownTopic = lessonTopic.matchesCode(schema.getTopic());
-        for (var related : request.simulation().path("simulationSpec").path("relatedSchemas"))
+        for (var related : request.simulation().path(SIMULATION_SPEC).path("relatedSchemas"))
             ownTopic |= lessonTopic.matchesCode(related.path("topic").asText());
         if (!ownTopic)
             throw ApiException.conflict("Bài học không thuộc chủ đề của mô phỏng");
-        String status = computed.path("validation").path("status").asText();
+        String status = computed.path(VALIDATION).path("status").asText();
         // A run that breaks a law or that the solver could not settle is not kept; a run no law covers is kept as
         // what it is — an illustration — and carries that status wherever it is shown.
         if (!status.startsWith("VERIFIED") && !status.equals("ILLUSTRATIVE"))
             throw ApiException.conflict("Mô phỏng này vi phạm định luật hoặc chưa tính ổn định nên chưa lưu được. Hãy sửa mô tả rồi phân tích lại");
         ObjectNode snapshot = request.simulation().deepCopy();
-        ObjectNode spec = (ObjectNode) snapshot.path("simulationSpec");
+        ObjectNode spec = (ObjectNode) snapshot.path(SIMULATION_SPEC);
         spec.put("topic", schema.getTopic());
-        spec.set("solverTimeline", computed.path("solverTimeline"));
-        snapshot.set("parameters", spec.path("parameters").deepCopy());
-        snapshot.set("validation", computed.path("validation"));
+        spec.set(SOLVER_TIMELINE, computed.path(SOLVER_TIMELINE));
+        snapshot.set(PARAMETERS, spec.path(PARAMETERS).deepCopy());
+        snapshot.set(VALIDATION, computed.path(VALIDATION));
         ObjectNode savedParameters = snapshot.putObject("savedParameters");
-        for (var parameter : spec.path("parameters")) {
+        for (var parameter : spec.path(PARAMETERS)) {
             String name = parameter.path("name").asText();
             savedParameters.set(name, request.parameters().has(name) ? request.parameters().get(name).deepCopy() : parameter.path("value").deepCopy());
         }
@@ -96,12 +102,12 @@ public class GeneratedSimulationStorage {
         specification.setTopic(schema.getTopic());
         specification.setConfidence(BigDecimal.ONE);
         specification.setObjects(spec.path("physicsModels").deepCopy());
-        specification.setQuantities(spec.path("parameters").deepCopy());
+        specification.setQuantities(spec.path(PARAMETERS).deepCopy());
         specification.setRelations(snapshot.arrayNode());
         specification.setAmbiguity(snapshot.arrayNode());
         specification.setConfirmationState(ConfirmationState.CONFIRMED);
         specification.setValidationStatus("PASSED");
-        specification.setValidationResult(computed.path("validation").deepCopy());
+        specification.setValidationResult(computed.path(VALIDATION).deepCopy());
         entities.persist(specification);
         submission.setCurrentSpecification(specification);
         var simulation = new Simulation();
@@ -117,8 +123,8 @@ public class GeneratedSimulationStorage {
         run.setSchemaId(schema.getSchemaId());
         run.setSchemaVersion(schema.getVersion());
         run.setValidationPassed(true);
-        run.setValidationCheckpoints(computed.path("validation").deepCopy());
-        run.setDurationSeconds(computed.path("solverTimeline").path("durationSeconds").asDouble(spec.path("durationSeconds").asDouble()));
+        run.setValidationCheckpoints(computed.path(VALIDATION).deepCopy());
+        run.setDurationSeconds(computed.path(SOLVER_TIMELINE).path("durationSeconds").asDouble(spec.path("durationSeconds").asDouble()));
         run.setResult(snapshot);
         entities.persist(run);
         simulation.setLatestRun(run);
@@ -133,7 +139,7 @@ public class GeneratedSimulationStorage {
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy mô phỏng"));
         var run = runs.findFirstBySimulationIdOrderByCreatedAtDesc(simulation.getId())
                 .orElseThrow(() -> ApiException.notFound("Không có dữ liệu mô phỏng đã lưu"));
-        if (!run.getResult().path("simulationSpec").path("visualProgram").isObject())
+        if (!run.getResult().path(SIMULATION_SPEC).path(VISUAL_PROGRAM).isObject())
             throw ApiException.conflict("Bài lưu cũ chưa có cảnh SVG/PixiJS để mở trong trình mô phỏng này");
         return ((ObjectNode) run.getResult()).deepCopy();
     }
@@ -150,14 +156,14 @@ public class GeneratedSimulationStorage {
             if (!snapshot.path(key).equals(generated.path(key)))
                 throw ApiException.conflict("Thiết kế mới không thuộc kế hoạch vật lý của bài đã lưu");
         }
-        var program = generated.path("simulationSpec").path("visualProgram");
+        var program = generated.path(SIMULATION_SPEC).path(VISUAL_PROGRAM);
         if (!program.isObject() || (program.path("code").asText().isBlank() && !program.path("scene").isObject()))
             throw ApiException.badRequest("Thiếu cảnh minh họa mới");
-        ObjectNode spec = (ObjectNode) snapshot.path("simulationSpec");
-        spec.set("visualProgram", program.deepCopy());
+        ObjectNode spec = (ObjectNode) snapshot.path(SIMULATION_SPEC);
+        spec.set(VISUAL_PROGRAM, program.deepCopy());
         snapshot.put("code", program.path("code").asText(""));
-        var design = generated.path("simulationSpec").get("visualDesign");
-        if (design == null) spec.remove("visualDesign"); else spec.set("visualDesign", design.deepCopy());
+        var design = generated.path(SIMULATION_SPEC).get(VISUAL_DESIGN);
+        if (design == null) spec.remove(VISUAL_DESIGN); else spec.set(VISUAL_DESIGN, design.deepCopy());
         // Preserve pinned historical runs and all saved physics/parameter data.
         var next = new SimulationRun();
         org.springframework.beans.BeanUtils.copyProperties(previous, next, "id", "createdAt", "updatedAt", "result");

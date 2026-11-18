@@ -146,7 +146,7 @@ export class Equations {
     const parameters = new Map<string, number>(), parameterUnits = new Map<string, string>();
     for (const parameter of elements(path(spec, "parameters"))) {
       const name = asText(path(parameter, "name"));
-      const value = has(overrides, name) ? asDouble(overrides[name], NaN) : asDouble(path(parameter, "value"), NaN);
+      const value = has(overrides, name) ? asDouble(overrides[name], Number.NaN) : asDouble(path(parameter, "value"), Number.NaN);
       require(name.trim() !== "" && !parameters.has(name) && Number.isFinite(value), "Tham số không hợp lệ");
       require(value >= asDouble(path(parameter, "min"), -MAX_VALUE) && value <= asDouble(path(parameter, "max"), MAX_VALUE),
         "Tham số nằm ngoài phạm vi cho phép: " + name);
@@ -154,7 +154,7 @@ export class Equations {
       parameterUnits.set(name, asText(path(parameter, "unit")));
     }
     for (const name of fieldNames(overrides)) require(parameters.has(name), "Tham số không xác định: " + name);
-    let duration = asDouble(path(spec, "durationSeconds"), NaN);
+    let duration = asDouble(path(spec, "durationSeconds"), Number.NaN);
     if (hasNonNull(spec, "durationParameter")) {
       const key = asText(spec.durationParameter);
       require(parameters.has(key), "Tham số thời gian không xác định");
@@ -229,7 +229,7 @@ export class Equations {
           require(this.sameQuantity(parameterUnit, unit), "Đầu vào phải sử dụng đơn vị SI chuẩn: " + key + " cần đơn vị "
             + unit + ", tham số " + binding + " đang dùng " + parameterUnit);
           value = this.convert(parameters.get(binding)!, parameterUnit, unit);
-        } else value = isNumber(binding) ? binding : asDouble(path(input, "defaultValue"), NaN);
+        } else value = isNumber(binding) ? binding : asDouble(path(input, "defaultValue"), Number.NaN);
         require(Number.isFinite(value), "Thiếu đầu vào chuẩn: " + key);
         require(value >= asDouble(path(input, "min"), -MAX_VALUE) && value <= asDouble(path(input, "max"), MAX_VALUE),
           "Giá trị nằm ngoài miền tính toán của bộ giải: " + key);
@@ -253,7 +253,7 @@ export class Equations {
           require(this.sameQuantity(parameterUnits.get(name)!, asText(path(watched, "unit"))), "Điều kiện kết thúc của " + id
             + ": tham số " + name + " phải cùng loại đơn vị với " + field + " (" + asText(path(watched, "unit")) + ")");
           value = this.convert(parameters.get(name)!, parameterUnits.get(name)!, asText(path(watched, "unit")));
-        } else value = asDouble(path(rule, "value"), NaN);
+        } else value = asDouble(path(rule, "value"), Number.NaN);
         require(Number.isFinite(value), "Điều kiện kết thúc của " + id + " thiếu giá trị");
         const dot = field.lastIndexOf(".");
         until = { sourceId: field.substring(0, dot), key: field.substring(dot + 1), rising: direction === "rising", value };
@@ -395,8 +395,8 @@ export class Equations {
     const h = duration / steps;
     for (const bound of bindings) {
       const m = math(bound);
-      const absTol = asDouble(path(path(bound.capability, "validation"), "absoluteTolerance"), NaN);
-      const relTol = asDouble(path(path(bound.capability, "validation"), "relativeTolerance"), NaN);
+      const absTol = asDouble(path(path(bound.capability, "validation"), "absoluteTolerance"), Number.NaN);
+      const relTol = asDouble(path(path(bound.capability, "validation"), "relativeTolerance"), Number.NaN);
       require(Number.isFinite(absTol) && absTol >= 0 && Number.isFinite(relTol) && relTol >= 0, "Mô hình cần có sai số cho phép để kiểm định");
       const samples = coarse.outputs.get(bound.id)!, liveInputs = coarse.inputs.get(bound.id)!;
       const byRefinement = asText(path(path(bound.capability, "validation"), "strategy")) === "step_refinement";
@@ -410,7 +410,7 @@ export class Equations {
         for (const [key, unit] of unitOf) sizeOf.set(key, worth.get(unit) ?? 0.0);
       }
       const startInputs = coarse.startInputs.get(bound.id)!;
-      const start = coarse.start.has(bound.id) ? coarse.start.get(bound.id)! : NaN;
+      const start = coarse.start.has(bound.id) ? coarse.start.get(bound.id)! : Number.NaN;
       let first = -1, last = -1;
       for (let i = 0; i < samples.length; i++) if (liveInputs[i] != null) { if (first < 0) first = i; last = i; }
       let driven = false;
@@ -476,7 +476,7 @@ export class Equations {
         const end = benchmarkSamples[benchmarkSamples.length - 1]!;
         for (const [key, expected] of fields(path(benchmark, "expectedOutputs"))) {
           require(end.has(key), "Bài kiểm chuẩn tham chiếu đến đầu ra không xác định");
-          const value = asDouble(expected, NaN);
+          const value = asDouble(expected, Number.NaN);
           passed &&= Number.isFinite(value) && Math.abs(end.get(key)! - value) <= absTol + relTol * Math.abs(value);
         }
         declaredBenchmarks++; benchmarksChecked++;
@@ -598,7 +598,7 @@ export class Equations {
       case "div": return a == null ? null : combine(a, b == null ? new Map() : b, -1);
       case "neg": case "abs": return a;
       case "sqrt": case "pow": {
-        const exponent = op === "sqrt" ? 0.5 : asDouble(path(ast, 2), NaN);
+        const exponent = op === "sqrt" ? 0.5 : asDouble(path(ast, 2), Number.NaN);
         require(Number.isFinite(exponent) && (b == null || b.size === 0), "Số mũ thứ nguyên phải là hằng số");
         const out = new Map<string, number>();
         if (a != null) for (const [key, value] of a) if (value * exponent !== 0) out.set(key, value * exponent);
@@ -686,8 +686,8 @@ export class Equations {
 }
 
 /** Math.min / Math.max: NaN wins, and -0.0 is smaller than 0.0 — as Java's. */
-export const javaMin = (a: number, b: number) => Number.isNaN(a) || Number.isNaN(b) ? NaN : Math.min(a, b);
-export const javaMax = (a: number, b: number) => Number.isNaN(a) || Number.isNaN(b) ? NaN : Math.max(a, b);
+export const javaMin = (a: number, b: number) => Number.isNaN(a) || Number.isNaN(b) ? Number.NaN : Math.min(a, b);
+export const javaMax = (a: number, b: number) => Number.isNaN(a) || Number.isNaN(b) ? Number.NaN : Math.max(a, b);
 
 function combine(a: Map<string, number>, b: Map<string, number>, sign: number): Map<string, number> {
   const result = new Map(a);
@@ -883,7 +883,7 @@ class Simulation {
       for (const node of this.conditions.get(bound.id)!) {
         let value: number;
         try { value = this.eq.evaluate(node[1], this.scope(bound, "outputs"), 0, { n: 0 }); }
-        catch (error) { if (!(error instanceof SolverError)) throw error; value = NaN; }
+        catch (error) { if (!(error instanceof SolverError)) throw error; value = Number.NaN; }
         own.set(node[1], asText(node[0]) === "sign" ? javaInt(signum(value))
           : value > 0 || (this.latched.get(bound.id) ?? NONE).has(node[1]) ? 1 : 0);
       }
@@ -924,7 +924,7 @@ class Simulation {
       if (!this.running(bound.id)) { sides.push(0); continue; }
       let value: number;
       try { value = this.eq.evaluate(node[1], this.scope(bound, "outputs"), 0, { n: 0 }); }
-      catch (error) { if (!(error instanceof SolverError)) throw error; value = NaN; }
+      catch (error) { if (!(error instanceof SolverError)) throw error; value = Number.NaN; }
       sides.push(asText(node[0]) === "sign" ? javaInt(signum(value)) : value > 0 ? 1 : 0);
     }
     return sides;

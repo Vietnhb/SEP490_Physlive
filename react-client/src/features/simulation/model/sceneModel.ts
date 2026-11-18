@@ -14,9 +14,9 @@ export type BackendFieldMeta = Record<string, { unit?: string; label?: string; s
   constant?: number }>;
 /** Display form of SI unit strings used in schemas (m/s^2 → m/s², degC → °C, ohm → Ω, m3 → m³; a pure number "1" has none). */
 export const prettyUnit = (unit: string) => unit.trim() === "1" ? "" : unit
-  .replace(/\bdegC\b/g, "°C").replace(/\bdegF\b/g, "°F").replace(/\bohm\b/g, "Ω")
-  .replace(/\^2|(?<=[a-zA-Z])2(?![0-9])/g, "²").replace(/\^3|(?<=[a-zA-Z])3(?![0-9])/g, "³")
-  .replace(/\*/g, "·");
+  .replaceAll(/\bdegC\b/g, "°C").replaceAll(/\bdegF\b/g, "°F").replaceAll(/\bohm\b/g, "Ω")
+  .replaceAll(/\^2|(?<=[a-zA-Z])2(?![0-9])/g, "²").replaceAll(/\^3|(?<=[a-zA-Z])3(?![0-9])/g, "³")
+  .replaceAll("*", "·");
 export type SimulationModelRef = { id: string; label?: string; capabilityId?: string; inputs?: Record<string, string | number> };
 
 export type SceneParticipant = {
@@ -39,7 +39,7 @@ export type SceneDescriptor = {
 
 /** A readable name for a result the backend sent without one (older saved runs). */
 const readable = (quantity: string) => {
-  const words = quantity.replace(/[_-]+/g, " ").trim();
+  const words = quantity.replaceAll(/[_-]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 

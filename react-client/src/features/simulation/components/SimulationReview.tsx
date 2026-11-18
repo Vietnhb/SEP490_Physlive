@@ -29,7 +29,7 @@ export function SimulationParameterControl({ parameter, value, onChange }: Reado
     setDragging(null);
   };
   const commit = () => {
-    const numeric = draft?.trim() ? Number(draft) : NaN;
+    const numeric = draft?.trim() ? Number(draft) : Number.NaN;
     if (Number.isFinite(numeric) && numeric !== value) onChange(numeric);
     setDraft(null);
   };

@@ -7,13 +7,20 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.core.io.ClassPathResource;
+import static com.example.backend.system.physics.model.SpecKeys.FRAMES;
+import static com.example.backend.system.physics.model.SpecKeys.LABEL;
+import static com.example.backend.system.physics.model.SpecKeys.OBJECT;
+import static com.example.backend.system.physics.model.SpecKeys.PARAMETERS;
+import static com.example.backend.system.physics.model.SpecKeys.PARTICIPANT_ID;
+import static com.example.backend.system.physics.model.SpecKeys.QUANTITY;
+import static com.example.backend.system.physics.model.SpecKeys.SYMBOL;
 
 /** Server-owned presentation contract for the teacher creation workspace only. */
 final class TeacherSimulationPresentation {
     private TeacherSimulationPresentation() { }
 
     static ObjectNode create(ObjectNode timeline, JsonNode spec, JsonNode metadata, JsonNode overrides) {
-        if (!timeline.path("frames").isArray() || timeline.path("frames").isEmpty())
+        if (!timeline.path(FRAMES).isArray() || timeline.path(FRAMES).isEmpty())
             throw ApiException.unprocessable("Mô phỏng thiếu mẫu dữ liệu từ máy chủ");
         ObjectNode result = timeline.objectNode().put("version", 1);
         try {
@@ -23,7 +30,7 @@ final class TeacherSimulationPresentation {
         ObjectNode ranges = result.putObject("fieldRanges");
         double previous = 0;
         boolean first = true;
-        for (JsonNode item : timeline.path("frames")) {
+        for (JsonNode item : timeline.path(FRAMES)) {
             ObjectNode frame = (ObjectNode) item;
             double t = frame.path("t").asDouble();
             frame.put("dt", first ? 0 : t - previous);
@@ -35,27 +42,29 @@ final class TeacherSimulationPresentation {
                 range.put("max", Math.max(range.path("max").asDouble(), value));
             });
         }
-        ObjectNode parameters = result.putObject("parameters");
-        for (JsonNode parameter : spec.path("parameters")) {
+        ObjectNode parameters = result.putObject(PARAMETERS);
+        for (JsonNode parameter : spec.path(PARAMETERS)) {
             String name = parameter.path("name").asText();
             parameters.set(name, overrides != null && overrides.has(name) ? overrides.get(name) : parameter.path("value"));
         }
-        result.set("initialFrame", timeline.path("frames").path(0).deepCopy());
+        result.set("initialFrame", timeline.path(FRAMES).path(0).deepCopy());
         ObjectNode descriptor = result.putObject("scene");
         descriptor.set("durationSeconds", timeline.path("durationSeconds"));
-        ObjectNode fields = descriptor.putObject("fields"), constants = descriptor.putObject("constants");
+        ObjectNode fields = descriptor.putObject("fields");
+        ObjectNode constants = descriptor.putObject("constants");
         Map<String, String> participants = new LinkedHashMap<>();
         metadata.fields().forEachRemaining(entry -> {
-            JsonNode meta = entry.getValue(); String key = entry.getKey();
-            String participant = meta.path("participantId").asText("");
+            JsonNode meta = entry.getValue();
+            String key = entry.getKey();
+            String participant = meta.path(PARTICIPANT_ID).asText("");
             if (meta.has("constant")) {
-                constants.putObject(key).put("label", meta.path("label").asText(key)).put("unit", meta.path("unit").asText()).set("value", meta.get("constant"));
+                constants.putObject(key).put(LABEL, meta.path(LABEL).asText(key)).put("unit", meta.path("unit").asText()).set("value", meta.get("constant"));
             }
             if (!ranges.has(key)) return;
             participants.putIfAbsent(participant, meta.path("participantLabel").asText(participant));
-            ObjectNode field = fields.putObject(key).put("key", key).put("participantId", participant)
-                    .put("quantity", meta.path("quantity").asText(key)).put("label", meta.path("label").asText(key))
-                    .put("symbol", meta.path("symbol").asText(meta.path("label").asText(key))).put("unit", meta.path("unit").asText());
+            ObjectNode field = fields.putObject(key).put("key", key).put(PARTICIPANT_ID, participant)
+                    .put(QUANTITY, meta.path(QUANTITY).asText(key)).put(LABEL, meta.path(LABEL).asText(key))
+                    .put(SYMBOL, meta.path(SYMBOL).asText(meta.path(LABEL).asText(key))).put("unit", meta.path("unit").asText());
             field.set("min", ranges.path(key).path("min")); field.set("max", ranges.path(key).path("max"));
             if (meta.has("rendererRole")) field.set("role", meta.get("rendererRole"));
         });
@@ -63,25 +72,25 @@ final class TeacherSimulationPresentation {
             String key = entry.getKey();
             if (fields.has(key)) return;
             participants.putIfAbsent("_", "_");
-            ObjectNode field = fields.putObject(key).put("key", key).put("participantId", "_")
-                    .put("quantity", key).put("label", key).put("symbol", key).put("unit", "");
+            ObjectNode field = fields.putObject(key).put("key", key).put(PARTICIPANT_ID, "_")
+                    .put(QUANTITY, key).put(LABEL, key).put(SYMBOL, key).put("unit", "");
             field.set("min", entry.getValue().path("min"));
             field.set("max", entry.getValue().path("max"));
         });
         var people = descriptor.putArray("participants");
-        participants.forEach((id, label) -> people.addObject().put("id", id).put("label", label).put("colorIndex", people.size()));
+        participants.forEach((id, label) -> people.addObject().put("id", id).put(LABEL, label).put("colorIndex", people.size()));
         var observables = descriptor.putArray("observables");
         for (JsonNode observable : spec.path("observables")) {
             String key = observable.path("field").asText();
             if (!fields.has(key)) continue;
             observables.add(key); ObjectNode field = (ObjectNode) fields.get(key);
-            if (observable.has("label")) field.set("caption", observable.get("label"));
-            if (observable.has("object")) field.set("object", observable.get("object"));
+            if (observable.has(LABEL)) field.set("caption", observable.get(LABEL));
+            if (observable.has(OBJECT)) field.set(OBJECT, observable.get(OBJECT));
         }
-        ObjectNode controls = descriptor.putObject("parameters");
-        for (JsonNode parameter : spec.path("parameters")) {
+        ObjectNode controls = descriptor.putObject(PARAMETERS);
+        for (JsonNode parameter : spec.path(PARAMETERS)) {
             String name = parameter.path("name").asText();
-            controls.putObject(name).put("label", parameter.path("label").asText(name)).put("unit", parameter.path("unit").asText());
+            controls.putObject(name).put(LABEL, parameter.path(LABEL).asText(name)).put("unit", parameter.path("unit").asText());
         }
         return result;
     }

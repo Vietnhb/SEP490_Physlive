@@ -9,7 +9,7 @@ export function offlineReplay(snapshot: Record<string, unknown>, timeline: Solve
   const program = spec.visualProgram as { code?: string; playbackRate?: number } | undefined;
   if (!program?.code || !timeline.frames.length) throw new Error("Chưa có cảnh và dữ liệu để xuất.");
   const nonce = crypto.randomUUID();
-  const child = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' 'unsafe-eval'; worker-src blob:; img-src blob: data:; style-src 'unsafe-inline'; connect-src 'none'"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas></canvas><script nonce="${nonce}">${PIXI_BRIDGE.replace(/<\/script/gi, "<\\/script")}</script>`;
+  const child = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' 'unsafe-eval'; worker-src blob:; img-src blob: data:; style-src 'unsafe-inline'; connect-src 'none'"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}canvas{width:100%;height:100%;display:block}</style><canvas></canvas><script nonce="${nonce}">${PIXI_BRIDGE.replaceAll(/<\/script/gi, "<\\/script")}</script>`;
   const start = {
     channel: "pixi-host", type: "start", code: program.code, timeline, parameters,
     fieldMeta: spec.solverFieldMeta, models: spec.physicsModels, observables: spec.observables,
