@@ -7,6 +7,7 @@ import GradeHistory from "./GradeHistory";
 import { apiMessage } from "../../../shared/lib/apiError";
 
 function gradingLabel(submission: AssignmentSubmission) {
+  if (submission.gradingStatus === "MISSED_DEADLINE") return "Quá hạn · Không nộp";
   if (submission.gradingStatus === "RETURNED") return "Cần làm lại";
   if (!submission.completedAt) return "Đang làm";
   if (submission.gradingStatus === "TEACHER_CONFIRMED") return "Đã chấm";
@@ -88,12 +89,13 @@ export function TeacherSubmissionTable({ record, students, filter, query, onGrad
           const text = (details.conclusion || details.answer).replace(/\s+/g, " ").trim();
           const preview = text.length > 160 ? text.slice(0, 160) + "…" : text;
           const completed = Boolean(submission?.completedAt);
+          const missed = submission?.gradingStatus === "MISSED_DEADLINE";
           return <tr key={studentId}>
             <td data-label="Học sinh"><div className="lab-student-cell"><span className="lab-student-avatar" aria-hidden="true">{initials(studentName, studentId)}</span><span><strong title={studentName}>{studentName}</strong></span></div></td>
-            <td data-label="Kết luận" className={submission ? "" : "lab-muted-cell"}>{submission ? <div className="lab-answer-preview"><small>{details.conclusion ? "Kết luận" : "Dự đoán"}</small><p>{preview}</p></div> : "Chưa bắt đầu"}</td>
+            <td data-label="Kết luận" className={submission ? "" : "lab-muted-cell"}>{missed ? "Không nộp trước hạn" : submission ? <div className="lab-answer-preview"><small>{details.conclusion ? "Kết luận" : "Dự đoán"}</small><p>{preview}</p></div> : "Chưa bắt đầu"}</td>
             <td data-label="Nộp lúc">{submission?.completedAt ? <><time dateTime={submission.completedAt}>{formatDateTime(submission.completedAt)}</time>{record.assignment.dueAt && new Date(submission.completedAt).getTime() > new Date(record.assignment.dueAt).getTime() && <small className="lab-late-badge">Nộp muộn</small>}</> : "—"}</td>
-            <td data-label="Trạng thái"><div className="lab-grade-status"><span className={`lab-status ${completed ? "submitted" : submission ? "progress" : "pending"}`}><span className="lab-status-dot" aria-hidden="true" />{submission ? gradingLabel(submission) : "Chưa bắt đầu"}</span>{completed && submission?.score != null && <strong>{submission.score}/{submission.maxScore ?? maxScore}</strong>}</div></td>
-            <td data-label="Thao tác" className="lab-grade-action">{submission ? <div className="lab-row-actions">
+            <td data-label="Trạng thái"><div className="lab-grade-status"><span className={`lab-status ${missed ? "pending" : completed ? "submitted" : submission ? "progress" : "pending"}`}><span className="lab-status-dot" aria-hidden="true" />{submission ? gradingLabel(submission) : "Chưa bắt đầu"}</span>{(completed || missed) && submission?.score != null && <strong>{submission.score}/{submission.maxScore ?? maxScore}</strong>}</div></td>
+            <td data-label="Thao tác" className="lab-grade-action">{submission && !missed ? <div className="lab-row-actions">
               <button type="button" className="lab-grade-button" aria-haspopup="dialog" onClick={() => openGrading(submission)}>{canManage && completed ? submission.gradingStatus === "TEACHER_CONFIRMED" ? "Sửa điểm" : "Chấm bài" : "Xem bài"}</button>
               <button type="button" className="lab-history-button" aria-label="Lịch sử điểm" aria-haspopup="dialog" onClick={() => openGrading(submission, "history")}>Lịch sử</button>
             </div> : <span className="lab-muted-cell">—</span>}</td>

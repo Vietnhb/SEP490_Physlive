@@ -7,6 +7,7 @@ import "../styles/assignment-studio.css";
 
 type TeacherAssignmentHistoryProps = {
   workspaceLayout: boolean;
+  initialClassId?: string;
   items: Assignment[];
   classes: TeacherClassOption[];
   students: StudentOption[];
@@ -25,11 +26,11 @@ const ACTIVITY_LABEL: Record<string, string> = {
 const shortDate = (value: string) => new Date(value).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export function TeacherAssignmentHistory({
-  workspaceLayout, items, classes, students, selectedAssignmentId, loading, onRefresh, onOpenSubmissions, onToggleOpen,
+  workspaceLayout, initialClassId, items, classes, students, selectedAssignmentId, loading, onRefresh, onOpenSubmissions, onToggleOpen,
 }: Readonly<TeacherAssignmentHistoryProps>) {
   /* "overdue" is judged against the moment this list was opened, so rendering stays pure */
   const [openedAt] = useState(() => Date.now());
-  const [classFilter, setClassFilter] = useState("");
+  const [classFilter, setClassFilter] = useState(initialClassId ?? "");
   const [studentFilter, setStudentFilter] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const visibleStudents = useMemo(() => {
@@ -40,14 +41,14 @@ export function TeacherAssignmentHistory({
     (!classFilter || item.classId === classFilter)
     && (!studentFilter || item.studentIds.includes(Number(studentFilter)))), [classFilter, items, studentFilter]);
   const studentNames = useMemo(() => new Map(students.map(student => [student.id, student.fullName])), [students]);
-  const openCount = items.filter(item => item.status === "ACTIVE").length;
+  const openCount = filteredItems.filter(item => item.status === "ACTIVE").length;
 
   return (
     <section className={`studio-card studio-history${workspaceLayout ? " assignment-workspace-panel assignment-history-panel" : ""}`} aria-labelledby="assigned-work-title">
       <header className="studio-header">
         <div>
           <Heading as="h2" size="4" weight="bold" id="assigned-work-title">Bài đã giao</Heading>
-          <Text as="p" size="1" color="gray">{items.length} bài · {openCount} đang mở</Text>
+          <Text as="p" size="1" color="gray">{filteredItems.length} bài · {openCount} đang mở</Text>
         </div>
         <IconButton variant="soft" color="gray" aria-label="Làm mới danh sách bài đã giao" onClick={onRefresh} disabled={loading}><LearningIcon name="refresh" /></IconButton>
       </header>

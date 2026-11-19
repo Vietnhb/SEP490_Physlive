@@ -36,7 +36,7 @@ class SchoolClassCsvExportTest {
     private final SchoolClassService service = new SchoolClassService(classes, enrollments, assignments,
             mock(SchoolRepository.class), mock(UserRepository.class), current, roles, mock(LicenseCheckService.class),
             mock(AccountAccessService.class), mock(EntityManager.class), mock(com.example.backend.system.assignment.repository.AssignmentRepository.class));
-    private final SchoolClassController controller = new SchoolClassController(service, mock(SchoolClassGradeService.class));
+    private final SchoolClassController controller = new SchoolClassController(service, mock(SchoolClassGradeService.class), mock(SchoolClassGradePageService.class));
 
     @BeforeEach
     void setup() {

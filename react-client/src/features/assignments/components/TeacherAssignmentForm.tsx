@@ -26,6 +26,8 @@ type TeacherAssignmentFormProps = {
   investigationOutcome: string;
   maxScore: string;
   dueAt: string;
+  allowLateSubmission: boolean;
+  onAllowLateSubmissionChange: (value: boolean) => void;
   students: StudentOption[];
   classes: TeacherClassOption[];
   selectedClassId: string;
@@ -74,7 +76,7 @@ function Field({ label, htmlFor, hint, children, required = false }: Readonly<{ 
 export function TeacherAssignmentForm({
   workspaceLayout, saved, selectedLibrary, libraryItemId, title, description, prompt, activityType, simulation,
   simulationOptionsLoading, simulationOptionsError, targetSeriesSource, sampleTime, measurementTolerance,
-  investigationParameter, investigationOutcome, maxScore, dueAt, students, classes, selectedClassId, selectedStudents,
+  investigationParameter, investigationOutcome, maxScore, dueAt, allowLateSubmission, onAllowLateSubmissionChange, students, classes, selectedClassId, selectedStudents,
   submitting, onSubmit, onLibraryChange, onTitleChange, onPromptChange, onActivityTypeChange, onTargetSeriesSourceChange,
   onSampleTimeChange, onMeasurementToleranceChange, onInvestigationParameterChange, onInvestigationOutcomeChange,
   onMaxScoreChange, onDueAtChange, onDescriptionChange, onToggleStudent, onSelectAll, onClassChange,
@@ -222,6 +224,10 @@ export function TeacherAssignmentForm({
                 <TextField.Root id="assignment-description" size="3" placeholder="Không bắt buộc" value={description} onChange={event => onDescriptionChange(event.target.value)} />
               </Field>
             </div>
+            <div className="studio-late-policy">
+              <label><Checkbox checked={allowLateSubmission} onCheckedChange={value => onAllowLateSubmissionChange(value === true)} disabled={!dueAt} />Cho phép nộp trễ</label>
+              <Text as="p" size="1" color="gray">{!dueAt ? "Bài không có hạn nộp, học sinh có thể nộp bất kỳ lúc nào khi bài đang mở." : allowLateSubmission ? "Vẫn nhận bài sau hạn nộp và đánh dấu Nộp muộn. Giáo viên chấm điểm như bình thường." : "Đến hạn sẽ ngừng nhận bài. Học sinh chưa nộp bài hoàn chỉnh được ghi nhận 0 điểm."}</Text>
+            </div>
             <div className="studio-field">
               <div className="studio-recipients__head">
                 <Text size="2" weight="medium">Học sinh nhận bài <Text color="gray">({selectedStudents.length}/{students.length})</Text></Text>
@@ -247,6 +253,7 @@ export function TeacherAssignmentForm({
               <div><dt>Mô phỏng</dt><dd>{selectedLibrary?.title}</dd></div>
               <div><dt>Lớp</dt><dd>{selectedClass ? `${selectedClass.name} · Khối ${selectedClass.gradeLevel}` : "Chưa chọn"}</dd></div>
               <div><dt>Học sinh</dt><dd>{wholeClass ? `Cả lớp (${students.length})` : `${selectedStudents.length}/${students.length} học sinh`}</dd></div>
+              <div><dt>Nộp trễ</dt><dd>{!dueAt ? "Không giới hạn hạn nộp" : allowLateSubmission ? "Cho phép · Đánh dấu nộp muộn" : "Không cho phép · Quá hạn chưa nộp: 0 điểm"}</dd></div>
               <div><dt>Hạn nộp</dt><dd>{dueAt ? new Date(dueAt).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "Không giới hạn"}</dd></div>
               <div><dt>Chấm điểm</dt><dd>{activityType === "MEASUREMENT" ? "Tự động phần kết quả đo" : "Thầy cô chấm"} · thang {maxScore}</dd></div>
               {activityType === "MEASUREMENT" && <div><dt>Phép đo</dt><dd>{series.find(item => item.source === targetSeriesSource)?.label} tại {sampleTime} s, sai số ±{measurementTolerance}</dd></div>}

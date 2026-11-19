@@ -26,7 +26,8 @@ class SchoolClassGradeServiceTest {
     private final AssignmentSubmissionRepository submissions = mock(AssignmentSubmissionRepository.class);
     private final UserRepository users = mock(UserRepository.class);
     private final CurrentUserService current = mock(CurrentUserService.class);
-    private final SchoolClassGradeService service = new SchoolClassGradeService(classes, enrollments, assignments, submissions, users, current);
+    private final ClassTeacherAssignmentRepository teacherLinks = mock(ClassTeacherAssignmentRepository.class);
+    private final SchoolClassGradeService service = new SchoolClassGradeService(classes, enrollments, assignments, submissions, users, current, teacherLinks);
     private final UUID schoolId = UUID.randomUUID(), classId = UUID.randomUUID();
     private final School school = new School();
     private final User student = new User(), actor = new User(), teacher = new User();
@@ -50,6 +51,21 @@ class SchoolClassGradeServiceTest {
         when(enrollments.findByClassId(classId)).thenReturn(List.of(enrollment));
         when(users.findAllById(any())).thenReturn(List.of(student));
         when(submissions.findByAssignmentIdIn(any())).thenReturn(List.of(submission));
+    }
+    @Test void strictOverdueMissingAndPredictionOnlyReceiveZeroButCompletedWorkKeepsGrade() {
+        assignment.setAllowLateSubmission(false); assignment.setDueAt(Instant.now().minusSeconds(10));
+        when(submissions.findByAssignmentIdIn(any())).thenReturn(List.of());
+        var missing = service.get(schoolId, classId).students().getFirst().cells().getFirst();
+        assertEquals("MISSED_DEADLINE", missing.state()); assertEquals(BigDecimal.ZERO, missing.score());
+        assertTrue(new String(service.csv(schoolId, classId), StandardCharsets.UTF_8).contains("Quá hạn · Không nộp (0 điểm)"));
+        submission.setCompletedAt(null); when(submissions.findByAssignmentIdIn(any())).thenReturn(List.of(submission));
+        assertEquals("MISSED_DEADLINE", service.get(schoolId, classId).students().getFirst().cells().getFirst().state());
+        submission.setCompletedAt(assignment.getDueAt().minusSeconds(20)); submission.setScore(BigDecimal.TEN);
+        var complete = service.get(schoolId, classId).students().getFirst().cells().getFirst();
+        assertEquals("TEACHER_CONFIRMED", complete.state()); assertEquals(BigDecimal.TEN, complete.score());
+        assignment.setAllowLateSubmission(true); submission.setCompletedAt(null);
+        var late = service.get(schoolId, classId).students().getFirst().cells().getFirst();
+        assertEquals("IN_PROGRESS", late.state()); assertNull(late.score());
     }
     @Test void formerStudentKeepsZeroGradeFeedbackAndActualGrader() {
         var row = service.get(schoolId, classId).students().getFirst();
@@ -102,5 +118,44 @@ class SchoolClassGradeServiceTest {
         String csv = new String(service.csv(schoolId, classId), StandardCharsets.UTF_8);
         assertTrue(csv.startsWith("\uFEFF")); assertTrue(csv.contains("Đã rời lớp"));
         assertTrue(csv.contains("'=HYPERLINK")); assertTrue(csv.contains("\"0\",\"10\""));
+    }
+
+    private void teachingActor() {
+        actor.setId(101); actor.setActive(true);
+        Role role = new Role(); role.setName("STAFF"); actor.setRole(role);
+        actor.grantPermission(new Permission("TEACH"), null);
+        classes.findById(classId).orElseThrow().setIsActive(true);
+    }
+    @Test void currentTeacherCanReadHistoricalGradesAndAnotherAssignedClass() {
+        teachingActor();
+        when(teacherLinks.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(classId, 101)).thenReturn(true);
+        assertEquals(BigDecimal.ZERO, service.forTeacher(classId).students().getFirst().cells().getFirst().score());
+        UUID secondId = UUID.randomUUID(); SchoolClass second = new SchoolClass();
+        second.setId(secondId); second.setSchool(school); second.setName("10A2"); second.setSchoolYear("2026-2027"); second.setIsActive(true);
+        when(classes.findById(secondId)).thenReturn(Optional.of(second));
+        when(teacherLinks.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(secondId, 101)).thenReturn(true);
+        when(assignments.findBySchoolClassIdOrderByAssignedAtDesc(secondId)).thenReturn(List.of());
+        when(enrollments.findByClassId(secondId)).thenReturn(List.of());
+        assertEquals(secondId, service.forTeacher(secondId).classId());
+    }
+    @Test void teacherLosesGradebookAccessImmediatelyAfterUnassignment() {
+        teachingActor();
+        assertThrows(ApiException.class, () -> service.forTeacher(classId));
+        verify(assignments, never()).findBySchoolClassIdOrderByAssignedAtDesc(any());
+    }
+    @Test void teacherCannotReadOtherSchoolOrInactiveClass() {
+        teachingActor();
+        var classroom = classes.findById(classId).orElseThrow(); classroom.setIsActive(false);
+        when(teacherLinks.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(classId, 101)).thenReturn(true);
+        assertThrows(ApiException.class, () -> service.forTeacher(classId));
+        classroom.setIsActive(true); School foreign = new School(); foreign.setId(UUID.randomUUID()); classroom.setSchool(foreign);
+        assertThrows(ApiException.class, () -> service.forTeacher(classId));
+        verify(assignments, never()).findBySchoolClassIdOrderByAssignedAtDesc(any());
+    }
+    @Test void staffWithoutTeachingPermissionOrInactiveAccountCannotReadGradebook() {
+        teachingActor(); actor.getPermissions().clear();
+        assertThrows(ApiException.class, () -> service.forTeacher(classId));
+        actor.grantPermission(new Permission("TEACH"), null); actor.setActive(false);
+        assertThrows(ApiException.class, () -> service.forTeacher(classId));
     }
 }

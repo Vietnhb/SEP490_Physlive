@@ -1,3 +1,5 @@
+import { missedDeadline } from "../model/assignmentDeadline";
+import { useAssignmentClock } from "../hooks/useAssignmentClock";
 import { Badge, Button, Callout, Card, Heading, IconButton, Progress, Spinner, Text, TextArea, TextField } from "@radix-ui/themes";
 import { motion, useReducedMotion } from "motion/react";
 import PhysicsScene from "../../simulation/components/BackendSimulationView";
@@ -114,6 +116,8 @@ export function AssignmentWorkbench({
   const steps = activityType === "PREDICT_OBSERVE_EXPLAIN"
     ? ["Dự đoán", "Quan sát", "Giải thích & nộp bài"]
     : ["Đọc nhiệm vụ", activityType === "MEASUREMENT" ? "Đo lường" : "Khảo sát", "Kết luận & nộp bài"];
+  const deadlineNow = useAssignmentClock();
+  const missed = missedDeadline(assignment, deadlineNow);
   const activeStep = assignmentSubmitted ? 3 : !predictionSubmitted ? 0 : conclusionInput.trim() ? 2 : 1;
 
   return <motion.section className="student-workbench" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .18 }}>
@@ -125,8 +129,8 @@ export function AssignmentWorkbench({
     <Card className="student-progress-card" size="3"><ol className="student-progress" aria-label="Tiến trình bài tập">{steps.map((step, index) => <li key={step} className={index < activeStep ? "is-complete" : index === activeStep ? "is-current" : ""} aria-current={index === activeStep ? "step" : undefined}><span className="student-step-marker" aria-hidden="true">{index < activeStep ? <LearningIcon name="check" /> : index + 1}</span><Text size="2" weight={index === activeStep ? "bold" : "medium"}>{step}</Text></li>)}</ol><Progress size="1" value={activeStep / 3 * 100} aria-label="Hoàn thành bài tập" /></Card>
     <Card asChild className="student-task-prompt" size="3"><section aria-label="Yêu cầu bài tập"><div className="student-task-title"><span className="student-task-icon"><LearningIcon name="book" /></span><Heading as="h2" size="3">Yêu cầu</Heading></div>{assignment.description && assignment.description !== teacherPrompt && <Text as="p" size="3">{assignment.description}</Text>}<Text as="p" size="3">{teacherPrompt}</Text></section></Card>
     {assignment.retryAllowed && <Callout.Root color="amber" size="1" className="student-inline-alert"><Callout.Icon><LearningIcon name="message" /></Callout.Icon><Callout.Text>Bài được trả lại. Xem nhận xét và gửi lại bài làm.</Callout.Text></Callout.Root>}
-    {(assignment.feedback || (assignment.score != null && !assignment.retryAllowed)) && <Card asChild className="student-assignment-result" size="3"><section aria-label="Kết quả bài tập">{assignment.score != null && !assignment.retryAllowed && <div><Text size="1" color="gray">Điểm</Text><Heading as="h2" size="7" color="cyan">{assignment.score}/{assignment.maxScore ?? 10}</Heading><Badge color={assignment.gradingStatus === "TEACHER_CONFIRMED" ? "green" : "amber"}>{assignment.gradingStatus === "TEACHER_CONFIRMED" ? "Đã xác nhận" : "Tạm tính · Chờ xác nhận"}</Badge></div>}{assignment.feedback && <div><Heading as="h3" size="3">Nhận xét của giáo viên</Heading><Text as="p" size="3">{assignment.feedback}</Text></div>}</section></Card>}
-    {!predictionSubmitted ? <div className="student-prediction-layout">
+    {!missed && (assignment.feedback || (assignment.score != null && !assignment.retryAllowed)) && <Card asChild className="student-assignment-result" size="3"><section aria-label="Kết quả bài tập">{assignment.score != null && !assignment.retryAllowed && <div><Text size="1" color="gray">Điểm</Text><Heading as="h2" size="7" color="cyan">{assignment.score}/{assignment.maxScore ?? 10}</Heading><Badge color={assignment.gradingStatus === "TEACHER_CONFIRMED" ? "green" : "amber"}>{assignment.gradingStatus === "TEACHER_CONFIRMED" ? "Đã xác nhận" : "Tạm tính · Chờ xác nhận"}</Badge></div>}{assignment.feedback && <div><Heading as="h3" size="3">Nhận xét của giáo viên</Heading><Text as="p" size="3">{assignment.feedback}</Text></div>}</section></Card>}
+    {missed ? <Card size="3"><Callout.Root color="red"><Callout.Text>Đã hết hạn nộp bài. Bài này không cho phép nộp trễ. Bạn chưa nộp bài hoàn chỉnh nên được ghi nhận 0/{assignment.maxScore ?? 10} điểm.</Callout.Text></Callout.Root></Card> : !predictionSubmitted ? <div className="student-prediction-layout">
       <Card asChild className="student-panel" size="3"><section>
         <header className="student-panel-heading"><Heading as="h2" size="4">1. Dự đoán</Heading><Badge color="amber" size="2">Chưa gửi</Badge></header>
         <form className="student-form" onSubmit={onSubmitPrediction}>

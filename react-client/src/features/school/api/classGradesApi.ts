@@ -6,6 +6,8 @@ export type GradeCell = { submissionId?: string | null; assignmentId: string; st
 export type GradeStudent = { id: number; fullName: string; email: string; current: boolean; cells: GradeCell[] };
 export type ClassGradebook = { classId: string; className: string; schoolYear: string; assignments: GradeAssignment[]; students: GradeStudent[] };
 
+export type ClassGradebookPage = ClassGradebook & { totalAssignments: number; assignmentPage: number; assignmentSize: number; assignmentPages: number; totalStudents: number; studentPage: number; studentSize: number; studentPages: number };
+
 export const classGradebook = (schoolId: string, classId: string, signal?: AbortSignal) =>
   api.get<ClassGradebook>(`/schools/${schoolId}/classes/${classId}/grades`, { signal }).then(r => r.data);
 

@@ -23,6 +23,19 @@ public class SchoolClassController {
     private final SchoolClassService service;
     private final com.example.backend.system.school.service.SchoolClassGradeService grades;
 
+    private final com.example.backend.system.school.service.SchoolClassGradePageService gradePages;
+
+    @GetMapping("/{classId}/grades/page")
+    public com.example.backend.system.school.service.SchoolClassGradePageService.Page gradePage(@PathVariable UUID schoolId, @PathVariable UUID classId,
+            @RequestParam(defaultValue = "0") int assignmentPage, @RequestParam(defaultValue = "5") int assignmentSize,
+            @RequestParam(defaultValue = "0") int studentPage, @RequestParam(defaultValue = "5") int studentSize,
+            @RequestParam(defaultValue = "ALL") String assignment, @RequestParam(defaultValue = "") String title,
+            @RequestParam(defaultValue = "") String studentQuery, @RequestParam(defaultValue = "CURRENT") String membership,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return gradePages.get(schoolId, classId, assignmentPage, assignmentSize, studentPage, studentSize, assignment, title, studentQuery, membership, from, to);
+    }
+
     @GetMapping("/{classId}/grades")
     public com.example.backend.system.school.dto.ClassGradebook grades(@PathVariable UUID schoolId, @PathVariable UUID classId) {
         return grades.get(schoolId, classId);

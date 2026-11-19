@@ -1,3 +1,4 @@
+import { saveFile } from "../../../shared/lib/saveFile";
 import axiosClient from "../../../shared/api/client";
 import type { Assignment, AssignmentSubmission, CreateAssignment, StudentOption, TeacherClassOption } from "../../../shared/types/physlive";
 import { normalizeSimulation, type BackendSimulation } from "../../simulation/api/simulationApi";
@@ -59,3 +60,9 @@ export const completeAssignment = (assignmentId: string, request: { conclusion: 
 
 export const logStudentAction = (assignmentId: string, action: string, payload?: unknown) =>
   axiosClient.post("/student/action-logs", { assignmentId, action, payload }).then(r => r.data);
+
+export async function downloadAssignmentGrades(assignmentId: string, title: string) {
+  const response = await axiosClient.get<Blob>("/assignments/" + assignmentId + "/grades.csv", { responseType: "blob" });
+  const name = title.replaceAll(/[^\p{L}\p{N}._-]/gu, "-").slice(0, 80) || assignmentId;
+  saveFile("diem-" + name + ".csv", response.data);
+}

@@ -31,6 +31,9 @@ public interface AssignmentSubmissionRepository extends JpaRepository<Assignment
     List<AssignmentSubmission> findByStudentIdAndAssignmentIdIn(Integer studentId, java.util.Collection<UUID> assignmentIds);
     List<AssignmentSubmission> findByAssignmentIdOrderBySubmittedAtDesc(UUID assignmentId);
     boolean existsByAssignmentIdAndStudentId(UUID assignmentId, Integer studentId);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"student", "gradedBy", "assignment"})
+    List<AssignmentSubmission> findByAssignmentIdInAndStudentIdIn(java.util.Collection<UUID> assignmentIds, java.util.Collection<Integer> studentIds);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"student", "gradedBy"})
     List<AssignmentSubmission> findByAssignmentIdIn(java.util.Collection<UUID> assignmentIds);
 }

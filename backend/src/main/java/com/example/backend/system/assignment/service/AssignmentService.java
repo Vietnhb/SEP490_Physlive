@@ -194,6 +194,7 @@ public class AssignmentService {
         assignment.setAutoGrade(autoGrade);
         assignment.setAssignedStudentIds(request.studentIds());
         assignment.setDueAt(request.dueAt());
+        assignment.setAllowLateSubmission(!Boolean.FALSE.equals(request.allowLateSubmission()));
         assignment.setAssignedAt(Instant.now());
         return toResponse(assignmentRepository.save(assignment));
     }
@@ -237,14 +238,16 @@ public class AssignmentService {
     @Transactional(readOnly = true)
     public List<TeacherClassOption> classesForTeacher() {
         User teacher = currentUserService.requireCurrentUser();
+        if (!isTeachingStaff(teacher)) throw ApiException.forbidden("Tài khoản không có quyền giảng dạy.");
         if (classTeacherAssignments == null || classEnrollments == null) return List.of();
         return classTeacherAssignments.findActiveByTeacherId(teacher.getId()).stream()
                 .map(item -> item.getSchoolClass())
                 .distinct()
+                .filter(schoolClass -> teacher.getSchool() != null && teacher.getSchool().getId().equals(schoolClass.getSchool().getId()))
                 .map(schoolClass -> new TeacherClassOption(schoolClass.getId(), schoolClass.getName(),
                         schoolClass.getGradeLevel(), schoolClass.getSchoolYear(), schoolClass.getSubject(),
                         classEnrollments.findActiveStudentsByClassId(schoolClass.getId()).stream()
-                                .map(enrollment -> new TeacherClassStudent(enrollment.getStudent().getId(), enrollment.getStudent().getFullName()))
+                                .map(enrollment -> new TeacherClassStudent(enrollment.getStudent().getId(), enrollment.getStudent().getFullName(), enrollment.getStudent().getEmail()))
                                 .toList()))
                 .toList();
     }
@@ -263,7 +266,8 @@ public class AssignmentService {
         // A closed assignment stays visible to students who handed it in, so their score and feedback are not lost.
         return assigned.stream()
                 .filter(item -> item.getStatus() == AssignmentStatus.ACTIVE
-                        || own.containsKey(item.getId()) && own.get(item.getId()).getCompletedAt() != null)
+                        || own.containsKey(item.getId()) && own.get(item.getId()).getCompletedAt() != null
+                        || AssignmentDeadlinePolicy.missed(item, own.get(item.getId()), Instant.now()))
                 .map(item -> toResponse(item, student, viewerIsStudent ? own.get(item.getId()) : null,
                         canManageAssignment(student, item)))
                 .toList();
@@ -332,7 +336,7 @@ public class AssignmentService {
         AssignmentSubmission submission = submissionRepository.findByAssignmentIdAndStudentId(assignmentId, student.getId()).orElse(null);
         if (assignment.getStatus() != com.example.backend.system.assignment.model.enums.AssignmentStatus.ACTIVE)
             throw ApiException.badRequest("Bài tập đã đóng, không nhận thêm bài làm.");
-        // Late work remains accepted and is identifiable from dueAt/submittedAt.
+        AssignmentDeadlinePolicy.requireBeforeDeadline(assignment);
         JsonNode prediction = request.predictions();
         if (prediction == null || !prediction.path(ANSWER_TEXT).isTextual()
                 || prediction.path(ANSWER_TEXT).asText().isBlank())
@@ -362,6 +366,7 @@ public class AssignmentService {
             throw ApiException.forbidden(NOT_ASSIGNED_TO_STUDENT);
         if (assignment.getStatus() != com.example.backend.system.assignment.model.enums.AssignmentStatus.ACTIVE)
             throw ApiException.badRequest("Bài tập đã đóng, không nhận thêm bài làm.");
+        AssignmentDeadlinePolicy.requireBeforeDeadline(assignment);
         AssignmentSubmission submission = submissionRepository.findByAssignmentIdAndStudentId(assignmentId, student.getId()).orElse(null);
         if (submission == null && requiresPrediction(assignment))
             throw ApiException.badRequest("Vui lòng nộp dự đoán trước khi hoàn thành bài tập");
@@ -476,6 +481,7 @@ public class AssignmentService {
         if (submission.getCompletedAt() == null)
             throw ApiException.badRequest("Học sinh chưa nộp bài này nên không thể trả lại.");
         requireGradeChangeReason(submission, reason);
+        AssignmentDeadlinePolicy.requireBeforeDeadline(assignment);
         var change = captureGrade(submission, teacher, "REOPENED", reason);
         // The old grade belongs to the returned attempt; the new attempt is graded afresh.
         submission.setScore(null); submission.setMaxScore(null); submission.setGradedAt(null); submission.setGradedBy(null);
@@ -507,7 +513,29 @@ public class AssignmentService {
         if (!canReadAssignment(teacher, assignment)) {
             throw ApiException.forbidden("Chỉ giáo viên mới được xem bài nộp");
         }
-        return submissionRepository.findByAssignmentIdOrderBySubmittedAtDesc(assignmentId).stream().map(this::toSubmission).toList();
+        var rows = submissionRepository.findByAssignmentIdOrderBySubmittedAtDesc(assignmentId);
+        var response = new java.util.ArrayList<>(rows.stream().map(this::toSubmission).toList());
+        if (AssignmentDeadlinePolicy.expired(assignment, Instant.now())) {
+            Set<Integer> existing = rows.stream().map(row -> row.getStudent().getId()).collect(java.util.stream.Collectors.toSet());
+            Set<Integer> missing = new java.util.HashSet<>(assignment.getAssignedStudentIds()); missing.removeAll(existing);
+            userRepository.findAllById(missing).forEach(student -> response.add(new AssignmentSubmissionResponse(null, assignmentId,
+                    student.getId(), student.getFullName(), JsonNodeFactory.instance.objectNode(), assignment.getDueAt(), null,
+                    BigDecimal.ZERO, assignment.getMaxScore(), AssignmentDeadlinePolicy.FEEDBACK, GradingStatus.MISSED_DEADLINE,
+                    assignment.getDueAt(), false, null, null)));
+        }
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportGrades(UUID assignmentId) {
+        User teacher = currentUserService.requireCurrentUser();
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> ApiException.notFound(ASSIGNMENT_NOT_FOUND));
+        if (!isTeachingStaff(teacher) || teacher.isSuspendedReadOnly() || !canManageAssignment(teacher, assignment))
+            throw ApiException.forbidden("Bạn chỉ được xuất điểm bài tập của lớp đang phụ trách.");
+        var recipients = userRepository.findAllById(assignment.getAssignedStudentIds());
+        var work = submissionRepository.findByAssignmentIdIn(List.of(assignmentId));
+        return AssignmentGradeCsv.render(assignment, recipients, work, Instant.now());
     }
 
     @Transactional(readOnly = true)
@@ -519,14 +547,15 @@ public class AssignmentService {
             throw ApiException.forbidden("Chỉ giáo viên giao bài mới được xem báo cáo");
         List<AssignmentSubmission> rows = submissionRepository.findByAssignmentIdOrderBySubmittedAtDesc(assignmentId);
         List<AssignmentSubmission> completed = rows.stream().filter(row -> row.getCompletedAt() != null).toList();
+        Set<Integer> completedIds = completed.stream().map(row -> row.getStudent().getId()).collect(java.util.stream.Collectors.toSet());
+        long missed = AssignmentDeadlinePolicy.expired(assignment, Instant.now()) ? assignment.getAssignedStudentIds().stream().filter(id -> !completedIds.contains(id)).count() : 0;
         BigDecimal total = completed.stream().map(AssignmentSubmission::getScore).filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        long graded = completed.stream().filter(row -> row.getGradingStatus() == com.example.backend.system.assignment.model.enums.GradingStatus.AI_GRADED || row.getGradingStatus() == com.example.backend.system.assignment.model.enums.GradingStatus.TEACHER_CONFIRMED).count();
-        long confirmed = completed.stream().filter(row -> row.getGradingStatus() == com.example.backend.system.assignment.model.enums.GradingStatus.TEACHER_CONFIRMED).count();
+        long graded = completed.stream().filter(row -> row.getScore() != null).count() + missed;
+        long confirmed = completed.stream().filter(row -> row.getGradingStatus() == GradingStatus.TEACHER_CONFIRMED).count();
         return new AssignmentReport(assignment.getAssignedStudentIds().size(), completed.size(),
                 (long) assignment.getAssignedStudentIds().size() - completed.size(), graded, confirmed,
-                rows.stream().filter(AssignmentSubmission::isRetryAllowed).count(),
-                graded == 0 ? null : total.divide(BigDecimal.valueOf(graded), 3, java.math.RoundingMode.HALF_UP),
-                assignment.getMaxScore());
+                AssignmentDeadlinePolicy.expired(assignment, Instant.now()) ? 0 : rows.stream().filter(AssignmentSubmission::isRetryAllowed).count(),
+                graded == 0 ? null : total.divide(BigDecimal.valueOf(graded), 3, java.math.RoundingMode.HALF_UP), assignment.getMaxScore());
     }
 
     private AssignmentResponse toResponse(Assignment item) {
@@ -538,7 +567,8 @@ public class AssignmentService {
 
     /** {@code ownSubmission} is the viewer's own submission when the viewer is a student, otherwise null. */
     private AssignmentResponse toResponse(Assignment item, User current, AssignmentSubmission ownSubmission, boolean canManage) {
-        boolean predictionSubmitted = ownSubmission != null;
+        boolean missed = AssignmentDeadlinePolicy.missed(item, ownSubmission, Instant.now());
+        boolean predictionSubmitted = ownSubmission != null && ownSubmission.getGradingStatus() != GradingStatus.MISSED_DEADLINE;
         return new AssignmentResponse(item.getId(), item.getLibraryItem() == null ? null : item.getLibraryItem().getId(),
                 item.getLibraryItem() == null ? null : item.getLibraryItem().getTitle(),
                 item.getSchoolClass() == null ? null : item.getSchoolClass().getId(),
@@ -551,10 +581,10 @@ public class AssignmentService {
                 ownSubmission == null ? null : ownSubmission.getCompletedAt(),
                 current.getRole() != null && RoleName.STUDENT.matches(current.getRole().getName())
                         ? null : item.getGradingCriteria(), item.getMaxScore(), item.isAutoGrade(),
-                ownSubmission == null ? null : ownSubmission.getScore(), ownSubmission == null ? null : ownSubmission.getFeedback(),
-                ownSubmission == null ? null : ownSubmission.getGradingStatus(), ownSubmission != null && ownSubmission.isRetryAllowed(),
+                missed ? BigDecimal.ZERO : ownSubmission == null ? null : ownSubmission.getScore(), missed ? AssignmentDeadlinePolicy.FEEDBACK : ownSubmission == null ? null : ownSubmission.getFeedback(),
+                missed ? GradingStatus.MISSED_DEADLINE : ownSubmission == null ? null : ownSubmission.getGradingStatus(), !missed && ownSubmission != null && ownSubmission.isRetryAllowed(),
                 ownSubmission == null ? null : ownSubmission.getPredictions(), canManage,
-                item.getTeacher().getId(), item.getTeacher().getFullName());
+                item.getTeacher().getId(), item.getTeacher().getFullName(), item.isAllowLateSubmission());
     }
 
     @Transactional(readOnly = true)
@@ -642,9 +672,10 @@ public class AssignmentService {
     }
 
     private AssignmentSubmissionResponse toSubmission(AssignmentSubmission item) {
+        boolean missed = AssignmentDeadlinePolicy.missed(item.getAssignment(), item, Instant.now());
         return new AssignmentSubmissionResponse(item.getId(), item.getAssignment().getId(), item.getStudent().getId(),
-                item.getStudent().getFullName(), item.getPredictions(), item.getSubmittedAt(), item.getCompletedAt(), item.getScore(), item.getMaxScore(),
-                item.getFeedback(), item.getGradingStatus(), item.getGradedAt(), item.isRetryAllowed(),
+                item.getStudent().getFullName(), item.getPredictions(), item.getSubmittedAt(), item.getCompletedAt(), missed ? BigDecimal.ZERO : item.getScore(), item.getMaxScore() == null ? item.getAssignment().getMaxScore() : item.getMaxScore(),
+                missed ? AssignmentDeadlinePolicy.FEEDBACK : item.getFeedback(), missed ? GradingStatus.MISSED_DEADLINE : item.getGradingStatus(), item.getGradedAt(), !missed && item.isRetryAllowed(),
                 item.getGradedBy() == null ? null : item.getGradedBy().getId(),
                 item.getGradedBy() == null ? null : item.getGradedBy().getFullName());
     }

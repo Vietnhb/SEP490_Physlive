@@ -28,14 +28,10 @@ public class SchoolClassGradeService {
     private final AssignmentSubmissionRepository submissions;
     private final UserRepository users;
     private final CurrentUserService currentUser;
+    private final ClassTeacherAssignmentRepository teacherAssignments;
 
     public ClassGradebook get(UUID schoolId, UUID classId) {
-        User actor = currentUser.requireCurrentUser();
-        String role = actor.getRole() == null ? "" : actor.getRole().getName();
-        if (!"MANAGER".equals(role) && !("SCHOOL".equals(role) && actor.getSchool() != null && schoolId.equals(actor.getSchool().getId())))
-            throw ApiException.forbidden("Bạn không được xem bảng điểm của trường này.");
-        var classroom = classes.findById(classId).filter(item -> schoolId.equals(item.getSchool().getId()))
-                .orElseThrow(() -> ApiException.notFound("Không tìm thấy lớp trong trường."));
+        var classroom = authorize(schoolId, classId);
         List<Assignment> lessons = assignments.findBySchoolClassIdOrderByAssignedAtDesc(classId);
         var membership = enrollments.findByClassId(classId);
         Set<Integer> current = membership.stream().filter(item -> item.getStatus() == com.example.backend.system.school.model.entity.ClassEnrollment.EnrollmentStatus.ACTIVE)
@@ -57,16 +53,42 @@ public class SchoolClassGradeService {
                 .map(item -> new ClassGradebook.Assignment(item.getId(), item.getTitle(), item.getStatus().name(), item.getMaxScore(), item.getTeacher().getFullName(), item.getDueAt())).toList(), students);
     }
 
-    private ClassGradebook.Cell cell(Assignment assignment, Integer studentId, AssignmentSubmission submission) {
+    com.example.backend.system.school.model.entity.SchoolClass authorize(UUID schoolId, UUID classId) {
+        User actor = currentUser.requireCurrentUser();
+        String role = actor.getRole() == null ? "" : actor.getRole().getName();
+        boolean teaching = "STAFF".equals(role) && Boolean.TRUE.equals(actor.getActive()) && !actor.isSuspendedReadOnly()
+                && actor.hasPermission(com.example.backend.system.account.model.enums.PermissionCode.TEACH)
+                && actor.getSchool() != null && schoolId.equals(actor.getSchool().getId());
+        if (!teaching && !"MANAGER".equals(role) && !("SCHOOL".equals(role) && actor.getSchool() != null && schoolId.equals(actor.getSchool().getId())))
+            throw ApiException.forbidden("Bạn không được xem bảng điểm của trường này.");
+        var classroom = classes.findById(classId).filter(item -> schoolId.equals(item.getSchool().getId()))
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy lớp trong trường."));
+        if (teaching && (!Boolean.TRUE.equals(classroom.getIsActive()) || !teacherAssignments.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(classId, actor.getId())))
+            throw ApiException.forbidden("Bạn không còn được phân công phụ trách lớp này.");
+        return classroom;
+    }
+
+    public ClassGradebook forTeacher(UUID classId) {
+        User actor = currentUser.requireCurrentUser();
+        if (actor.getRole() == null || !"STAFF".equals(actor.getRole().getName()) || !Boolean.TRUE.equals(actor.getActive())
+                || actor.isSuspendedReadOnly() || actor.getSchool() == null
+                || !actor.hasPermission(com.example.backend.system.account.model.enums.PermissionCode.TEACH))
+            throw ApiException.forbidden("Tài khoản không có quyền giảng dạy.");
+        return get(actor.getSchool().getId(), classId);
+    }
+
+    ClassGradebook.Cell cell(Assignment assignment, Integer studentId, AssignmentSubmission submission) {
+        boolean missed = assignment.getAssignedStudentIds().contains(studentId) && com.example.backend.system.assignment.service.AssignmentDeadlinePolicy.missed(assignment, submission, java.time.Instant.now());
         String state;
-        if (submission == null) state = assignment.getAssignedStudentIds().contains(studentId) ? "NOT_STARTED" : "NOT_ASSIGNED";
+        if (missed) state = "MISSED_DEADLINE";
+        else if (submission == null) state = assignment.getAssignedStudentIds().contains(studentId) ? "NOT_STARTED" : "NOT_ASSIGNED";
         else if (submission.isRetryAllowed()) state = "RETURNED";
         else if (submission.getCompletedAt() == null) state = "IN_PROGRESS";
         else if (submission.getScore() == null) state = SUBMITTED;
         else state = submission.getGradingStatus() == null ? SUBMITTED : submission.getGradingStatus().name();
-        return new ClassGradebook.Cell(assignment.getId(), state, submission == null || submission.getCompletedAt() == null ? null : submission.getScore(),
+        return new ClassGradebook.Cell(assignment.getId(), state, missed ? java.math.BigDecimal.ZERO : submission == null || submission.getCompletedAt() == null ? null : submission.getScore(),
                 submission == null || submission.getMaxScore() == null ? assignment.getMaxScore() : submission.getMaxScore(),
-                submission == null ? null : submission.getFeedback(),
+                missed ? com.example.backend.system.assignment.service.AssignmentDeadlinePolicy.FEEDBACK : submission == null ? null : submission.getFeedback(),
                 submission == null || submission.getGradedBy() == null ? null : submission.getGradedBy().getFullName(),
                 submission == null ? null : submission.getGradedAt(), submission == null ? null : submission.getCompletedAt(),
                 submission == null ? null : submission.getId());
@@ -89,7 +111,7 @@ public class SchoolClassGradeService {
 
     private static String stateLabel(String state) {
         return switch (state) {
-            case "NOT_STARTED" -> "Chưa làm"; case "IN_PROGRESS" -> "Đang làm"; case SUBMITTED -> "Chưa chấm";
+            case "MISSED_DEADLINE" -> "Quá hạn · Không nộp (0 điểm)"; case "NOT_STARTED" -> "Chưa làm"; case "IN_PROGRESS" -> "Đang làm"; case SUBMITTED -> "Chưa chấm";
             case "RETURNED" -> "Trả làm lại"; case "AI_GRADED" -> "AI đã chấm"; case "TEACHER_CONFIRMED" -> "Giáo viên đã xác nhận";
             default -> state;
         };

@@ -54,7 +54,7 @@ export default function LearningHeader({
   const inLibrary = pathname.startsWith("/lab/library") || pathname.startsWith("/lab/community");
   const journey = [
     { to: "/workspace", label: "Mô phỏng", icon: "atom" as const, active: pathname === "/workspace" },
-    { to: "/lab", label: "Bài tập", icon: "book" as const,
+    { to: "/lab/classes", label: "Bài tập", icon: "book" as const,
       active: pathname === "/assignments/workspace" || (pathname.startsWith("/lab") && !inLibrary) },
     { to: "/lab/library", label: "Thư viện", icon: "folder" as const, active: inLibrary },
   ];

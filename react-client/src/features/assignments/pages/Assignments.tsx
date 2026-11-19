@@ -1,7 +1,7 @@
 import { useConfirm } from "../../../shared/ui/useConfirm";
 import { useResource } from "../../../shared/hooks/operationsData";
-import { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { createAssignment, setAssignmentOpen } from "../api/assignmentApi";
 import { createLibraryFolder } from "../../library/api/libraryApi";
 import { getSimulation } from "../../simulation/api/simulationApi";
@@ -31,6 +31,8 @@ export default function Assignments({
   const [searchParams, setSearchParams] = useSearchParams();
   const queryLibraryItemId = searchParams.get("libraryItemId") ?? "";
 
+  const queryClassId = searchParams.get("classId") ?? "";
+  const prefilledClass = useRef("");
   const isStudent = isStudentRole(user?.role);
 
   // STAFF ASSIGNMENT STUDIO & SUBMISSIONS MANAGEMENT
@@ -57,6 +59,7 @@ export default function Assignments({
   const [investigationOutcome, setInvestigationOutcome] = useState("");
   const [maxScore, setMaxScore] = useState("10");
   const [dueAt, setDueAt] = useState("");
+  const [allowLateSubmission, setAllowLateSubmission] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setError] = useState("");
@@ -137,6 +140,15 @@ export default function Assignments({
     return () => { active = false; };
   }, [selectedLibrary]);
 
+  useEffect(() => {
+    if (!queryClassId || classesResource.loading || prefilledClass.current === queryClassId) return;
+    prefilledClass.current = queryClassId;
+    const classroom = classes.find(item => item.id === queryClassId);
+    if (!classroom) { setError("Lớp không còn nằm trong danh sách phân công của bạn."); return; }
+    setSelectedClassId(classroom.id);
+    setSelectedStudents(classroom.students.map(student => student.id));
+  }, [queryClassId, classes, classesResource.loading]);
+
   const toggleStudent = (id: number) => {
     setSelectedStudents((curr) =>
       curr.includes(id) ? curr.filter((x) => x !== id) : [...curr, id],
@@ -205,6 +217,7 @@ export default function Assignments({
         },
         studentIds: selectedStudents,
         dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+        allowLateSubmission,
         maxScore: Number(maxScore) || 10,
         autoGrade: activityType === "MEASUREMENT",
       });
@@ -217,9 +230,11 @@ export default function Assignments({
       setPrompt("");
       setActivityType("PREDICT_OBSERVE_EXPLAIN");
       setDueAt("");
+      setAllowLateSubmission(false);
       setMaxScore("10");
-      setSelectedStudents([]);
-      setSelectedClassId("");
+      const nextClass = queryClassId ? classes.find(item => item.id === selectedClassId) : undefined;
+      setSelectedStudents(nextClass?.students.map(student => student.id) ?? []);
+      setSelectedClassId(nextClass?.id ?? "");
       updateLibrarySelection("");
       setNotice("Đã giao bài tập cho học sinh thành công.");
       await loadData();
@@ -233,7 +248,7 @@ export default function Assignments({
   };
 
   // Grading lives on the "Bài nộp" page; open it on this assignment.
-  const handleOpenSubmissions = (assignment: Assignment) => navigate(`/lab?assignment=${encodeURIComponent(assignment.id)}`);
+  const handleOpenSubmissions = (assignment: Assignment) => navigate(assignment.classId ? `/lab/classes/${assignment.classId}?tab=assignments&assignment=${encodeURIComponent(assignment.id)}` : `/lab?assignment=${encodeURIComponent(assignment.id)}`);
 
   const handleToggleOpen = async (assignment: Assignment) => {
     const closing = assignment.status === "ACTIVE";
@@ -287,6 +302,7 @@ export default function Assignments({
         }
       >
         <div className={workspaceLayout ? "assignment-workspace-content" : "assignment-workspace-content-standard"}>
+        {queryClassId && classes.some(item => item.id === queryClassId) && <p><Link to={"/lab/classes/" + encodeURIComponent(queryClassId)}>← Quay lại lớp {classes.find(item => item.id === queryClassId)?.name}</Link></p>}
         {notice && (
           <div
             className="status-pill pass assignment-banner" role="status"
@@ -336,6 +352,8 @@ export default function Assignments({
             investigationOutcome={investigationOutcome}
             maxScore={maxScore}
             dueAt={dueAt}
+            allowLateSubmission={allowLateSubmission}
+            onAllowLateSubmissionChange={setAllowLateSubmission}
             students={classStudents}
             classes={classes}
             selectedClassId={selectedClassId}
@@ -360,6 +378,8 @@ export default function Assignments({
           />}
 
           {!workspaceLayout && view === "history" && <TeacherAssignmentHistory
+          key={queryClassId}
+          initialClassId={queryClassId}
             workspaceLayout={workspaceLayout}
             items={items}
             classes={classes}
@@ -375,6 +395,8 @@ export default function Assignments({
       </div>
       {workspaceLayout && <aside className="assignment-history-rail" aria-label="Danh sách bài đã giao">
         <TeacherAssignmentHistory
+          key={queryClassId}
+          initialClassId={queryClassId}
           workspaceLayout
           items={items}
           classes={classes}

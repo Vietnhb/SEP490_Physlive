@@ -88,6 +88,9 @@ public class Assignment extends AuditedEntity {
     @Column
     private Instant dueAt;
 
+    @Column(name = "allow_late_submission", nullable = false)
+    private boolean allowLateSubmission = true;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private AssignmentStatus status = AssignmentStatus.ACTIVE;

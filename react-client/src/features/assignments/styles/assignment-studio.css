@@ -106,3 +106,7 @@
 .studio-select { max-width: 100%; }
 .studio-select .rt-SelectTriggerInner { min-width: 0; }
 .studio-step, .studio-field, .studio-review, .studio-config, .studio-assignment, .studio-history__list { grid-template-columns: minmax(0, 1fr); }
+
+.studio-late-policy { padding: 16px; border: 1px solid var(--gray-6); background: var(--gray-2); border-radius: 10px; margin: 16px 0 20px; }
+.studio-late-policy > label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.studio-late-policy > p { margin: 8px 0 0 26px; line-height: 1.6; }

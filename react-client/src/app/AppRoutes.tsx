@@ -52,6 +52,7 @@ const teacherAreaModule = () => import("../features/assignments/pages/TeacherAre
 const TeacherArea = lazy(teacherAreaModule);
 const TeacherThemed = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherThemed })));
 const TeacherComplaints = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherComplaintsPage })));
+const TeacherClasses = lazy(() => import("../features/assignments/pages/TeacherClassesPage"));
 const Lab = lazy(() => import("../features/simulation/pages/Lab"));
 const studentModule = () => import("../features/assignments/pages/StudentAssignments");
 const StudentArea = lazy(studentModule);
@@ -130,7 +131,9 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           />
           <Route path="/lab" element={workspaceElement(<TeacherArea />)}>
             <Route index element={<Lab />} />
-            <Route path="complaints" element={<TeacherComplaints />} />
+            <Route path="classes" element={<TeacherThemed><TeacherClasses /></TeacherThemed>} />
+            <Route path="classes/:classId" element={<TeacherThemed><TeacherClasses /></TeacherThemed>} />
+            <Route path="complaints" element={<TeacherThemed><TeacherComplaints /></TeacherThemed>} />
             <Route path="library" element={<Library />} />
             <Route path="community" element={<TeacherThemed><CommunityLibrary inApp /></TeacherThemed>} />
             <Route path="department" element={isDepartmentHead(user) && user?.schoolId ? <DepartmentWorkspace /> : <Navigate to="/lab" replace />} />

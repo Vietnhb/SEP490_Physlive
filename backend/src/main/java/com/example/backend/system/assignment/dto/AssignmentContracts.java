@@ -30,16 +30,20 @@ public final class AssignmentContracts {
             Instant dueAt,
             JsonNode gradingCriteria,
             @DecimalMin("0.001") @Digits(integer = 5, fraction = 3) BigDecimal maxScore,
-            Boolean autoGrade) {
+            Boolean autoGrade, Boolean allowLateSubmission) {
+        public CreateAssignmentRequest(UUID libraryItemId, UUID classId, String title, String description, JsonNode questions,
+                                       Set<Integer> studentIds, Instant dueAt, JsonNode gradingCriteria, BigDecimal maxScore, Boolean autoGrade) {
+            this(libraryItemId, classId, title, description, questions, studentIds, dueAt, gradingCriteria, maxScore, autoGrade, true);
+        }
         public CreateAssignmentRequest(UUID libraryItemId, String title, String description, JsonNode questions,
                                        Set<Integer> studentIds, Instant dueAt) {
-            this(libraryItemId, null, title, description, questions, studentIds, dueAt, null, null, false);
+            this(libraryItemId, null, title, description, questions, studentIds, dueAt, null, null, false, true);
         }
 
         public CreateAssignmentRequest(UUID libraryItemId, String title, String description, JsonNode questions,
                                        Set<Integer> studentIds, Instant dueAt, JsonNode gradingCriteria,
                                        BigDecimal maxScore, Boolean autoGrade) {
-            this(libraryItemId, null, title, description, questions, studentIds, dueAt, gradingCriteria, maxScore, autoGrade);
+            this(libraryItemId, null, title, description, questions, studentIds, dueAt, gradingCriteria, maxScore, autoGrade, true);
         }
     }
 
@@ -98,7 +102,8 @@ public final class AssignmentContracts {
             JsonNode predictions,
             boolean canManage,
             Integer assignedById,
-            String assignedByName) {
+            String assignedByName,
+            boolean allowLateSubmission) {
     }
 
     public record AssignmentSubmissionResponse(UUID id, UUID assignmentId, Integer studentId,
@@ -124,7 +129,7 @@ public final class AssignmentContracts {
 
     public record AssignmentReport(long assigned, long submitted, long pending, long graded, long confirmed,
                                    long retryAllowed, BigDecimal averageScore, BigDecimal maxScore) { }
-    public record TeacherClassStudent(Integer id, String fullName) { }
+    public record TeacherClassStudent(Integer id, String fullName, String email) { }
     public record TeacherClassOption(UUID id, String name, Integer gradeLevel, String schoolYear,
                                      String subject, List<TeacherClassStudent> students) { }
 

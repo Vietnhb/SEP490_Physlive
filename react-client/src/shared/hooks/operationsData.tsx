@@ -13,7 +13,7 @@ export function message(error: unknown) {
 export function useResource<T>(url: string, enabled = true, refreshInterval?: number) {
   const scopeId = sessionScope();
   const result = useQuery<T>({ enabled, refetchInterval: refreshInterval, queryKey: apiKey(url), placeholderData: (previous, query) => {
-    const scope = (value: string) => { const parsed = new URL(value, "https://physlive.local"); parsed.searchParams.delete("page"); parsed.searchParams.delete("size"); return parsed.pathname + parsed.search; };
+    const scope = (value: string) => { const parsed = new URL(value, "https://physlive.local"); ["page", "size", "studentPage", "studentSize", "assignmentPage"].forEach(key => parsed.searchParams.delete(key)); return parsed.pathname + parsed.search; };
     return query?.queryKey[1] === sessionScope() && scope(String(query.queryKey[2])) === scope(url) ? previous : undefined;
   }, queryFn: ({ signal }) => api.get<T>(url, { signal }).then(response => response.data) });
   const accessDenied = axios.isAxiosError(result.error) && [401, 403, 404].includes(result.error.response?.status ?? 0);

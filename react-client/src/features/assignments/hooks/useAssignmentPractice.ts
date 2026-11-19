@@ -1,3 +1,4 @@
+import { missedDeadline } from "../model/assignmentDeadline";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { adjustAssignedSimulation, assignedSimulation, studentAssignments, submitAssignmentPrediction, completeAssignment, logStudentAction } from "../api/assignmentApi";
@@ -170,7 +171,7 @@ export function useAssignmentPractice(userId: number | undefined) {
     setPlaying(false);
     setIsSubmittingPrediction(false);
     setSimError("");
-    if (predictionReady) await loadAssignedSimulation(item.id, requestId);
+    if (predictionReady && !missedDeadline(item)) await loadAssignedSimulation(item.id, requestId);
   };
 
   useEffect(() => {
@@ -253,6 +254,7 @@ export function useAssignmentPractice(userId: number | undefined) {
   const handleSubmitPrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isCurrentSession() || !selectedAssignment || !predictionInput.trim() || predictionLockRef.current) return;
+    if (missedDeadline(selectedAssignment)) { setPredictionError("Đã hết hạn nộp bài. Bài này không cho phép nộp trễ."); return; }
     if (selectedAssignment.autoGrade && (!estimatedValue.trim() || !Number.isFinite(Number(estimatedValue)))) { setPredictionError("Vui lòng nhập kết quả dự đoán bằng số."); return; }
     const assignmentId = selectedAssignment.id;
     const requestId = ++assignmentRequestRef.current;
@@ -311,6 +313,7 @@ export function useAssignmentPractice(userId: number | undefined) {
   const handleCompleteAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isCurrentSession() || !selectedAssignment || !predictionSubmitted || !conclusionInput.trim() || completionLockRef.current) return;
+    if (missedDeadline(selectedAssignment)) { setSubmissionError("Đã hết hạn nộp bài. Hệ thống ghi nhận 0 điểm vì chưa nộp bài hoàn chỉnh."); return; }
     const activityType = activityTypeOf(selectedAssignment);
     if (activityType === "MEASUREMENT" && (!estimatedValue.trim() || !Number.isFinite(Number(estimatedValue)))) {
       setSubmissionError("Vui lòng nhập kết quả đo bằng số trước khi nộp bài.");
@@ -442,7 +445,7 @@ export function useAssignmentPractice(userId: number | undefined) {
 
   return {
     assignments, list, workbench, vectors, close: closeAssignment,
-    pending: assignments.filter(item => !item.submissionCompleted || item.retryAllowed).length,
+    pending: assignments.filter(item => !missedDeadline(item) && (!item.submissionCompleted || item.retryAllowed)).length,
     completed: assignments.filter(item => item.submissionCompleted && !item.retryAllowed).length,
   };
 }

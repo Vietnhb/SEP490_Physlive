@@ -77,6 +77,15 @@ public class AssignmentController {
         return assignmentService.submissions(id);
     }
 
+    @GetMapping(value = "/{id}/grades.csv", produces = "text/csv")
+    public org.springframework.http.ResponseEntity<byte[]> exportGrades(@PathVariable UUID id) {
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment().filename("diem-bai-tap-" + id + ".csv").build().toString())
+                .body(assignmentService.exportGrades(id));
+    }
+
     @GetMapping("/{id}/report")
     public AssignmentContracts.AssignmentReport report(@PathVariable UUID id) {
         return assignmentService.report(id);
