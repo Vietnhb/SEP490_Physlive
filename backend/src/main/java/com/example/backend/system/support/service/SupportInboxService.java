@@ -36,6 +36,7 @@ public class SupportInboxService {
     private static final String FILTERS = ") inbox where (:kind = 'ALL' or kind = :kind) and (:handler = 'ALL' or handler = :handler) "
             + "and (:status = 'ALL' or (:status = 'DONE' and status in ('RESOLVED','APPROVED','REJECTED')) "
             + "or (:status = 'TODO' and status not in ('RESOLVED','APPROVED','REJECTED'))) "
+            + "and created_at >= :fromInstant and created_at < :untilInstant "
             + "and (:search = '' or lower(concat(coalesce(full_name,''), ' ', email, ' ', subject)) like :search escape '!')";
     private static final String ROW_ORDER = " order by created_at desc, id desc";
     private static final String SCHOOL_COUNT = "select count(*) from (" + SCHOOL_APPEALS + FILTERS;
@@ -68,10 +69,18 @@ public class SupportInboxService {
     }
 
     public InboxPage page(int page, int size, String kind, String handler, String status, String search) {
+        return page(page, size, kind, handler, status, search, null, null);
+    }
+
+    public InboxPage page(int page, int size, String kind, String handler, String status, String search, java.time.LocalDate fromDate, java.time.LocalDate toDate) {
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) throw ApiException.badRequest("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.");
+        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
         com.example.backend.common.dto.PageResponse.request(page, size, org.springframework.data.domain.Sort.unsorted());
         if (search != null && search.length() > 200) throw ApiException.badRequest("Search is too long.");
         Handler asking = handler();
         Map<String, Object> parameters = new HashMap<>();
+        parameters.put("fromInstant", fromDate == null ? java.time.Instant.parse("1900-01-01T00:00:00Z") : fromDate.atStartOfDay(zone).toInstant());
+        parameters.put("untilInstant", toDate == null ? java.time.Instant.parse("9999-12-31T00:00:00Z") : toDate.plusDays(1).atStartOfDay(zone).toInstant());
         parameters.put("kind", kind == null ? ALL : kind);
         parameters.put("handler", handler == null ? ALL : handler);
         parameters.put("status", "DONE".equals(status) || "TODO".equals(status) ? status : ALL);

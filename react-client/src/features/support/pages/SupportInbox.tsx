@@ -13,6 +13,7 @@ import { TableLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
 import modal from "../../../shared/ui/ModalScroll.module.css";
 import "../styles/support-pages.css";
 import RefreshButton from "../../../shared/ui/RefreshButton";
+import filters from "../styles/SupportFilters.module.css";
 
 const KINDS = { COMPLAINT: "Báo lỗi mô phỏng", MESSAGE: "Yêu cầu hỗ trợ", FEEDBACK: "Góp ý", ACCOUNT: "Yêu cầu mở khóa" };
 const STATUS: Record<string, string> = { OPEN: "Chờ xử lý", READ: "Đang xử lý", RESOLVED: "Đã hoàn tất", PENDING: "Chờ xử lý", APPROVED: "Đã duyệt mở khóa", REJECTED: "Đã từ chối" };
@@ -27,18 +28,28 @@ export default function SupportInbox({ schoolOnly = false }: { schoolOnly?: bool
   const [handler, setHandler] = useState<Handler>("ALL");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const invalidDates = Boolean(from && to && from > to);
+  const hasFilters = Boolean(query || status !== "ALL" || from || to || handler !== "ALL" || (!schoolOnly && kind !== "ALL"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [selectedKey, setSelectedKey] = useState("");
   const [response, setResponse] = useState("");
   const lock = useRef(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const resetPage = () => { setPage(1); tableRef.current?.scrollTo({ top: 0 }); };
   const search = useDebouncedValue(query);
+  const inboxParams = new URLSearchParams({ page: String(page - 1), size: String(pageSize), kind: schoolOnly ? "ACCOUNT" : kind, handler, status, query: search });
+  if (from) inboxParams.set("from", from);
+  if (to) inboxParams.set("to", to);
   const resource = useResource<{ support: SupportItem[]; appeals: Appeal[]; totalElements: number; totalPages: number; page: number }>(
-    "/support/inbox?" + new URLSearchParams({ page: String(page - 1), size: "10", kind: schoolOnly ? "ACCOUNT" : kind, handler, status, query: search }));
+    "/support/inbox?" + inboxParams, !invalidDates);
   const items = resource.data?.support ?? [];
   const appeals = resource.data?.appeals ?? [];
-  const loading = resource.loading;
+  const loading = !invalidDates && resource.loading;
   const load = resource.refresh;
   const total = resource.data?.totalElements ?? 0;
   const entries: Entry[] = [
@@ -67,19 +78,23 @@ export default function SupportInbox({ schoolOnly = false }: { schoolOnly?: bool
     } catch (err) { setError(apiMessage(err, "Không thể cập nhật yêu cầu.")); }
     finally { lock.current = false; setBusy(false); }
   };
-  return <main className="support-page support-page--manager"><PageHeader title={schoolOnly ? "Yêu cầu mở khóa" : "Yêu cầu hỗ trợ"} description={schoolOnly ? "Xem xét yêu cầu của giáo viên, học sinh do nhà trường tạm khóa." : "Xử lý hỗ trợ và quyết định khóa cấp hệ thống; theo dõi đơn do nhà trường và người kiểm duyệt xử lý."} action={<RefreshButton onClick={() => void load()} disabled={loading || busy} />} />
+  return <main className="support-page support-page--manager"><PageHeader title={schoolOnly ? "Yêu cầu mở khóa" : "Yêu cầu hỗ trợ"} description={schoolOnly ? "Xem xét yêu cầu của giáo viên, học sinh do nhà trường tạm khóa." : "Xử lý hỗ trợ và quyết định khóa cấp hệ thống; theo dõi đơn do nhà trường và người kiểm duyệt xử lý."} action={<RefreshButton onClick={() => void load()} disabled={loading || busy || invalidDates} />} />
     {notice && <p role="status" className="support-success">{notice}</p>}{(error || resource.error) && !selected && <p role="alert" className="admin-error-banner">{error || resource.error}</p>}
-    <section className="support-panel"><Flex gap="3" wrap="wrap" mb="4">
-      <TextField.Root aria-label="Tìm yêu cầu" placeholder="Tìm tên, email, tiêu đề…" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
-      {!schoolOnly && <Select.Root value={kind} onValueChange={value => { setKind(value); setPage(1); }}><Select.Trigger aria-label="Loại yêu cầu" /><Select.Content><Select.Item value="ALL">Tất cả loại yêu cầu</Select.Item>{Object.entries(KINDS).map(([value, label]) => <Select.Item value={value} key={value}>{label}</Select.Item>)}</Select.Content></Select.Root>}
-      {!schoolOnly && <Select.Root value={handler} onValueChange={value => { setHandler(value as Handler); setPage(1); }}><Select.Trigger aria-label="Bên xử lý" /><Select.Content><Select.Item value="ALL">Tất cả bên xử lý</Select.Item><Select.Item value="MANAGER">Vận hành quản lý</Select.Item><Select.Item value="SCHOOL">Nhà trường quản lý</Select.Item><Select.Item value="REVIEWER">Kiểm duyệt quản lý</Select.Item></Select.Content></Select.Root>}
-      <Select.Root value={status} onValueChange={value => { setStatus(value); setPage(1); }}><Select.Trigger aria-label="Trạng thái" /><Select.Content><Select.Item value="ALL">Tất cả trạng thái</Select.Item><Select.Item value="TODO">Chưa hoàn tất</Select.Item><Select.Item value="DONE">Đã hoàn tất</Select.Item></Select.Content></Select.Root>
-    </Flex>
-    {loading ? <TableLoadingSkeleton headers={["Người gửi", "Loại", "Tiêu đề", "Trạng thái", "Ngày gửi", "Thao tác"]} /> : <div className="support-scroll"><table className="support-table"><thead><tr><th>Người gửi</th><th>Loại</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>
-      {filtered.map(item => <tr key={item.key}><td>{item.sender}<small>{item.email}</small></td><td>{KINDS[item.kind]}</td><td>{item.subject}</td><td><Badge color={done(item) ? "green" : "orange"}>{STATUS[item.status]}</Badge>{item.kind === "COMPLAINT" && <small>Người kiểm duyệt xử lý</small>}{item.appeal && <small>{item.appeal.authority === "SCHOOL" ? "Nhà trường xử lý" : "Cấp hệ thống"}</small>}</td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td><RowActions subject={item.subject} actions={[{ label: "Xem", onSelect: () => { setSelectedKey(item.key); setResponse(item.response ?? ""); setError(""); } }]} /></td></tr>)}
+    <section className="support-panel"><div className={filters.filters} role="group" aria-label="Bộ lọc yêu cầu">
+      <label className={filters.field + " " + filters.search}>Tìm kiếm<TextField.Root aria-label="Tìm yêu cầu" placeholder="Tìm tên, email, tiêu đề…" value={query} onChange={e => { setQuery(e.target.value); resetPage(); }} /></label>
+      {!schoolOnly && <Select.Root value={kind} onValueChange={value => { setKind(value); resetPage(); }}><Select.Trigger aria-label="Loại yêu cầu" /><Select.Content><Select.Item value="ALL">Tất cả loại yêu cầu</Select.Item>{Object.entries(KINDS).map(([value, label]) => <Select.Item value={value} key={value}>{label}</Select.Item>)}</Select.Content></Select.Root>}
+      {!schoolOnly && <Select.Root value={handler} onValueChange={value => { setHandler(value as Handler); resetPage(); }}><Select.Trigger aria-label="Bên xử lý" /><Select.Content><Select.Item value="ALL">Tất cả bên xử lý</Select.Item><Select.Item value="MANAGER">Vận hành quản lý</Select.Item><Select.Item value="SCHOOL">Nhà trường quản lý</Select.Item><Select.Item value="REVIEWER">Kiểm duyệt quản lý</Select.Item></Select.Content></Select.Root>}
+      <label className={filters.field}>Trạng thái<Select.Root value={status} onValueChange={value => { setStatus(value); resetPage(); }}><Select.Trigger aria-label="Trạng thái" /><Select.Content><Select.Item value="ALL">Tất cả trạng thái</Select.Item><Select.Item value="TODO">Chưa hoàn tất</Select.Item><Select.Item value="DONE">Đã hoàn tất</Select.Item></Select.Content></Select.Root></label>
+      <label className={filters.field}>Từ ngày<input type="date" aria-label="Yêu cầu từ ngày" value={from} max={to || undefined} onChange={event => { setFrom(event.target.value); resetPage(); }} /></label>
+      <label className={filters.field}>Đến ngày<input type="date" aria-label="Yêu cầu đến ngày" value={to} min={from || undefined} onChange={event => { setTo(event.target.value); resetPage(); }} /></label>
+      <Button variant="outline" disabled={!hasFilters} onClick={() => { setQuery(""); setStatus("ALL"); setFrom(""); setTo(""); setHandler("ALL"); setKind(schoolOnly ? "ACCOUNT" : "ALL"); resetPage(); }}>Xóa bộ lọc</Button>
+    </div>
+    {invalidDates && <p role="alert" className="admin-error-banner">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</p>}
+    {loading ? <TableLoadingSkeleton headers={["Người gửi", "Loại", "Tiêu đề", "Trạng thái", "Ngày gửi", "Thao tác"]} /> : <div ref={tableRef} className="support-scroll" role="region" tabIndex={0} aria-label="Danh sách yêu cầu có thể cuộn"><table className="support-table"><thead><tr><th>Người gửi</th><th>Loại</th><th>Tiêu đề</th><th>Trạng thái</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>
+      {filtered.map(item => <tr key={item.key}><td>{item.sender}<small>{item.email}</small></td><td>{KINDS[item.kind]}</td><td>{item.subject}</td><td><Badge color={item.status === "REJECTED" ? "red" : done(item) ? "green" : "orange"}>{STATUS[item.status]}</Badge>{item.kind === "COMPLAINT" && <small>Người kiểm duyệt xử lý</small>}{item.appeal && <small>{item.appeal.authority === "SCHOOL" ? "Nhà trường xử lý" : "Cấp hệ thống"}</small>}</td><td>{new Date(item.createdAt).toLocaleString("vi-VN")}</td><td><RowActions subject={item.subject} actions={[{ label: "Xem", onSelect: () => { setSelectedKey(item.key); setResponse(item.response ?? ""); setError(""); } }]} /></td></tr>)}
       {total === 0 && <tr><td colSpan={6}>Không có yêu cầu phù hợp.</td></tr>}
     </tbody></table></div>}
-    <Flex justify="between" align="center" mt="4" gap="3" wrap="wrap"><span>{total} yêu cầu</span><Flex align="center" gap="3"><Button size="1" variant="soft" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</Button><span>Trang {currentPage}/{pages}</span><Button size="1" variant="soft" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>Sau</Button></Flex></Flex></section>
+    <Flex justify="between" align="center" mt="4" gap="3" wrap="wrap"><span>{total} yêu cầu</span><Flex align="center" gap="3" wrap="wrap"><label className={filters.pageSize}>Số dòng/trang<Select.Root value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); resetPage(); }}><Select.Trigger aria-label="Số yêu cầu mỗi trang" /><Select.Content>{[10, 25, 50].map(value => <Select.Item key={value} value={String(value)}>{value}</Select.Item>)}</Select.Content></Select.Root></label><Button size="1" variant="soft" disabled={currentPage <= 1} onClick={() => { setPage(currentPage - 1); tableRef.current?.scrollTo({ top: 0 }); }}>Trước</Button><span>Trang {currentPage}/{pages}</span><Button size="1" variant="soft" disabled={currentPage >= pages} onClick={() => { setPage(currentPage + 1); tableRef.current?.scrollTo({ top: 0 }); }}>Sau</Button></Flex></Flex></section>
     <Dialog.Root open={!!selected} onOpenChange={open => { if (!open && !lock.current) setSelectedKey(""); }}><Dialog.Content maxWidth="700px" className={modal.dialog}><div className={modal.body}>
       <Dialog.Title>{selected?.subject}</Dialog.Title><Dialog.Description>{selected?.sender} · {selected?.email}</Dialog.Description><p><Badge>{selected ? KINDS[selected.kind] : ""}</Badge> {selected ? STATUS[selected.status] : ""}</p><p className="support-body">{selected?.content}</p>
       {selected && !canProcess && <p>Chỉ xem. {selected.kind === "COMPLAINT" ? "Người kiểm duyệt tiếp nhận và xử lý trực tiếp báo lỗi mô phỏng." : selected.appeal?.authority === "SCHOOL" ? "Nhà trường chịu trách nhiệm xem xét quyết định khóa này." : "Yêu cầu không thuộc quyền xử lý hoặc quyết định khóa đã thay đổi."}</p>}

@@ -1,0 +1,21 @@
+.filters { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.field { display: grid; gap: 7px; min-width: 150px; color: var(--gray-11); font-size: 12px; }
+.search { min-width: 240px; flex: 1; max-width: 340px; }
+.field input[type="date"] { box-sizing: border-box; width: 100%; min-height: 32px; padding: 5px 9px; border: 1px solid var(--gray-7); border-radius: 6px; background: var(--color-surface); color: var(--gray-12); font: inherit; font-size: 13px; }
+.field input:focus-visible { outline: 2px solid var(--accent-8); outline-offset: 2px; }
+.table { table-layout: fixed; min-width: 850px; }
+.table td { height: 94px; box-sizing: border-box; vertical-align: middle; }
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; line-height: 1.5; margin: 0; font-size: 14px; }
+.table time { font-size: 13px; }
+.summary { color: var(--gray-11); }
+.meta { font-size: 13px; color: var(--gray-11); }
+.detailTitle { font-size: 16px; margin: 20px 0 8px; overflow-wrap: anywhere; }
+.response { margin-top: 20px; padding: 16px; border: 1px solid var(--gray-6); border-radius: 10px; background: var(--gray-2); }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; flex-wrap: wrap; color: var(--gray-11); font-size: 13px; }
+.footer > div, .footer label { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.footer label { white-space: nowrap; flex-wrap: nowrap; }
+@media (max-width: 600px) { .field, .search { width: 100%; min-width: 0; max-width: none; } }
+
+.teacher.teacher :global(input.rt-TextFieldInput) { border: 0; box-shadow: none; background: transparent; min-height: 0; border-radius: 0; }
+.pageSize { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 13px; color: var(--gray-11); }
+.pageSize :global(.rt-SelectTrigger) { min-width: 64px; }

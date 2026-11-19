@@ -1,19 +1,18 @@
 import { useResource } from "../../../shared/hooks/operationsData";
 import FallbackHeading from "../../../shared/layout/FallbackHeading";
-import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import { type ComponentProps, type ReactNode } from "react";
 import { Theme } from "@radix-ui/themes";
 import { useEffectiveTheme } from "../../../shared/theme/themeStore";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import LearningHeader from "../../../shared/layout/LearningHeader";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { isDepartmentHead } from "../../../shared/auth/permissions";
-import type { SimulationComplaint, SupportStatus } from "../../support/api/supportApi";
-import { COMPLAINT_STATUS } from "../../support/model/complaintStatus";
+import type { SimulationComplaint } from "../../support/api/supportApi";
 import "../../support/styles/complaints.css";
 import "../../simulation/styles/learning.css";
 import "../../simulation/styles/lab.css";
-import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
+export { default as TeacherComplaintsPage } from "./TeacherComplaintsPage";
 
 const complaintsOnly = (items: SimulationComplaint[]) =>
   items.filter((item) => item.kind === "COMPLAINT");
@@ -51,7 +50,8 @@ export default function TeacherAreaLayout() {
     {
       label: "Bài tập",
       items: [
-        { to: "/lab", label: "Bài đã giao", icon: "chart", end: true },
+        { to: "/lab/classes", label: "Lớp phụ trách", icon: "users" },
+        { to: "/lab", label: "Tất cả bài đã giao", icon: "chart", end: true },
         { to: "/assignments/workspace", label: "Giao bài mới", icon: "plus" },
       ],
     },
@@ -129,131 +129,5 @@ export function TeacherThemed({ children }: Readonly<{ children: ReactNode }>) {
     >
       {children}
     </Theme>
-  );
-}
-
-type Filter = "ALL" | SupportStatus;
-
-export function TeacherComplaintsPage() {
-  const [filter, setFilter] = useState<Filter>("ALL");
-  const resource = useResource<SimulationComplaint[]>("/support/mine");
-  const items = resource.data ? complaintsOnly(resource.data) : null;
-  const error = resource.error || "";
-  const load = resource.refresh;
-
-  const visible = useMemo(() => (items ?? []).filter(item => filter === "ALL" || item.status === filter), [items, filter]);
-  const count = (status: SupportStatus) => (items ?? []).filter(item => item.status === status).length;
-
-  return (
-    <div className="complaint-page">
-      <header className="complaint-page__head">
-        <div>
-          <h1>Khiếu nại đã gửi</h1>
-          <p>Theo dõi các báo lỗi bạn đã gửi. </p>
-        </div>
-        <button
-          type="button"
-          className="complaint-page__refresh"
-          onClick={() => void load()}
-        >
-          Làm mới
-        </button>
-      </header>
-      <div
-        className="complaint-page__filters"
-        role="group"
-        aria-label="Lọc theo trạng thái"
-      >
-        <button
-          type="button"
-          aria-pressed={filter === "ALL"}
-          onClick={() => setFilter("ALL")}
-        >
-          Tất cả · {items?.length ?? 0}
-        </button>
-        {(["OPEN", "READ", "RESOLVED"] as const).map((status) => (
-          <button
-            type="button"
-            key={status}
-            aria-pressed={filter === status}
-            onClick={() => setFilter(status)}
-          >
-            {COMPLAINT_STATUS[status]} · {count(status)}
-          </button>
-        ))}
-      </div>
-      {error && (
-        <p className="complaint-error" role="alert">
-          {error}
-        </p>
-      )}
-      {items === null ? (
-        <CardLoadingSkeleton cards={3} label="Đang tải danh sách khiếu nại…" />
-      ) : visible.length === 0 ? (
-        <p className="complaint-page__empty">
-          {items.length === 0 ? (
-            <>
-              Bạn chưa gửi khiếu nại nào.{" "}
-              <Link to="/workspace">Mở trang Mô phỏng</Link>
-            </>
-          ) : (
-            "Không có khiếu nại ở trạng thái này."
-          )}
-        </p>
-      ) : (
-        <div className="complaint-page__list">
-          {visible.map((item) => {
-            const [detail, context] = item.content.split("\n— Đề bài —");
-            return (
-              <article className="complaint-item" key={item.id}>
-                <div className="complaint-item__top">
-                  <strong>{item.subject}</strong>
-                  <span className="complaint-status" data-status={item.status}>
-                    {COMPLAINT_STATUS[item.status]}
-                  </span>
-                </div>
-                <time dateTime={item.createdAt}>
-                  Gửi lúc{" "}
-                  {new Date(item.createdAt).toLocaleString("vi-VN", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
-                </time>
-                {item.reviewerReferred && (
-                  <p className="complaint-item__meta">
-                    Đã chuyển Reviewer kiểm tra.
-                  </p>
-                )}
-                <p className="complaint-item__body">{detail.trim()}</p>
-                {context && (
-                  <p
-                    className="complaint-context"
-                    style={{ whiteSpace: "pre-wrap" }}
-                  >
-                    <strong>Đề bài</strong>
-                    {"\n"}
-                    {context.split("— Thông số đang dùng —")[0].trim()}
-                  </p>
-                )}
-                {item.adminResponse ? (
-                  <p className="complaint-item__answer">
-                    <b>
-                      Phản hồi
-                      {item.responderName ? ` (${item.responderName})` : ""}
-                      {item.respondedAt
-                        ? ` · ${new Date(item.respondedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}`
-                        : ""}
-                    </b>
-                    {item.adminResponse}
-                  </p>
-                ) : (
-                  <p className="complaint-item__meta">Chưa có phản hồi.</p>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </div>
   );
 }

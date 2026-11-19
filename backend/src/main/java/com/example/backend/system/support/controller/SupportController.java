@@ -23,8 +23,10 @@ public class SupportController {
     public com.example.backend.system.support.service.SupportInboxService.InboxPage inbox(
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "ALL") String kind, @RequestParam(defaultValue = "ALL") String handler,
-            @RequestParam(defaultValue = "ALL") String status, @RequestParam(defaultValue = "") String query) {
-        return inbox.page(page, size, kind, handler, status, query);
+            @RequestParam(defaultValue = "ALL") String status, @RequestParam(defaultValue = "") String query,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return inbox.page(page, size, kind, handler, status, query, from, to);
     }
 
     @GetMapping("/inbox/pending-count")
