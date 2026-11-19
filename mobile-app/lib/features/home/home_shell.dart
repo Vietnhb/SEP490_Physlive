@@ -5,6 +5,7 @@ import '../account/account_screens.dart';
 import '../library/library_screen.dart';
 import '../manager/manager_overview_screen.dart';
 import '../manager/manager_support_screen.dart';
+import '../school/school_overview_screen.dart';
 import '../student/student_assignments_screen.dart';
 import '../teacher/teacher_assignments_screen.dart';
 
@@ -23,6 +24,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     final user = SessionScope.of(context).user!;
     if (user.isManager) return _managerShell();
+    if (user.isSchool) return _schoolShell();
     final pages = [
       user.isStudent ? const StudentAssignmentsScreen() : const TeacherAssignmentsScreen(),
       const LibraryScreen(),
@@ -49,6 +51,21 @@ class _HomeShellState extends State<HomeShell> {
             selectedIcon: Icon(Icons.person_rounded),
             label: 'Tài khoản',
           ),
+        ],
+      ),
+    );
+  }
+
+  /// School accounts: the school at a glance; managing people, classes and billing stays on the web.
+  Widget _schoolShell() {
+    return Scaffold(
+      body: IndexedStack(index: _tab, children: const [SchoolOverviewScreen(), AccountScreen()]),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (index) => setState(() => _tab = index),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.apartment_outlined), selectedIcon: Icon(Icons.apartment_rounded), label: 'Trường'),
+          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Tài khoản'),
         ],
       ),
     );

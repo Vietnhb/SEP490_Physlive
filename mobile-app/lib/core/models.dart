@@ -21,6 +21,7 @@ class User {
   String get fullName => (asString(json['fullName']) ?? '').trim().isEmpty ? email : json['fullName'].toString();
   String get role => asString(json['role']) ?? '';
   String? get schoolName => asString(json['schoolName']);
+  String? get schoolId => asString(json['schoolId']);
   String? get avatarUrl => asString(json['avatarUrl']);
   List<String> get permissions => (json['permissions'] is List) ? (json['permissions'] as List).map((e) => '$e').toList() : const [];
   bool get mustChangePassword => asBool(json['mustChangePassword']);
@@ -29,9 +30,10 @@ class User {
   bool get isStudent => role == 'STUDENT';
   bool get isTeacher => role == 'STAFF' && permissions.contains('TEACH');
   bool get isManager => role == 'MANAGER';
+  bool get isSchool => role == 'SCHOOL';
 
   /// The accounts the app is made for; everyone else manages from the web.
-  bool get usesApp => isStudent || isTeacher || isManager;
+  bool get usesApp => isStudent || isTeacher || isManager || isSchool;
 
   String get roleLabel => switch (role) {
         'STUDENT' => 'Học sinh',
