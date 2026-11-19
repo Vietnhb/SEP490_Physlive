@@ -16,7 +16,8 @@ class ManagerSupportScreen extends StatefulWidget {
 
 class _ManagerSupportScreenState extends State<ManagerSupportScreen> {
   int _reload = 0;
-  bool _showDone = false;
+  /// 0 = to handle, 1 = done, 2 = simulation complaints (reviewers handle them; read-only here).
+  int _view = 0;
 
   Future<List<SupportItem>> _load() async =>
       asJsonList(await SessionScope.api(context).get('/support/admin')).map(SupportItem.new).toList();
@@ -35,28 +36,37 @@ class _ManagerSupportScreenState extends State<ManagerSupportScreen> {
         load: _load,
         reloadKey: _reload,
         builder: (context, items, reload) {
-          final todo = items.where((item) => !item.resolved).toList();
-          final done = items.where((item) => item.resolved).toList();
-          final shown = _showDone ? done : todo;
+          final requests = items.where((item) => !item.isComplaint);
+          final todo = requests.where((item) => !item.resolved).toList();
+          final done = requests.where((item) => item.resolved).toList();
+          final complaints = items.where((item) => item.isComplaint).toList();
+          final shown = [todo, done, complaints][_view];
           return RefreshIndicator(
             onRefresh: reload,
             child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-              SegmentedButton<bool>(
+              SegmentedButton<int>(
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: false, label: Text('Cần xử lý (${todo.length})')),
-                  ButtonSegment(value: true, label: Text('Đã xong (${done.length})')),
+                  ButtonSegment(value: 0, label: Text('Cần xử lý (${todo.length})')),
+                  ButtonSegment(value: 1, label: Text('Đã xong (${done.length})')),
+                  ButtonSegment(value: 2, label: Text('Báo lỗi (${complaints.length})')),
                 ],
-                selected: {_showDone},
-                onSelectionChanged: (value) => setState(() => _showDone = value.first),
+                selected: {_view},
+                onSelectionChanged: (value) => setState(() => _view = value.first),
               ),
+              if (_view == 2)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text('Báo lỗi mô phỏng do người kiểm duyệt xử lý; bạn chỉ theo dõi.',
+                      style: TextStyle(color: context.palette.muted, fontSize: 13)),
+                ),
               const SizedBox(height: 14),
               if (shown.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 40),
                   child: EmptyState(
                     icon: Icons.inbox_outlined,
-                    title: _showDone ? 'Chưa có yêu cầu nào đã xong' : 'Không còn yêu cầu nào cần xử lý',
+                    title: const ['Không còn yêu cầu nào cần xử lý', 'Chưa có yêu cầu nào đã xong', 'Chưa có báo lỗi mô phỏng'][_view],
                   ),
                 )
               else

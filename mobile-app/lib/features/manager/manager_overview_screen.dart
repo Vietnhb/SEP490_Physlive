@@ -91,8 +91,15 @@ class _ManagerOverviewScreenState extends State<ManagerOverviewScreen> {
                 title: 'Tài khoản theo vai trò',
                 icon: Icons.groups_rounded,
                 child: Column(children: [
-                  for (final role in const ['STUDENT', 'STAFF', 'SCHOOL', 'REVIEWER', 'MANAGER', 'ADMIN'])
-                    _Row(label: User({'role': role}).roleLabel, value: '${asInt(accounts[role]) ?? 0}'),
+                  for (final (role, label) in const [
+                    ('STUDENT', 'Học sinh'),
+                    ('STAFF', 'Giáo viên / tổ trưởng'),
+                    ('SCHOOL', 'Quản trị trường'),
+                    ('REVIEWER', 'Kiểm duyệt'),
+                    ('MANAGER', 'Vận hành'),
+                    ('ADMIN', 'Quản trị hệ thống'),
+                  ])
+                    _Row(label: label, value: '${asInt(accounts[role]) ?? 0}'),
                 ]),
               ),
               const SizedBox(height: 12),
