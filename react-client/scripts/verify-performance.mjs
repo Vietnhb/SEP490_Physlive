@@ -2,7 +2,7 @@ import { build, preview } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { chromium } from "playwright";
 import { expect } from "@playwright/test";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
@@ -42,7 +42,7 @@ const accounts = { total: 12, STUDENT: 12, suspended: 0 };
 const actor = role => ({ id: role === "SCHOOL" ? 101 : role === "STUDENT" ? 102 : 100, email: role.toLowerCase() + "@test.invalid",
   fullName: "Fixture " + role, role, active: true, accountStatus: "ACTIVE", permissions: role === "STAFF" ? ["TEACH"] : role === "REVIEWER" ? ["CONTENT_EDIT", "CONTENT_REVIEW"] : [], mustChangePassword: false,
   schoolId: role === "MANAGER" ? null : schoolId, schoolName: "Fixture school", billingRequired: false });
-async function fixture(role, openPath, delayRecent = false, handover = false, appealMode = false, emptyInbox = false) {
+async function fixture(role, openPath, delayRecent = false, handover = false, appealMode = false, emptyInbox = false, teacherClassMode = false, complaintDateMode = false) {
   let releaseRoster; const rosterGate = new Promise(resolve => { releaseRoster = resolve; });
   const context = await browser.newContext(); const requests = [], errors = []; let current = actor(role);
   if (appealMode && role === "STAFF") current = { ...current, active: false, accountStatus: "SUSPENDED_READ_ONLY" };
@@ -64,6 +64,36 @@ async function fixture(role, openPath, delayRecent = false, handover = false, ap
     if (api === failPath) { failPath = ""; return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "Fixture refresh failed" }) }); }
     let data = [];
     if (api === "/api/user/me") data = current;
+    else if (complaintDateMode && api === "/api/support/mine") data = Array.from({ length: 23 }, (_, index) => ({ id: String(index + 1).padStart(8, "0") + "-fixture", kind: "COMPLAINT", subject: "Báo lỗi " + (index + 1), content: (index === 22 ? "Kết luận dài. ".repeat(100) + "END FULL COMPLAINT" : "Nội dung ngắn") + "\n— Đề bài —\nĐề bài đầy đủ\n— Thông số đang dùng —\nv = 15 m/s", status: ["OPEN", "READ", "RESOLVED"][index % 3], createdAt: new Date(Date.UTC(2026, 10, index + 1, 8)).toISOString(), responderName: "Reviewer", adminResponse: index === 22 ? "Phản hồi đầy đủ" : null }));
+    else if (complaintDateMode && api === "/api/support/inbox") {
+      const from = parsed.searchParams.get("from"), to = parsed.searchParams.get("to"), status = parsed.searchParams.get("status"), query = parsed.searchParams.get("query") ?? "";
+      const rows = Array.from({ length: 23 }, (_, index) => ({ id: String(index + 1).padStart(8, "0") + "-fixture", userId: index + 1, userName: "Teacher " + (index + 1), userEmail: "teacher" + (index + 1) + "@test.invalid", reason: "Yêu cầu " + (index + 1), content: "School appeal details", status: ["PENDING", "APPROVED", "REJECTED"][index % 3], authority: "SCHOOL", canResolve: true, createdAt: new Date(Date.UTC(2026, 10, index + 1, 8)).toISOString() })).reverse().filter(item => (!from || item.createdAt.slice(0, 10) >= from) && (!to || item.createdAt.slice(0, 10) <= to) && (status === "ALL" || (status === "TODO" ? item.status === "PENDING" : item.status !== "PENDING")) && (item.userName + " " + item.reason).toLowerCase().includes(query.toLowerCase()));
+      const size = Number(parsed.searchParams.get("size") || 10), totalPages = Math.ceil(rows.length / size), page = Math.min(Number(parsed.searchParams.get("page") || 0), Math.max(0, totalPages - 1));
+      data = { support: [], appeals: rows.slice(page * size, (page + 1) * size), totalElements: rows.length, totalPages, page };
+    }
+    else if (teacherClassMode && api === "/api/assignments/mine/teacher/classes") data = [{ ...classrooms[0], students: people.slice(0, 3) }, { ...classrooms[1], students: people.slice(10, 12) }];
+    else if (teacherClassMode && api === "/api/assignments/mine/teacher") data = [{ id: "assignment-1", classId: classrooms[0].id, className: classrooms[0].name, title: "Fixture assignment", studentIds: [1, 2, 3, 4], status: "ACTIVE", maxScore: 10, questions: {}, assignedAt: "2026-11-01T10:00:00Z" }, { id: "assignment-other", classId: classrooms[1].id, className: classrooms[1].name, title: "Other class assignment", studentIds: [11, 12], status: "ACTIVE", questions: {}, assignedAt: "2026-11-01T10:00:00Z" }];
+    else if (teacherClassMode && api.endsWith("/grades.csv")) return route.fulfill({ status: 200, contentType: "text/csv; charset=UTF-8", body: "\uFEFFHọc sinh,Điểm\r\nStudent 01,8\r\nStudent 02,\r\nStudent 03,\r\nFormer student,0\r\n" });
+    else if (api.endsWith("/grades/page")) {
+      const source = gradebookFixture();
+      if (teacherClassMode) source.students = source.students.map(student => student.id !== 1 ? student : { ...student, cells: student.cells.map(cell => cell.assignmentId === "assignment-1" ? { ...cell, score: submission.score, feedback: submission.feedback, state: submission.gradingStatus, submissionId: submission.id } : cell) });
+      data = pageGradebook(source, parsed);
+    }
+    else if (teacherClassMode && api.endsWith("/grades")) {
+      data = gradebookFixture(); data.students = data.students.map(student => student.id !== 1 ? student : { ...student, cells: student.cells.map(cell => cell.assignmentId === "assignment-1" ? { ...cell, score: submission.score, feedback: submission.feedback, state: submission.gradingStatus, submissionId: submission.id } : cell) });
+    }
+    else if (teacherClassMode && api === "/api/library/mine") data = [{ id: "library-fixture", simulationId: "simulation-fixture", title: "Fixture simulation", validationStatus: "PASSED", visibility: "PERSONAL", createdAt: "2026-11-01T10:00:00Z" }];
+    else if (teacherClassMode && api.includes("/simulations/simulation-fixture")) data = { simulationId: "simulation-fixture", time: [0, 1], parameters: {}, visualization: { controls: [], series: [] }, validation: { passed: true, checkpoints: [] } };
+    else if (teacherClassMode && api === "/api/assignments" && method === "POST") data = { id: "created-fixture" };
+    else if (api === "/api/admin/validation-runs/topics") data = ["KINEMATICS", "DYNAMICS"];
+    else if (api === "/api/schemas/topic-names") data = [{ topic: "KINEMATICS", name: "Động học" }, { topic: "DYNAMICS", name: "Động lực học" }];
+    else if (api === "/api/admin/validation-runs/page") {
+      const all = Array.from({ length: 37 }, (_, index) => ({ id: "validation-" + index, topic: index % 2 ? "DYNAMICS" : "KINEMATICS", passed: index % 3 !== 0, createdAt: new Date(Date.UTC(2026, 10, index + 1, 10)).toISOString(), schemaVersion: "1.0", errorMessage: index % 3 ? null : "Fixture failed check" }));
+      const topic = parsed.searchParams.get("topic"), status = parsed.searchParams.get("status"), from = parsed.searchParams.get("from"), to = parsed.searchParams.get("to");
+      const matches = all.filter(item => (!topic || item.topic === topic) && (!status || status === "ALL" || item.passed === (status === "PASS")) && (!from || item.createdAt.slice(0, 10) >= from) && (!to || item.createdAt.slice(0, 10) <= to));
+      const page = Number(parsed.searchParams.get("page") || 0), size = Number(parsed.searchParams.get("size") || 10);
+      data = { items: matches.slice(page * size, (page + 1) * size), totalElements: matches.length, totalPages: Math.ceil(matches.length / size), page, size };
+    }
     else if (api === "/api/auth/login") { current = actor("STUDENT"); data = { token: fixtureToken + "-second", user: current }; }
     else if (api === "/api/user/me/license") data = { active: true, canPerformWriteOperations: true, showRenewalBanner: false };
     else if (api.endsWith("/users/page")) {
@@ -128,11 +158,303 @@ function gradebookFixture() {
       state, score: ["TEACHER_CONFIRMED", "AI_GRADED"].includes(state) ? index ? 7 : 8 : null, maxScore: 10, feedback: "Original feedback", gradedBy: "Fixture teacher",
     })) })) };
 }
+function pageGradebook(source, parsed) {
+  const p = parsed.searchParams, id = p.get("assignment") || "ALL", title = (p.get("title") || "").toLowerCase();
+  const from = p.get("from"), to = p.get("to"), membership = p.get("membership") || "CURRENT", query = (p.get("studentQuery") || "").toLowerCase();
+  const lessons = source.assignments.filter(item => (id === "ALL" || item.id === id) && item.title.toLowerCase().includes(title) && (!from || (item.assignedAt || "2026-11-01").slice(0, 10) >= from) && (!to || (item.assignedAt || "2026-11-01").slice(0, 10) <= to));
+  const allStudents = source.students.filter(student => lessons.length && (membership === "ALL" || student.current === (membership === "CURRENT")) && (student.fullName + " " + student.email).toLowerCase().includes(query) && (id === "ALL" || student.cells.some(cell => cell.assignmentId === id && cell.state !== "NOT_ASSIGNED")));
+  const assignmentSize = Math.max(1, Math.min(5, Number(p.get("assignmentSize") || 5))), studentSize = Math.max(1, Math.min(50, Number(p.get("studentSize") || 5)));
+  const assignmentPages = Math.max(1, Math.ceil(lessons.length / assignmentSize)), studentPages = Math.max(1, Math.ceil(allStudents.length / studentSize));
+  const assignmentPage = Math.min(assignmentPages - 1, Number(p.get("assignmentPage") || 0)), studentPage = Math.min(studentPages - 1, Number(p.get("studentPage") || 0));
+  const shown = lessons.slice(assignmentPage * assignmentSize, (assignmentPage + 1) * assignmentSize);
+  return { ...source, assignments: shown, students: allStudents.slice(studentPage * studentSize, (studentPage + 1) * studentSize).map(student => ({ ...student, cells: student.cells.filter(cell => shown.some(lesson => lesson.id === cell.assignmentId)) })), totalAssignments: lessons.length, assignmentPage, assignmentSize, assignmentPages, totalStudents: allStudents.length, studentPage, studentSize, studentPages };
+}
 async function navigate(page, pathname) {
   await page.evaluate(next => { history.pushState({}, "", next); window.dispatchEvent(new PopStateEvent("popstate")); }, pathname);
 }
 const countRequests = (fixture, api) => fixture.requests.filter(request => request === "/api" + api).length;
 try {
+  const validation = await fixture("MANAGER", "/manager/validation");
+  await expect(validation.page.locator("tbody tr")).toHaveCount(10);
+  await validation.page.getByRole("button", { name: "Sau", exact: true }).click();
+  await expect(validation.page.getByText("Trang 2/4", { exact: true })).toBeVisible();
+  await validation.page.getByRole("combobox", { name: "Lọc chủ đề kiểm định" }).click();
+  await validation.page.getByRole("option", { name: "Động học", exact: true }).click();
+  await expect(validation.page.getByText("Trang 1/2", { exact: true })).toBeVisible();
+  await validation.page.getByRole("combobox", { name: "Lọc trạng thái kiểm định" }).click();
+  await validation.page.getByRole("option", { name: "Không đạt", exact: true }).click();
+  await expect(validation.page.locator("tbody tr")).toHaveCount(7);
+  await validation.page.getByLabel("Kiểm định từ ngày", { exact: true }).fill("2026-11-10");
+  await validation.page.getByLabel("Kiểm định đến ngày", { exact: true }).fill("2026-11-30");
+  await expect(validation.page.locator("tbody tr")).toHaveCount(3);
+  await expect(validation.page.getByText("3 lần chạy phù hợp bộ lọc", { exact: true })).toBeVisible();
+  await validation.page.screenshot({ path: path.join(outDir, "manager-validation-filters.png"), fullPage: true, animations: "disabled" });
+  await validation.page.getByRole("button", { name: "Xóa bộ lọc", exact: true }).click();
+  await expect(validation.page.locator("tbody tr")).toHaveCount(10);
+  await expect(validation.page.getByText("37 lần chạy", { exact: true })).toBeVisible();
+  assert.equal(validation.errors.length, 0, validation.errors.join("\n"));
+  results.push("Manager validation: server filters combine topic status and dates, reset pagination and clear correctly PASS");
+  await validation.context.close();
+  if (process.argv.includes("--reviewer-redesign-only")) {
+    const reviewer = await fixture("REVIEWER", "/");
+    let reports = Array.from({ length: 23 }, (_, index) => ({ id: String(index + 1).padStart(8, "0") + "-fixture", kind: "COMPLAINT", senderId: 100 + index, senderName: "Teacher " + (index + 1), senderEmail: "teacher" + (index + 1) + "@test.invalid", subject: "Báo lỗi mô phỏng " + (index + 1), content: (index === 22 ? "Nội dung đầy đủ. ".repeat(200) + "END FULL REPORT" : "Nội dung ngắn") + "\n— Đề bài —\nĐề bài vật lý\n— Thông số đang dùng —\ny0 = 28; vx = 6; g = 9.8", status: ["OPEN", "READ", "RESOLVED"][index % 3], createdAt: new Date(Date.UTC(2026, 10, index + 1, 8)).toISOString(), adminResponse: index % 3 === 2 ? "Đã kiểm tra kết quả." : null }));
+    await reviewer.context.route("**/api/support/complaints/review**", async route => {
+      const api = new URL(route.request().url()).pathname;
+      if (route.request().method() === "PUT") { const request = route.request().postDataJSON(); const id = api.split("/").at(-1); reports = reports.map(item => item.id === id ? { ...item, status: request.status, adminResponse: request.response || item.adminResponse, responderName: "Reviewer", respondedAt: new Date().toISOString() } : item); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(reports.find(item => item.id === id)) }); }
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(reports) });
+    });
+    let versions = [{ id: "schema-old", schemaId: "ac_model", version: "1.0", name: "Dòng điện xoay chiều", topic: "AC", lifecycleStatus: "APPROVED", createdAt: "2026-09-29T10:00:00Z", definition: { grade: 12 } }, { id: "schema-new", schemaId: "ac_model", version: "1.1", name: "Dòng điện xoay chiều", topic: "AC", lifecycleStatus: "DRAFT", createdAt: "2026-11-19T10:00:00Z", definition: { grade: 12 } }];
+    await reviewer.context.route("**/api/reviewer/schemas", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(versions) }));
+    await reviewer.context.route("**/api/reviewer/schema-versions/*/lifecycle?*", route => { const parsed = new URL(route.request().url()), id = parsed.pathname.split("/").at(-2); versions = versions.map(item => ({ ...item, lifecycleStatus: item.id === id ? "APPROVED" : item.schemaId === "ac_model" && item.lifecycleStatus === "APPROVED" ? "RETIRED" : item.lifecycleStatus })); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(versions.find(item => item.id === id)) }); });
+    await navigate(reviewer.page, "/reviewer/complaints");
+    const table = reviewer.page.getByRole("region", { name: "Danh sách khiếu nại Reviewer", exact: true });
+    await expect(table.locator("tbody tr")).toHaveCount(5);
+    await expect(table.locator("tbody tr").first()).toContainText("Teacher 23");
+    const heights = await table.locator("tbody tr").evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
+    assert.ok(Math.max(...heights) - Math.min(...heights) < 2);
+    await reviewer.page.screenshot({ path: path.join(outDir, "reviewer-complaints-table.png"), fullPage: true });
+    await table.locator("tbody tr").first().getByRole("button", { name: "Xử lý", exact: true }).click();
+    const dialog = reviewer.page.getByRole("dialog", { name: "Xử lý khiếu nại mô phỏng", exact: true });
+    await expect(dialog).toContainText("END FULL REPORT");
+    await dialog.getByRole("button", { name: "Hoàn tất xử lý", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText("Hãy nhập phản hồi");
+    await dialog.locator("summary").click(); await expect(dialog.getByText(/y0 = 28; vx = 6/)).toBeVisible();
+    await dialog.getByLabel("Kết quả kiểm tra và hướng xử lý", { exact: true }).fill("Đã kiểm tra đầy đủ. Vui lòng thử lại mô phỏng.");
+    await dialog.getByRole("button", { name: "Gửi phản hồi", exact: true }).click();
+    await expect(dialog.getByText("Đã kiểm tra đầy đủ. Vui lòng thử lại mô phỏng.", { exact: true })).toBeVisible();
+    await reviewer.page.screenshot({ path: path.join(outDir, "reviewer-complaint-dialog.png"), fullPage: true });
+    await dialog.getByRole("button", { name: "Hoàn tất xử lý", exact: true }).click(); await expect(dialog).toHaveCount(0);
+    await expect(table.locator("tbody")).not.toContainText("Teacher 23");
+    await reviewer.page.getByRole("combobox", { name: "Số khiếu nại Reviewer mỗi trang", exact: true }).click(); await reviewer.page.getByRole("option", { name: "10", exact: true }).click();
+    await expect(table.locator("tbody tr")).toHaveCount(10);
+    await reviewer.page.getByLabel("Reviewer khiếu nại từ ngày", { exact: true }).fill("2026-11-10"); await reviewer.page.getByLabel("Reviewer khiếu nại đến ngày", { exact: true }).fill("2026-11-15");
+    await expect(table.locator("tbody tr")).toHaveCount(4);
+    await reviewer.page.getByRole("button", { name: "Xóa bộ lọc", exact: true }).click();
+    await reviewer.page.getByRole("radio", { name: /Đã giải quyết/ }).click();
+    await table.locator("tbody tr").first().getByRole("button", { name: "Xem chi tiết", exact: true }).click(); await expect(dialog.getByRole("textbox")).toHaveCount(0); await dialog.getByRole("button", { name: "Đóng chi tiết khiếu nại", exact: true }).click();
+    await navigate(reviewer.page, "/reviewer/topics");
+    await reviewer.page.getByRole("row").filter({ hasText: "v1.1" }).getByRole("button", { name: "Thao tác với Dòng điện xoay chiều", exact: true }).click(); await reviewer.page.getByRole("menuitem", { name: "Phê duyệt", exact: true }).click();
+    const publish = reviewer.page.getByRole("dialog", { name: "Phê duyệt phiên bản?", exact: true }); await expect(publish).toContainText("Ngừng dùng"); await publish.getByRole("button", { name: "Phê duyệt", exact: true }).click(); await expect(publish).toHaveCount(0);
+    await expect(reviewer.page.getByRole("row").filter({ hasText: "v1.0" })).toContainText("Ngừng sử dụng"); await expect(reviewer.page.getByRole("row").filter({ hasText: "v1.1" })).toContainText(/Đang (sử dụng|dùng)/);
+    await reviewer.page.screenshot({ path: path.join(outDir, "reviewer-schema-versions.png"), fullPage: true }); assert.equal(reviewer.errors.length, 0, reviewer.errors.join("\n")); await reviewer.context.close();
+    const manager = await fixture("MANAGER", "/manager/curriculum"); await expect(manager.page.getByRole("heading", { name: "Chương trình học", exact: true })).toBeVisible(); await expect(manager.page.getByRole("button", { name: "Thêm nội dung", exact: true })).toHaveCount(0); await expect(manager.page.getByRole("dialog")).toHaveCount(0); assert.equal(manager.errors.length, 0); await manager.context.close();
+    results.push("Reviewer complaints: uniform rows, full scrollable detail, response validation and resolution, date filters, pagination, automatic old-version retirement UI; Manager curriculum add removed PASS");
+  }
+  if (process.argv.includes("--gradebook-pages-only") || process.argv.includes("--gradebook-layout-only")) {
+    for (const role of ["SCHOOL", "STAFF"]) {
+      const check = await fixture(role, role === "STAFF" ? "/lab/classes" : "/school/classes/" + classrooms[0].id, false, true, false, false, role === "STAFF");
+      const base = gradebookFixture();
+      base.assignments = Array.from({ length: 1000 }, (_, index) => ({ ...base.assignments[0], id: "test-" + index, title: "Physics assignment " + String(index + 1).padStart(4, "0") + " " + "A detailed scenario. ".repeat(12), assignedAt: new Date(Date.UTC(2026, 10 - Math.floor(index / 20), 15)).toISOString() }));
+      base.students = Array.from({ length: 32 }, (_, index) => ({ ...base.students[1], id: index + 1, fullName: "Student " + String(index + 1).padStart(2, "0"), email: "student" + (index + 1) + "@test.invalid", current: index < 30, cells: base.assignments.map(lesson => ({ ...base.students[1].cells[0], assignmentId: lesson.id, state: lesson.id === "test-0" && index !== 0 ? "NOT_ASSIGNED" : "TEACHER_CONFIRMED" })) }));
+      await check.context.route("**/api/**/grades/page?*", route => { const parsed = new URL(route.request().url()); check.requests.push(parsed.pathname + parsed.search); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(pageGradebook(base, parsed)) }); });
+      await navigate(check.page, role === "STAFF" ? "/lab/classes/" + classrooms[0].id + "?tab=grades" : "/school/classes/" + classrooms[0].id + "?view=grades");
+      const panel = check.page.getByRole("region", { name: "Bảng điểm lớp học", exact: true });
+      const table = check.page.getByRole("region", { name: "Bảng điểm lớp học có phân trang", exact: true });
+      await expect(table.locator("tbody tr")).toHaveCount(5);
+      const columnCount = await table.locator("thead th").count();
+      assert.ok(columnCount >= 2 && columnCount <= 6);
+      assert.ok(await table.evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Gradebook must fit without horizontal clipping");
+      const title = table.locator("thead strong").first(); await title.hover();
+      await expect(check.page.getByRole("tooltip")).toContainText("Physics assignment 0001"); await check.page.mouse.move(0, 0);
+      await panel.getByRole("button", { name: "Bài tiếp", exact: true }).click();
+      await expect(table.locator("thead th").nth(1)).not.toContainText("0001");
+      await panel.getByRole("button", { name: "Sau", exact: true }).click();
+      await expect(panel.getByText("Trang học sinh 2/6", { exact: true })).toBeVisible();
+      await panel.getByLabel("Ngày giao từ", { exact: true }).fill("2026-11-01"); await panel.getByLabel("Ngày giao đến", { exact: true }).fill("2026-11-30");
+      await expect(panel.getByText("Trang học sinh 1/6", { exact: true })).toBeVisible();
+      await expect.poll(() => check.requests.filter(item => item.includes("/grades/page?")).at(-1)).toContain("from=2026-11-01");
+      await panel.getByRole("textbox", { name: "Tìm bài tập trong bảng điểm", exact: true }).fill("0001");
+      await expect(table.locator("thead th")).toHaveCount(2);
+      await panel.getByRole("combobox", { name: "Lọc bài tập", exact: true }).click();
+      await check.page.getByRole("option", { name: base.assignments[0].title, exact: true }).click();
+      await expect(table.locator("tbody tr")).toHaveCount(1);
+      await expect(table.locator("tbody")).toContainText("Student 01");
+      await panel.getByRole("button", { name: "Xóa bộ lọc", exact: true }).click();
+      await expect(table.locator("tbody tr")).toHaveCount(5);
+      await expect(panel.getByRole("group", { name: "Phân trang bài tập", exact: true })).toContainText("1000");
+      await panel.getByRole("combobox", { name: "Số học sinh mỗi trang trong bảng điểm", exact: true }).click(); await check.page.getByRole("option", { name: "10", exact: true }).click();
+      await expect(table.locator("tbody tr")).toHaveCount(10);
+      await check.page.evaluate(() => { window.scrollTo(0, 0); document.querySelectorAll("main, .teacher-area__content").forEach(el => { el.scrollTop = 0; }); });
+      await check.page.screenshot({ path: path.join(outDir, role.toLowerCase() + "-gradebook-pages.png"), fullPage: true, animations: "disabled" });
+      await check.page.setViewportSize({ width: 390, height: 844 });
+      await expect(table.locator("thead th")).toHaveCount(2);
+      assert.ok(await table.evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Mobile table must fit fully");
+      assert.ok(await panel.evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Mobile filters must fit fully");
+      await check.page.evaluate(() => { window.scrollTo(0, 0); document.querySelectorAll("main, .teacher-area__content").forEach(el => { el.scrollTop = 0; }); });
+      await check.page.screenshot({ path: path.join(outDir, role.toLowerCase() + "-gradebook-mobile.png"), fullPage: true, animations: "disabled" });
+      await panel.getByLabel("Ngày giao từ", { exact: true }).fill("2026-11-30"); await panel.getByLabel("Ngày giao đến", { exact: true }).fill("2026-11-01");
+      await expect(panel.getByRole("alert")).toContainText("Từ ngày phải trước");
+      assert.equal(check.errors.length, 0, check.errors.join("\n")); await check.context.close();
+    }
+    results.push("School and Teacher: 1000 assignment fixture, bounded columns, independent student/assignment pagination, sent-date/title filters, individual recipient, mobile fit PASS");
+  }
+  if (process.argv.includes("--deadline-only")) {
+    const learner = await fixture("STUDENT", "/student/assignments");
+    const common = { libraryItemId: "fixture", specificationId: "fixture", questions: { activityType: "PREDICT_OBSERVE_EXPLAIN", prompt: "Predict" }, studentIds: [102], status: "ACTIVE", assignedAt: "2026-11-01T10:00:00Z", dueAt: "2020-01-01T10:00:00Z", maxScore: 10 };
+    await learner.context.route("**/api/assignments/mine/student", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+      { ...common, id: "strict", title: "Strict deadline work", allowLateSubmission: false, gradingStatus: "MISSED_DEADLINE", score: 0 },
+      { ...common, id: "late", title: "Late permitted work", allowLateSubmission: true },
+    ]) }));
+    await learner.page.reload();
+    await expect(learner.page.getByRole("button", { name: "Nộp muộn: Late permitted work", exact: true })).toBeVisible();
+    await learner.page.getByRole("radio", { name: /Quá hạn/ }).click();
+    await expect(learner.page.getByText("Quá hạn · 0 điểm", { exact: true })).toBeVisible();
+    await learner.page.getByRole("button", { name: "Xem kết quả: Strict deadline work", exact: true }).click();
+    await expect(learner.page.getByText(/Bạn chưa nộp bài hoàn chỉnh nên được ghi nhận 0/)).toBeVisible();
+    await expect(learner.page.getByRole("button", { name: "Nộp bài", exact: true })).toHaveCount(0);
+    await expect(learner.page.getByRole("button", { name: /Gửi dự đoán/ })).toHaveCount(0);
+    await learner.page.screenshot({ path: path.join(outDir, "student-missed-deadline.png"), fullPage: true });
+    await learner.context.close();
+    const teacher = await fixture("STAFF", "/assignments/workspace?classId=" + classrooms[0].id, false, true, false, false, true);
+    await teacher.page.locator("#assignment-library-item").click();
+    await teacher.page.getByRole("option", { name: "Fixture simulation", exact: true }).click();
+    await teacher.page.locator("#assignment-prompt").fill("Predict then explain");
+    await teacher.page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
+    const late = teacher.page.getByRole("checkbox", { name: "Cho phép nộp trễ", exact: true });
+    await expect(late).not.toBeChecked(); await expect(late).toBeDisabled();
+    await teacher.page.locator("#assignment-due-at").fill("2030-12-01T10:00");
+    await expect(late).toBeEnabled();
+    await expect(teacher.page.getByText(/Học sinh chưa nộp bài hoàn chỉnh được ghi nhận 0 điểm/)).toBeVisible();
+    await late.check();
+    await teacher.page.screenshot({ path: path.join(outDir, "teacher-late-policy.png"), fullPage: true });
+    await teacher.page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
+    await teacher.page.getByRole("button", { name: "Giao bài cho cả lớp", exact: true }).click();
+    await expect.poll(() => teacher.writes.some(item => item.api === "/api/assignments")).toBe(true);
+    assert.equal(teacher.writes.find(item => item.api === "/api/assignments").body.allowLateSubmission, true);
+    assert.equal(teacher.errors.length, 0); await teacher.context.close();
+    results.push("Deadlines: student cannot submit strict overdue work, zero result visible, late work remains available, teacher setting reaches create API PASS");
+  }
+  if (process.argv.includes("--complaint-dates-only")) {
+    const complaints = await fixture("STAFF", "/lab/complaints", false, false, false, false, false, true);
+    const complaintTable = complaints.page.getByRole("region", { name: "Danh sách khiếu nại có thể cuộn", exact: true });
+    await expect(complaintTable.locator("tbody tr")).toHaveCount(10);
+    await expect(complaintTable.locator("tbody tr").first()).toContainText("Báo lỗi 23");
+    const heights = await complaintTable.locator("tbody tr").evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
+    assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, "Complaint summaries should use consistent row heights");
+    await complaints.page.screenshot({ path: path.join(outDir, "teacher-complaints-table-dates.png"), fullPage: true });
+    await complaintTable.locator("tbody tr").first().getByRole("button", { name: "Xem chi tiết", exact: true }).click();
+    const complaintDialog = complaints.page.getByRole("dialog", { name: "Chi tiết khiếu nại", exact: true });
+    await expect(complaintDialog.getByText(/END FULL COMPLAINT/)).toBeAttached();
+    await expect(complaintDialog.getByText(/v = 15 m\/s/)).toBeAttached();
+    await expect(complaintDialog.getByText("Phản hồi đầy đủ", { exact: true })).toBeAttached();
+    await complaints.page.screenshot({ path: path.join(outDir, "teacher-complaints-full-detail.png"), fullPage: true });
+    await complaints.page.keyboard.press("Escape");
+    await complaints.page.getByRole("button", { name: "Sau", exact: true }).click();
+    await expect(complaintTable.locator("tbody tr").first()).toContainText("Báo lỗi 13");
+    await complaints.page.getByLabel("Khiếu nại từ ngày", { exact: true }).fill("2026-11-10");
+    await complaints.page.getByLabel("Khiếu nại đến ngày", { exact: true }).fill("2026-11-12");
+    await expect(complaintTable.locator("tbody tr")).toHaveCount(3);
+    await complaints.page.getByRole("combobox", { name: "Trạng thái khiếu nại", exact: true }).click();
+    await complaints.page.getByRole("option", { name: "Chờ xử lý", exact: true }).click();
+    await expect(complaintTable.locator("tbody tr")).toHaveCount(1);
+    await expect(complaintTable).toContainText("Báo lỗi 10");
+    await complaints.page.getByRole("button", { name: "Xóa bộ lọc", exact: true }).click();
+    await expect(complaintTable.locator("tbody tr")).toHaveCount(10);
+    await complaints.page.getByRole("combobox", { name: "Số khiếu nại mỗi trang", exact: true }).click();
+    await complaints.page.getByRole("option", { name: "25", exact: true }).click();
+    await expect(complaintTable.locator("tbody tr")).toHaveCount(23);
+    assert.equal(complaints.errors.length, 0, complaints.errors.join("\n"));
+    await complaints.context.close();
+    const schoolDates = await fixture("SCHOOL", "/school/appeals", false, false, false, false, false, true);
+    await expect(schoolDates.page.locator("tbody tr")).toHaveCount(10);
+    await schoolDates.page.getByRole("button", { name: "Sau", exact: true }).click();
+    await expect(schoolDates.page.getByText("Trang 2/3", { exact: true })).toBeVisible();
+    await schoolDates.page.getByLabel("Yêu cầu từ ngày", { exact: true }).fill("2026-11-10");
+    await schoolDates.page.getByLabel("Yêu cầu đến ngày", { exact: true }).fill("2026-11-12");
+    await expect(schoolDates.page.locator("tbody tr")).toHaveCount(3);
+    await expect(schoolDates.page.getByText("Trang 1/1", { exact: true })).toBeVisible();
+    await schoolDates.page.getByRole("combobox", { name: "Trạng thái", exact: true }).click();
+    await schoolDates.page.getByRole("option", { name: "Đã hoàn tất", exact: true }).click();
+    await expect(schoolDates.page.locator("tbody tr")).toHaveCount(2);
+    await schoolDates.page.screenshot({ path: path.join(outDir, "school-appeals-date-filters.png"), fullPage: true });
+    assert.ok(schoolDates.requests.some(request => request.includes("from=2026-11-10") && request.includes("to=2026-11-12") && request.includes("status=DONE")));
+    await schoolDates.page.getByRole("button", { name: "Xóa bộ lọc", exact: true }).click();
+    await expect(schoolDates.page.locator("tbody tr")).toHaveCount(10);
+    await schoolDates.page.getByRole("combobox", { name: "Số yêu cầu mỗi trang", exact: true }).click();
+    await schoolDates.page.getByRole("option", { name: "25", exact: true }).click();
+    await expect(schoolDates.page.locator("tbody tr")).toHaveCount(23);
+    assert.equal(schoolDates.errors.length, 0, schoolDates.errors.join("\n"));
+    await schoolDates.context.close();
+    results.push("Teacher and school complaints: uniform table, complete detail, combined sent-date/status filters, reset and pagination PASS");
+  }
+  if (process.argv.includes("--teacher-classes-only")) {
+    const teaching = await fixture("STAFF", "/lab/classes", false, true, false, false, true);
+    await expect(teaching.page.getByRole("heading", { name: "Lớp phụ trách", exact: true })).toBeVisible();
+    await expect(teaching.page.locator("tbody tr")).toHaveCount(2);
+    await teaching.page.screenshot({ path: path.join(outDir, "teacher-class-list.png"), fullPage: true });
+    await teaching.page.getByRole("row").filter({ hasText: "Class 01" }).getByRole("link", { name: "Xem lớp", exact: true }).click();
+    await expect(teaching.page.getByText("student1@test.invalid", { exact: true })).toBeVisible();
+    await expect(teaching.page.locator("tbody tr")).toHaveCount(3);
+    await teaching.page.screenshot({ path: path.join(outDir, "teacher-class-students.png"), fullPage: true });
+    await teaching.page.getByRole("tab", { name: "Bài đã giao & chấm điểm", exact: true }).click();
+    await expect(teaching.page.getByRole("combobox", { name: "Chọn bài tập của lớp", exact: true })).toHaveText("Fixture assignment");
+    await expect(teaching.page.getByText("Other class assignment", { exact: true })).toHaveCount(0);
+    await teaching.page.screenshot({ path: path.join(outDir, "teacher-assignment-redesign.png"), fullPage: true });
+    await teaching.page.getByRole("group", { name: "Lọc bài nộp của lớp", exact: true }).getByRole("button", { name: "Chưa nộp", exact: false }).click();
+    await expect(teaching.page.locator("tbody tr")).toHaveCount(2);
+    await teaching.page.getByRole("group", { name: "Lọc bài nộp của lớp", exact: true }).getByRole("button", { name: "Đã nộp", exact: false }).click();
+    await expect(teaching.page.locator("tbody tr")).toHaveCount(2);
+    await teaching.page.getByRole("group", { name: "Lọc bài nộp của lớp", exact: true }).getByRole("button", { name: "Tất cả", exact: false }).click();
+    await teaching.page.getByRole("searchbox", { name: "Tìm học sinh để chấm", exact: true }).fill("Student 01");
+    await expect(teaching.page.locator("tbody tr")).toHaveCount(1);
+    const csvDownload = teaching.page.waitForEvent("download");
+    await teaching.page.getByRole("button", { name: "Xuất điểm CSV", exact: true }).click();
+    const downloaded = await csvDownload;
+    assert.equal(downloaded.suggestedFilename(), "diem-Fixture-assignment.csv");
+    const csvText = await readFile(await downloaded.path(), "utf8");
+    assert.ok(csvText.includes("Student 03")); assert.ok(csvText.includes("Former student,0"));
+    await expect(teaching.page.getByRole("status")).toContainText("Đã xuất điểm CSV");
+    teaching.failNext("/api/assignments/assignment-1/grades.csv");
+    await teaching.page.getByRole("button", { name: "Xuất điểm CSV", exact: true }).click();
+    await expect(teaching.page.getByRole("alert")).toContainText("Không thể xuất điểm CSV");
+    await expect(teaching.page.getByRole("button", { name: "Xuất điểm CSV", exact: true })).toBeEnabled();
+    await teaching.page.getByRole("searchbox", { name: "Tìm học sinh để chấm", exact: true }).fill("");
+    await teaching.page.getByRole("button", { name: "Sửa điểm", exact: true }).click();
+    const classGradeDialog = teaching.page.getByRole("dialog", { name: "Bài làm của Student 01", exact: true });
+    await classGradeDialog.getByLabel("Điểm", { exact: true }).fill("9");
+    await classGradeDialog.getByLabel(/Lý do thay đổi/).fill("Reviewed in the class workspace");
+    await teaching.page.screenshot({ path: path.join(outDir, "teacher-class-grading.png"), fullPage: true });
+    await classGradeDialog.getByRole("button", { name: "Xác nhận điểm", exact: true }).click();
+    await expect(teaching.page.getByText("9/10", { exact: true })).toBeVisible();
+    await teaching.page.getByRole("tab", { name: "Bảng điểm", exact: true }).click();
+    await teaching.page.getByRole("button", { name: "Student 01 - Fixture assignment: 9/10", exact: true }).click();
+    const resultDialog = teaching.page.getByRole("dialog", { name: "Chi tiết kết quả học tập", exact: true });
+    await expect(resultDialog.getByRole("region", { name: "Lịch sử chấm và sửa điểm", exact: true })).toContainText("Reviewed in the class workspace");
+    await resultDialog.getByRole("button", { name: "Xem bài nộp và chấm", exact: true }).click();
+    await expect(teaching.page.locator("tbody tr")).toHaveCount(1);
+    await expect(teaching.page.getByText("9/10", { exact: true })).toBeVisible();
+    await teaching.page.getByRole("link", { name: "Giao bài cho lớp này", exact: true }).click();
+    await expect(teaching.page).toHaveURL(new RegExp("classId=" + classrooms[0].id));
+    await expect(teaching.page.locator("#assignment-class")).toContainText("Class 01");
+    await expect(teaching.page.getByRole("combobox", { name: "Lọc theo lớp", exact: true })).toContainText("Class 01");
+    await expect(teaching.page.getByText("Other class assignment", { exact: true })).toHaveCount(0);
+    await teaching.page.locator("#assignment-library-item").click();
+    await teaching.page.getByRole("option", { name: "Fixture simulation", exact: true }).click();
+    await teaching.page.locator("#assignment-prompt").fill("Predict the outcome then explain it.");
+    await teaching.page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
+    await expect(teaching.page.locator("#assignment-class")).toBeVisible();
+    await expect(teaching.page.locator("#assignment-class")).toContainText("Class 01");
+    await teaching.page.screenshot({ path: path.join(outDir, "teacher-class-assignment.png"), fullPage: true });
+    await teaching.page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
+    await teaching.page.getByRole("button", { name: "Giao bài cho cả lớp", exact: true }).click();
+    await expect.poll(() => teaching.writes.filter(item => item.api === "/api/assignments").length).toBe(1);
+    const creation = teaching.writes.find(item => item.api === "/api/assignments");
+    assert.equal(creation.body.classId, classrooms[0].id); assert.deepEqual(creation.body.studentIds, [1, 2, 3]);
+    await navigate(teaching.page, "/lab/classes/" + classrooms[1].id + "?tab=assignments");
+    await expect(teaching.page.getByRole("combobox", { name: "Chọn bài tập của lớp", exact: true })).toHaveText("Other class assignment");
+    await expect(teaching.page.getByText("Fixture assignment", { exact: true })).toHaveCount(0);
+    await navigate(teaching.page, "/lab/classes/" + classrooms[0].id);
+    await teaching.page.setViewportSize({ width: 390, height: 844 });
+    await expect(teaching.page.getByText("student1@test.invalid", { exact: true })).toBeVisible();
+    assert.ok(await teaching.page.locator(".teacher-area__content").evaluate(element => element.scrollWidth <= element.clientWidth + 1), "The class workspace must fit mobile without whole-page horizontal scrolling");
+    await teaching.page.screenshot({ path: path.join(outDir, "teacher-class-mobile.png"), fullPage: true });
+    await navigate(teaching.page, "/lab/classes/not-assigned");
+    await expect(teaching.page.getByRole("heading", { name: "Không truy cập được lớp", exact: true })).toBeVisible();
+    assert.equal(teaching.errors.length, 0, teaching.errors.join("\n"));
+    results.push("Teacher classes: scoped rosters, per-class assignments, grading history, gradebook and preselected class creation PASS");
+    await teaching.context.close();
+  }
+  if (!process.argv.includes("--reviewer-redesign-only") && !process.argv.includes("--gradebook-pages-only") && !process.argv.includes("--deadline-only") && !process.argv.includes("--gradebook-layout-only") && !process.argv.includes("--validation-only") && !process.argv.includes("--teacher-classes-only") && !process.argv.includes("--complaint-dates-only")) {
   const manager = await fixture("MANAGER", "/manager/users");
   const { page, requests } = manager;
   await expect(page.getByText("Student 01", { exact: true })).toBeVisible();
@@ -550,6 +872,7 @@ try {
   assert.equal(schoolAccountList.errors.length, 0, schoolAccountList.errors.join("\n"));
   results.push("School account list: school role is visible and read-only; birth date is absent PASS");
   await schoolAccountList.context.close();
+  }
   console.log(results.join("\n"));
   const main = chunks.find(chunk => chunk.file.match(/assets\/index-[^/]+\.js/) && chunk.modules.includes("main.tsx"));
   const studentChunk = chunks.find(chunk => chunk.modules.includes("features/assignments/pages/StudentAssignments.tsx"));
