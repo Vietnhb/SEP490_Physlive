@@ -71,6 +71,7 @@ public class SecurityConfig {
                 .requestMatchers(POST, "/api/admin/users").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers(PUT, "/api/admin/users/**").hasAnyRole(ADMIN, MANAGER)
                 .requestMatchers(POST, "/api/admin/users/*/reset-password").hasAnyRole(ADMIN, MANAGER)
+                .requestMatchers(POST, "/api/admin/curriculum/**").denyAll()
                 .requestMatchers("/api/admin/**").hasRole(MANAGER)
                 .requestMatchers("/api/user/students").hasAnyRole(STAFF, MANAGER)
                 .requestMatchers("/api/schools/*/activate", "/api/schools/*/deactivate").hasRole(MANAGER)
@@ -92,6 +93,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/support/**").hasAnyRole(APPLICATION_ROLES)
                 .requestMatchers("/api/school/billing", "/api/school/billing/**").hasRole(SCHOOL)
                 // Match assignment actions before the broader shared reads.
+                .requestMatchers(GET, "/api/assignments/mine/teacher/classes/*/grades", "/api/assignments/mine/teacher/classes/*/grades/page").hasRole(STAFF)
+                .requestMatchers(GET, "/api/assignments/*/grades.csv").hasRole(STAFF)
                 .requestMatchers(GET, "/api/assignments/*/submissions/*/grade-history").hasAnyRole(SCHOOL, STAFF, MANAGER)
                 .requestMatchers("/api/assignments/mine/teacher", "/api/assignments/mine/teacher/classes",
                     "/api/assignments/*/submissions", "/api/assignments/*/report",

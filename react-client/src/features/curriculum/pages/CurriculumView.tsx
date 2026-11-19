@@ -1,15 +1,14 @@
 import { useResource } from "../../../shared/hooks/operationsData";
-import { useState, type FormEvent } from "react";
-import { Badge, Button, Callout, Dialog, Select, Switch, TextField } from "@radix-ui/themes";
-import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
-import { createCurriculumNode, toggleCurriculum, type CurriculumTree, type CurriculumTopic, type CurriculumModule } from "../api/curriculumApi";
+import { useState } from "react";
+import { Badge, Button, Callout, Select, Switch, TextField } from "@radix-ui/themes";
+import { ChevronDownIcon, ChevronRightIcon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { toggleCurriculum, type CurriculumTree, type CurriculumTopic, type CurriculumModule } from "../api/curriculumApi";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { topicLabel } from "../../../shared/lib/topicLabel";
 import type { LocalizedName } from "../../../shared/types/localization";
-import { curriculumParentOptions, curriculumPath, type CurriculumKind } from "../model/curriculumUtils";
+import { type CurriculumKind } from "../model/curriculumUtils";
 import { extractGradeNumber, formatTopicCode, formatGradeCode, formatLessonCode } from "../model/curriculumCodeGenerator";
-import { PageHeader, Loading, ErrorNotice, FormField } from "../../../shared/ui/ManagementUI";
-import modal from "../../../shared/ui/ModalScroll.module.css";
+import { PageHeader, Loading, ErrorNotice } from "../../../shared/ui/ManagementUI";
 import s from "./CurriculumView.module.css";
 import { compareCodeUnits } from "../../../shared/lib/compareText";
 import RefreshButton from "../../../shared/ui/RefreshButton";
@@ -25,31 +24,12 @@ export function CurriculumView() {
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
   const [grade, setGrade] = useState("ALL");
-  const [showCreate, setShowCreate] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [name, setName] = useState("");
-  const [viName, setViName] = useState("");
-  const [kind, setKind] = useState<CurriculumKind>("topic");
-  const [parentId, setParentId] = useState("");
-
   const curriculumResource = useResource<CurriculumTree>("/admin/curriculum", true);
   const tree = curriculumResource.data ?? null;
   const setTree = curriculumResource.setData;
   const loading = curriculumResource.loading;
   const error = actionError || curriculumResource.error || "";
   const load = () => { setError(""); return curriculumResource.refresh(); };
-  const create = async (event: FormEvent) => {
-    event.preventDefault();
-    if (busy || !name.trim() || (kind === "topic" ? !viName.trim() : !parentId)) return;
-    setBusy(true); setFormError(""); setNotice("");
-    try {
-      setTree(await createCurriculumNode(curriculumPath(kind, parentId), { name: kind === "topic" ? { en: name.trim(), vi: viName.trim() } : name.trim() }));
-      setShowCreate(false); setName(""); setViName(""); setParentId("");
-      setNotice("Đã thêm nội dung vào chương trình học.");
-    } catch (e) { setFormError(apiMessage(e, "Không thể tạo mục chương trình học mới.")); }
-    finally { setBusy(false); }
-  };
-
   const toggle = async (type: CurriculumKind, id: string) => {
     if (busy) return;
     setBusy(true); setError(""); setNotice("");
@@ -63,11 +43,10 @@ export function CurriculumView() {
   const visibleTopics = topics.filter(({ topic, code }) => topic.modules.some(module => filterLevels(module, topic, code, search, grade).length || (grade === "ALL" && matches(search, topic.name, code, module.name))) || (grade === "ALL" && matches(search, topic.name, code)));
   const selected = visibleTopics.find(({ topic }) => topic.id === selectedId) ?? visibleTopics[0];
   const grades = [...new Set(topics.flatMap(({ topic }) => topic.modules.flatMap(module => module.levels.map(level => extractGradeNumber(level.name)))))].sort(compareCodeUnits);
-  const parentOptions = curriculumParentOptions(kind, tree);
 
   return <div className="admin-content">
     <PageHeader title="Chương trình học" description="Tra cứu và quản lý chủ đề, chương và bài học."
-      action={<div className={s.headerActions}><RefreshButton onClick={() => void load()} disabled={loading || busy} /><Button disabled={loading || busy} onClick={() => { setFormError(""); setShowCreate(true); }}><PlusIcon />Thêm nội dung</Button></div>} />
+      action={<div className={s.headerActions}><RefreshButton onClick={() => void load()} disabled={loading || busy} /></div>} />
     {error && <ErrorNotice error={error} onRetry={() => void load()} />}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {loading && !tree ? <Loading text="Đang tải chương trình học…" /> : <section className={s.workspace} aria-label="Danh mục chương trình học" aria-busy={loading}>
@@ -91,23 +70,13 @@ export function CurriculumView() {
                 if (!levels.length && (grade !== "ALL" || (search && !matches(search, selected.topic.name, selected.code, module.name)))) return null;
                 return <Chapter key={JSON.stringify([module.id, search, grade])} module={module} levels={levels} index={index} searching={!!search || grade !== "ALL"} busy={busy} onToggle={toggle} />;
               })}
-              {!selected.topic.modules.length && <div className={s.empty}>Chủ đề này chưa có chương. Chọn “Thêm nội dung” để tạo chương mới.</div>}
+              {!selected.topic.modules.length && <div className={s.empty}>Chủ đề này chưa có chương.</div>}
             </div>
-          </> : <div className={s.empty}><h2>{topics.length ? "Không tìm thấy nội dung" : "Chưa có chương trình học"}</h2><p>{topics.length ? "Thử từ khóa khác hoặc bỏ bộ lọc để xem toàn bộ chương trình." : "Thêm chủ đề đầu tiên để bắt đầu xây dựng chương trình."}</p>{topics.length > 0 && <Button variant="soft" onClick={() => { setQuery(""); setGrade("ALL"); }}>Xóa bộ lọc</Button>}</div>}
+          </> : <div className={s.empty}><h2>{topics.length ? "Không tìm thấy nội dung" : "Chưa có chương trình học"}</h2><p>{topics.length ? "Thử từ khóa khác hoặc bỏ bộ lọc để xem toàn bộ chương trình." : "Nội dung chương trình chưa được thiết lập."}</p>{topics.length > 0 && <Button variant="soft" onClick={() => { setQuery(""); setGrade("ALL"); }}>Xóa bộ lọc</Button>}</div>}
         </div>
       </div>
     </section>}
-    <Dialog.Root open={showCreate} onOpenChange={open => { if (!busy) setShowCreate(open); }}><Dialog.Content className={modal.dialog} maxWidth="560px" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => { if (busy) event.preventDefault(); }}><div className={modal.body}>
-      <Dialog.Title>Thêm nội dung chương trình</Dialog.Title><Dialog.Description size="2" mb="5">Chọn cấp nội dung và vị trí trong chương trình học.</Dialog.Description>
-      <form className={s.form} onSubmit={create}>
-        {formError && <Callout.Root color="red" role="alert"><Callout.Text>{formError}</Callout.Text></Callout.Root>}
-        <FormField label="Cấp nội dung" htmlFor="managed-curriculum-kind"><Select.Root size="3" value={kind} disabled={busy} onValueChange={value => { setKind(value as CurriculumKind); setParentId(""); }}><Select.Trigger id="managed-curriculum-kind" /><Select.Content position="popper"><Select.Item value="topic">Môn học / Chủ đề</Select.Item><Select.Item value="module">Chương / Học phần</Select.Item><Select.Item value="level">Khối lớp</Select.Item><Select.Item value="lesson">Bài học</Select.Item></Select.Content></Select.Root></FormField>
-        {kind !== "topic" && <FormField label="Thuộc nội dung" htmlFor="managed-curriculum-parent"><Select.Root size="3" required value={parentId} disabled={busy} onValueChange={setParentId}><Select.Trigger id="managed-curriculum-parent" placeholder="Chọn nội dung cha" /><Select.Content position="popper">{parentOptions.map(item => <Select.Item key={item.id} value={item.id}>{item.label}</Select.Item>)}</Select.Content></Select.Root>{!parentOptions.length && <small>Chưa có nội dung cha. Hãy tạo cấp phía trên trước.</small>}</FormField>}
-        <FormField label={kind === "topic" ? "Tên tiếng Anh" : "Tên nội dung"} htmlFor="managed-curriculum-name"><TextField.Root id="managed-curriculum-name" size="3" required maxLength={kind === "topic" ? 80 : undefined} disabled={busy} value={name} onChange={event => setName(event.target.value)} placeholder={kind === "topic" ? "Ví dụ: Kinematics" : "Nhập tên nội dung…"} /></FormField>
-        {kind === "topic" && <FormField label="Tên tiếng Việt" htmlFor="managed-curriculum-name-vi"><TextField.Root id="managed-curriculum-name-vi" size="3" required maxLength={80} disabled={busy} value={viName} onChange={event => setViName(event.target.value)} placeholder="Ví dụ: Động học" /></FormField>}
-        <div className={s.formActions}><Button type="button" variant="soft" color="gray" disabled={busy} onClick={() => setShowCreate(false)}>Hủy</Button><Button type="submit" loading={busy} disabled={busy || !name.trim() || (kind === "topic" ? !viName.trim() : !parentId)}>Thêm nội dung</Button></div>
-      </form>
-    </div></Dialog.Content></Dialog.Root>
+
   </div>;
 }
 
