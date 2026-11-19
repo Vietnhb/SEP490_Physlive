@@ -152,7 +152,23 @@ public class AdminOperationsService {
 
     @Transactional(readOnly = true)
     public com.example.backend.common.dto.PageResponse<ValidationRow> validationPage(int page, int size) {
-        var rows = simulationRunRepository.readValidationPage(com.example.backend.common.dto.PageResponse.request(page, size,
+        return validationPage(page, size, null, "ALL", null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> validationTopics() { return simulationRunRepository.validationTopics(); }
+
+    @Transactional(readOnly = true)
+    public com.example.backend.common.dto.PageResponse<ValidationRow> validationPage(int page, int size, String topic, String status,
+            java.time.LocalDate fromDate, java.time.LocalDate toDate) {
+        String normalizedStatus = status == null ? "ALL" : status.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("ALL", "PASS", "FAIL").contains(normalizedStatus)) throw ApiException.badRequest("Trạng thái kiểm định không hợp lệ.");
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) throw ApiException.badRequest("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.");
+        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        var from = fromDate == null ? java.time.Instant.parse("1900-01-01T00:00:00Z") : fromDate.atStartOfDay(zone).toInstant();
+        var until = toDate == null ? java.time.Instant.parse("9999-12-31T00:00:00Z") : toDate.plusDays(1).atStartOfDay(zone).toInstant();
+        var rows = simulationRunRepository.readValidationPage(topic == null ? "" : topic.trim(), normalizedStatus, from, until,
+                com.example.backend.common.dto.PageResponse.request(page, size,
                 Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id"))));
         return com.example.backend.common.dto.PageResponse.from(rows.map(row -> new ValidationRow(row.getId(), row.getSubmissionId(),
                 row.getTopic(), row.getSchemaId(), row.getSchemaVersion(), row.getSolverVersion(), row.getPassed(),

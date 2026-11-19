@@ -58,11 +58,18 @@ public class AdminOperationsController {
         return service.schoolsPage(page, size);
     }
 
+    @GetMapping("/validation-runs/topics")
+    public List<String> validationTopics() { return service.validationTopics(); }
+
     @GetMapping("/validation-runs/page")
     public com.example.backend.common.dto.PageResponse<ValidationRow> validationPage(
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size) {
-        return service.validationPage(page, size);
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int size,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String topic,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "ALL") String status,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return service.validationPage(page, size, topic, status, from, to);
     }
 
     @GetMapping("/schools")

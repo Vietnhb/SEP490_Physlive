@@ -43,8 +43,23 @@ public interface SimulationRunRepository extends JpaRepository<SimulationRun, UU
                r.validationPassed as passed, case when r.validationPassed = true then 'PASS' else 'FAIL' end as status,
                r.validationError as errorMessage, r.createdAt as createdAt
         from SimulationRun r join r.simulation simulation join simulation.specification spec join spec.submission submission
+        where (:topic = '' or spec.topic = :topic)
+          and (:status = 'ALL' or (:status = 'PASS' and r.validationPassed = true) or (:status = 'FAIL' and r.validationPassed = false))
+          and r.createdAt >= :from and r.createdAt < :until
         """)
-    org.springframework.data.domain.Page<ValidationSummary> readValidationPage(org.springframework.data.domain.Pageable page);
+    org.springframework.data.domain.Page<ValidationSummary> readValidationPage(
+            @org.springframework.data.repository.query.Param("topic") String topic,
+            @org.springframework.data.repository.query.Param("status") String status,
+            @org.springframework.data.repository.query.Param("from") Instant from,
+            @org.springframework.data.repository.query.Param("until") Instant until,
+            org.springframework.data.domain.Pageable page);
+
+    default org.springframework.data.domain.Page<ValidationSummary> readValidationPage(org.springframework.data.domain.Pageable page) {
+        return readValidationPage("", "ALL", Instant.parse("1900-01-01T00:00:00Z"), Instant.parse("9999-12-31T00:00:00Z"), page);
+    }
+
+    @org.springframework.data.jpa.repository.Query("select distinct spec.topic from SimulationRun r join r.simulation simulation join simulation.specification spec where spec.topic is not null order by spec.topic")
+    java.util.List<String> validationTopics();
 
     Optional<SimulationRun> findFirstBySimulationIdOrderByCreatedAtDesc(UUID simulationId);
     Optional<SimulationRun> findFirstBySimulationIdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(
