@@ -28,9 +28,10 @@ class User {
 
   bool get isStudent => role == 'STUDENT';
   bool get isTeacher => role == 'STAFF' && permissions.contains('TEACH');
+  bool get isManager => role == 'MANAGER';
 
   /// The accounts the app is made for; everyone else manages from the web.
-  bool get usesApp => isStudent || isTeacher;
+  bool get usesApp => isStudent || isTeacher || isManager;
 
   String get roleLabel => switch (role) {
         'STUDENT' => 'Học sinh',
@@ -149,4 +150,39 @@ class LibraryItem {
   String? get schoolName => asString(json['schoolName']);
   DateTime? get createdAt => asDate(json['createdAt']);
   String get validationStatus => asString(json['validationStatus']) ?? '';
+}
+
+/// A support request (feedback, message or simulation complaint) as the operations team sees it.
+class SupportItem {
+  SupportItem(this.json);
+  final Json json;
+
+  String get id => asString(json['id']) ?? '';
+  String get kind => asString(json['kind']) ?? '';
+  String get senderName => (asString(json['senderName']) ?? '').trim().isEmpty ? senderEmail : json['senderName'].toString();
+  String get senderEmail => asString(json['senderEmail']) ?? '';
+  String get subject => asString(json['subject']) ?? '';
+  String get content => asString(json['content']) ?? '';
+  String get status => asString(json['status']) ?? 'OPEN';
+  String? get response => asString(json['adminResponse']);
+  String? get responderName => asString(json['responderName']);
+  DateTime? get createdAt => asDate(json['createdAt']);
+  DateTime? get respondedAt => asDate(json['respondedAt']);
+
+  /// Simulation complaints belong to reviewers; the operations team only reads them.
+  bool get isComplaint => kind == 'COMPLAINT';
+  bool get resolved => status == 'RESOLVED';
+
+  String get kindLabel => switch (kind) {
+        'FEEDBACK' => 'Góp ý',
+        'MESSAGE' => 'Tin nhắn',
+        'COMPLAINT' => 'Báo lỗi mô phỏng',
+        _ => kind,
+      };
+  String get statusLabel => switch (status) {
+        'OPEN' => 'Mới',
+        'READ' => 'Đang xử lý',
+        'RESOLVED' => 'Đã xong',
+        _ => status,
+      };
 }

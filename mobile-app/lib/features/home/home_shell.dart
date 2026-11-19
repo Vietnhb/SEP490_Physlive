@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/session.dart';
 import '../account/account_screens.dart';
 import '../library/library_screen.dart';
+import '../manager/manager_overview_screen.dart';
+import '../manager/manager_support_screen.dart';
 import '../student/student_assignments_screen.dart';
 import '../teacher/teacher_assignments_screen.dart';
 
@@ -20,6 +22,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final user = SessionScope.of(context).user!;
+    if (user.isManager) return _managerShell();
     final pages = [
       user.isStudent ? const StudentAssignmentsScreen() : const TeacherAssignmentsScreen(),
       const LibraryScreen(),
@@ -46,6 +49,26 @@ class _HomeShellState extends State<HomeShell> {
             selectedIcon: Icon(Icons.person_rounded),
             label: 'Tài khoản',
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Operations accounts: what needs attention now, and the support inbox. Everything else stays on the web.
+  Widget _managerShell() {
+    return Scaffold(
+      body: IndexedStack(index: _tab, children: [
+        ManagerOverviewScreen(onOpenSupport: () => setState(() => _tab = 1)),
+        const ManagerSupportScreen(),
+        const AccountScreen(),
+      ]),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (index) => setState(() => _tab = index),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Tổng quan'),
+          NavigationDestination(icon: Icon(Icons.support_agent_outlined), selectedIcon: Icon(Icons.support_agent_rounded), label: 'Hỗ trợ'),
+          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Tài khoản'),
         ],
       ),
     );

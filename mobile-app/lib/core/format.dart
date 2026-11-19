@@ -46,6 +46,14 @@ String formatTime(double seconds, double duration, {int digits = 2}) {
   return '$text ${unit.$2}';
 }
 
+/// 1250000 → "1.250.000 ₫".
+String formatVnd(num? value) {
+  if (value == null) return '—';
+  final digits = value.round().abs().toString();
+  final grouped = digits.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+  return '${value < 0 ? '−' : ''}$grouped ₫';
+}
+
 String sentenceCase(String text) => text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
 
 String _two(int value) => value.toString().padLeft(2, '0');
