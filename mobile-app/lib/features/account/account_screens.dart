@@ -84,7 +84,13 @@ class AccountScreen extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'Quản lý lớp, tạo mô phỏng bằng AI và báo cáo dùng trên bản web.',
+          user.isManager
+              ? 'Quản lý trường, tài khoản, gói, thanh toán và chương trình học trên bản web.'
+              : user.isSchool
+                  ? 'Quản lý tài khoản, lớp học, nhập dữ liệu và gia hạn gói trên bản web.'
+                  : user.isTeacher
+                      ? 'Tạo mô phỏng bằng AI, giao bài mới và báo cáo dùng trên bản web.'
+                      : 'Một số chức năng chỉ có trên bản web.',
           textAlign: TextAlign.center,
           style: TextStyle(color: p.muted, fontSize: 12),
         ),
