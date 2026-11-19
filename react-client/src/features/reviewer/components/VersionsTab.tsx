@@ -71,7 +71,7 @@ export function VersionsTab() {
           updatedVersion = response.data;
         }
       },
-      isDelete ? "Đã xoá bản nháp." : decision.status === "APPROVED" ? "Đã phê duyệt. Phiên bản này bắt đầu được sử dụng." : "Đã ngừng sử dụng phiên bản.",
+      isDelete ? "Đã xoá bản nháp." : decision.status === "APPROVED" ? "Đã phê duyệt phiên bản mới. Phiên bản cũ cùng chủ đề đã được chuyển sang ngừng dùng." : "Đã ngừng sử dụng phiên bản.",
     );
     if (ok) {
       if (isDelete) {
@@ -79,7 +79,7 @@ export function VersionsTab() {
         if (selected?.id === targetId) setSelected(null);
       } else if (updatedVersion) {
         const nextVersion = updatedVersion;
-        resource.setData(prev => (prev ?? []).map(item => item.id === targetId ? nextVersion : item));
+        resource.setData(prev => (prev ?? []).map(item => item.id === targetId ? nextVersion : decision.status === "APPROVED" && item.schemaId.toLowerCase() === nextVersion.schemaId.toLowerCase() && item.lifecycleStatus === "APPROVED" ? { ...item, lifecycleStatus: "RETIRED" } : item));
         if (selected?.id === targetId) setSelected(nextVersion);
       }
       setDecision(null);
@@ -199,6 +199,7 @@ function DecisionDialog({ decision, busy, feedback, onClose, onConfirm }: Readon
       <li>Bản nháp này sẽ bị <strong>xoá vĩnh viễn</strong> và không thể khôi phục.</li>
       <li>Các phiên bản đang dùng hoặc ngừng dùng của chủ đề không bị ảnh hưởng.</li>
     </> : isApprove ? <>
+      <li>Phiên bản đang dùng trước đó của cùng mã chủ đề sẽ tự chuyển sang <strong>Ngừng dùng</strong>.</li>
       <li>Hệ thống sẽ dùng phiên bản này cho các mô phỏng <strong>mới</strong>. Mô phỏng cũ giữ nguyên phiên bản đã dùng.</li>
       <li>Sau khi phê duyệt, nội dung <strong>không sửa được</strong> — muốn thay đổi phải tạo phiên bản mới.</li>
     </> : <>

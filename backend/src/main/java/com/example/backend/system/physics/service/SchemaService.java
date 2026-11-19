@@ -72,21 +72,26 @@ public class SchemaService {
     @Transactional
     public SchemaVersion changeLifecycle(String schemaId, LifecycleStatus status) {
         if (status == null) throw ApiException.badRequest("Vui lòng chọn trạng thái");
-        SchemaVersion schema = schemaRepository.findTopBySchemaIdIgnoreCaseOrderByCreatedAtDesc(schemaId.trim())
+        List<SchemaVersion> family = schemaRepository.lockFamily(schemaId.trim());
+        SchemaVersion schema = family.stream().max(java.util.Comparator.comparing(SchemaVersion::getCreatedAt,
+                java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())))
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy mô hình"));
-        transition(schema, status);
+        transition(schema, status, family);
         return schemaRepository.save(schema);
     }
 
     @Transactional
     public SchemaVersion changeVersionLifecycle(java.util.UUID id, LifecycleStatus status) {
         if (status == null) throw ApiException.badRequest("Vui lòng chọn trạng thái");
-        SchemaVersion schema = schemaRepository.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên bản mô hình"));
-        transition(schema, status);
+        String schemaId = schemaRepository.schemaIdOf(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên bản mô hình"));
+        List<SchemaVersion> family = schemaRepository.lockFamily(schemaId);
+        SchemaVersion schema = family.stream().filter(item -> item.getId().equals(id)).findFirst()
+                .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên bản mô hình"));
+        transition(schema, status, family);
         return schemaRepository.save(schema);
     }
 
-    private void transition(SchemaVersion schema, LifecycleStatus status) {
+    private void transition(SchemaVersion schema, LifecycleStatus status, List<SchemaVersion> family) {
         if (schema.getLifecycleStatus() == status) return;
         if (schema.getLifecycleStatus() == LifecycleStatus.RETIRED || status == LifecycleStatus.DRAFT)
             throw ApiException.conflict("Vui lòng tạo bản nháp mới thay vì mở lại phiên bản đã xuất bản");
@@ -101,6 +106,14 @@ public class SchemaService {
                 throw ApiException.conflict("Phát hiện dữ liệu mô hình không nhất quán: " + schema.getSchemaId() + "@" + schema.getVersion()
                                 + "; vui lòng tạo phiên bản mô hình mới");
             }
+            List<SchemaVersion> previous = family.stream().filter(item -> !item.getId().equals(schema.getId())
+                    && item.getLifecycleStatus() == LifecycleStatus.APPROVED).toList();
+            if (previous.stream().anyMatch(item -> SchemaVersionOrdering.compareVersions(schema.getVersion(), item.getVersion()) <= 0))
+                throw ApiException.conflict("Đã có phiên bản mới hơn hoặc tương đương đang dùng. Hãy tạo phiên bản cao hơn.");
+            previous.forEach(item -> item.setLifecycleStatus(LifecycleStatus.RETIRED));
+            schemaRepository.saveAll(previous);
+            // Retire the old row before the new one can satisfy the unique published-family index.
+            schemaRepository.flush();
             schema.setDefinitionChecksum(actualChecksum);
         }
         schema.setLifecycleStatus(status);

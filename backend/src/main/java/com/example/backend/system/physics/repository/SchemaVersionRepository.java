@@ -8,6 +8,13 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SchemaVersionRepository extends JpaRepository<SchemaVersion, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select s from SchemaVersion s where lower(s.schemaId) = lower(:schemaId) order by s.id")
+    List<SchemaVersion> lockFamily(@org.springframework.data.repository.query.Param("schemaId") String schemaId);
+
+    @org.springframework.data.jpa.repository.Query("select s.schemaId from SchemaVersion s where s.id = :id")
+    Optional<String> schemaIdOf(@org.springframework.data.repository.query.Param("id") UUID id);
+
     /** How many rows there are and when the latest changed: moves whenever any schema version is added or changed. */
     interface ChangeMark { Long getCount(); java.time.Instant getUpdated(); }
 

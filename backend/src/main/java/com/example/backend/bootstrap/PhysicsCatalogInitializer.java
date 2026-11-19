@@ -80,25 +80,12 @@ public class PhysicsCatalogInitializer implements CommandLineRunner {
         String checksum = schemaDefinitions.compiledChecksum(definition);
 
         var published = schemaRepository.findFirstBySchemaIdAndVersion(id, version);
-        if (published.isEmpty()) {
-            SchemaVersion schema = new SchemaVersion();
-            schema.setSchemaId(id);
-            schema.setName(entry.path("name").asText());
-            schema.setTopic(entry.path(TOPIC).asText());
-            schema.setVersion(version);
-            schema.setDefinition(definition);
-            schema.setDefinitionChecksum(checksum);
-            schema.setLifecycleStatus(LifecycleStatus.APPROVED);
-            schemaRepository.save(schema);
-            return;
-        }
-
-        SchemaVersion existing = published.orElseThrow();
-        existing.setName(entry.path("name").asText());
-        existing.setTopic(entry.path(TOPIC).asText());
-        existing.setDefinition(definition);
-        existing.setDefinitionChecksum(checksum);
-        existing.setLifecycleStatus(LifecycleStatus.APPROVED);
-        schemaRepository.save(existing);
+        if (published.isPresent()) return;
+        SchemaVersion schema = new SchemaVersion();
+        schema.setSchemaId(id); schema.setName(entry.path("name").asText()); schema.setTopic(entry.path(TOPIC).asText());
+        schema.setVersion(version); schema.setDefinition(definition); schema.setDefinitionChecksum(checksum);
+        boolean hasPublished = schemaRepository.lockFamily(id).stream().anyMatch(item -> item.getLifecycleStatus() == LifecycleStatus.APPROVED);
+        schema.setLifecycleStatus(hasPublished ? LifecycleStatus.DRAFT : LifecycleStatus.APPROVED);
+        schemaRepository.save(schema);
     }
 }
