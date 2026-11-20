@@ -115,7 +115,7 @@ export function roleHome(role: string | null | undefined, billingRequired = fals
     case 'MANAGER': return '/manager';
     case 'REVIEWER': return '/reviewer';
     case 'SCHOOL': return billingRequired ? '/school/billing' : '/school';
-    case 'STAFF': return '/workspace';
+    case 'STAFF': return '/teacher';
     case 'STUDENT': return '/student';
     default: return '/';
   }

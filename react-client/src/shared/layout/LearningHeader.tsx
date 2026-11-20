@@ -6,6 +6,7 @@ import { ActivePill } from "../effects/Motion";
 import { ThemeSegmented } from "../theme/ThemeToggle";
 import AccountMenu from "./AccountMenu";
 import MobileTabBar from "./MobileTabBar";
+import { canTeach } from "../auth/permissions";
 import { useSessionStore } from "../auth/sessionStore";
 
 type HeaderVariant = "workspace" | "submissions";
@@ -53,6 +54,7 @@ export default function LearningHeader({
   // three jobs, three places: make a simulation, run assignments (give, follow, grade), keep simulations
   const inLibrary = pathname.startsWith("/lab/library") || pathname.startsWith("/lab/community");
   const journey = [
+    ...(canTeach(user) ? [{ to: "/teacher", label: "Tổng quan", icon: "chart" as const, active: pathname === "/teacher" }] : []),
     { to: "/workspace", label: "Mô phỏng", icon: "atom" as const, active: pathname === "/workspace" },
     { to: "/lab/classes", label: "Bài tập", icon: "book" as const,
       active: pathname === "/assignments/workspace" || (pathname.startsWith("/lab") && !inLibrary) },

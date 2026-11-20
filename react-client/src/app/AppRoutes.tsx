@@ -52,6 +52,7 @@ const teacherAreaModule = () => import("../features/assignments/pages/TeacherAre
 const TeacherArea = lazy(teacherAreaModule);
 const TeacherThemed = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherThemed })));
 const TeacherComplaints = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherComplaintsPage })));
+const TeacherDashboard = lazy(() => import("../features/assignments/pages/TeacherDashboard"));
 const TeacherClasses = lazy(() => import("../features/assignments/pages/TeacherClassesPage"));
 const Lab = lazy(() => import("../features/simulation/pages/Lab"));
 const studentModule = () => import("../features/assignments/pages/StudentAssignments");
@@ -115,6 +116,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           <Route path="/department" element={roleElement([ROLE_NAMES.STAFF],
             isDepartmentHead(user) && user?.schoolId ? <DepartmentWorkspace /> : <Navigate to="/assignments" replace />)} />
           <Route path="/player" element={<Navigate to={`/workspace${search}`} replace />} />
+          <Route path="/teacher" element={roleElement([ROLE_NAMES.STAFF], teachingElement(<TeacherDashboard />))} />
           <Route path="/workspace" element={workspaceElement(<Workspace />)} />
           <Route
             path="/assignments/workspace"

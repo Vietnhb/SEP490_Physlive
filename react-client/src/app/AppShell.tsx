@@ -23,6 +23,7 @@ export default function AppShell({ children }: PropsWithChildren) {
     );
   const fullPage =
     [
+      "/teacher",
       "/player",
       "/workspace",
       "/assignments/workspace",
