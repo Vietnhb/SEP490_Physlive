@@ -186,7 +186,7 @@ class _SubmissionTile extends StatelessWidget {
     } else if (s.gradingStatus == 'TEACHER_CONFIRMED') {
       status = Pill('${formatScore(s.score ?? 0)}/${formatScore(s.maxScore)}', tone: Tone.success);
     } else if (s.gradingStatus == 'AI_GRADED' && s.score != null) {
-      status = Pill('AI: ${formatScore(s.score!)} · chờ xác nhận', tone: Tone.accent);
+      status = Pill('Tạm: ${formatScore(s.score!)} · chờ xác nhận', tone: Tone.accent);
     } else {
       status = const Pill('Chờ chấm', tone: Tone.warning);
     }
@@ -311,7 +311,7 @@ class _GradeSheetState extends State<_GradeSheet> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: p.accentSoft, borderRadius: BorderRadius.circular(10)),
-              child: Text('Điểm đang là điểm AI chấm tạm. Lưu để xác nhận.', style: TextStyle(color: p.accent)),
+              child: Text('Điểm này mới lưu tạm, chưa xác nhận. Lưu để xác nhận.', style: TextStyle(color: p.accent)),
             ),
           const Divider(),
           const SizedBox(height: 14),

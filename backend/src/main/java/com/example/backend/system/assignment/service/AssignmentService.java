@@ -117,12 +117,6 @@ public class AssignmentService {
                 && request.classId() == null)
             throw ApiException.badRequest("Vui lòng chọn lớp trước khi giao bài");
         String activityType = activityType(request.questions());
-        if (Boolean.TRUE.equals(request.autoGrade()) && !MEASUREMENT.equals(activityType)) {
-            JsonNode criteria = request.gradingCriteria();
-            if (criteria == null || !finiteNumber(criteria.path(EXPECTED_VALUE))
-                    || !finiteNumber(criteria.path(TOLERANCE)) || criteria.path(TOLERANCE).asDouble() < 0)
-                throw ApiException.badRequest("Vui lòng nhập đáp án dạng số và sai số cho phép không âm");
-        }
         LibraryItem libraryItem = libraryItemRepository.findByIdAndOwnerIdAndActiveTrue(request.libraryItemId(), teacher.getId())
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy mục trong thư viện cá nhân"));
         Specification specification = libraryItem.getSpecification();
@@ -162,8 +156,8 @@ public class AssignmentService {
         assignment.setTitle(request.title().trim());
         assignment.setDescription(request.description());
         assignment.setQuestions(request.questions());
+        // Teachers grade every submission themselves; a measurement keeps the simulation's value only as their reference.
         JsonNode gradingCriteria = request.gradingCriteria();
-        boolean autoGrade = Boolean.TRUE.equals(request.autoGrade());
         if (MEASUREMENT.equals(activityType)) {
             JsonNode measurement = request.questions().path("measurement");
             String source = measurement.path("seriesSource").asText("");
@@ -180,18 +174,16 @@ public class AssignmentService {
             derived.put("sampleTime", sampleTime);
             derived.put("unit", measurement.path("unit").asText(""));
             gradingCriteria = derived;
-            autoGrade = true;
         } else if ("PARAMETER_INVESTIGATION".equals(activityType)) {
             String parameterKey = request.questions().path("investigation").path("parameterKey").asText("");
             SimulationResponse snapshot = simulationService.replay(libraryItem.getSimulation(), assignedRunId);
             if (parameterKey.isBlank() || snapshot.adjustableParams() == null || !snapshot.adjustableParams().containsKey(parameterKey))
                 throw ApiException.badRequest("Không thể điều chỉnh tham số khảo sát trong mô phỏng này");
-            autoGrade = false;
             gradingCriteria = null;
         }
         assignment.setGradingCriteria(gradingCriteria);
         assignment.setMaxScore(request.maxScore() == null || request.maxScore().signum() <= 0 ? BigDecimal.TEN : request.maxScore());
-        assignment.setAutoGrade(autoGrade);
+        assignment.setAutoGrade(false);
         assignment.setAssignedStudentIds(request.studentIds());
         assignment.setDueAt(request.dueAt());
         assignment.setAllowLateSubmission(!Boolean.FALSE.equals(request.allowLateSubmission()));
@@ -341,8 +333,6 @@ public class AssignmentService {
         if (prediction == null || !prediction.path(ANSWER_TEXT).isTextual()
                 || prediction.path(ANSWER_TEXT).asText().isBlank())
             throw ApiException.badRequest("Vui lòng nhập dự đoán");
-        if (assignment.isAutoGrade() && !finiteNumber(prediction.path(ESTIMATED_VALUE)))
-            throw ApiException.badRequest("Vui lòng nhập dự đoán dạng số cho bài tập này");
         if (submission != null && !submission.isRetryAllowed())
             throw ApiException.conflict("Dự đoán đã được nộp");
         if (submission == null) submission = new AssignmentSubmission();
@@ -393,34 +383,17 @@ public class AssignmentService {
         prediction.put("conclusion", request.conclusion().trim());
         if (request.estimatedValue() != null && Double.isFinite(request.estimatedValue()))
             prediction.put(ESTIMATED_VALUE, request.estimatedValue());
-        if (assignment.isAutoGrade() && !finiteNumber(prediction.path(ESTIMATED_VALUE)))
+        if (MEASUREMENT.equals(activityType(assignment.getQuestions())) && !finiteNumber(prediction.path(ESTIMATED_VALUE)))
             throw ApiException.badRequest("Vui lòng nhập kết quả đo dạng số cho bài tập này");
-        var automaticChange = assignment.isAutoGrade() ? captureGrade(submission, null, "AUTO_GRADED", "Chấm tự động theo tiêu chí bài đo") : null;
         submission.setCompletedAt(Instant.now());
         submission.setRetryAllowed(false);
         submission.setGradingStatus(com.example.backend.system.assignment.model.enums.GradingStatus.PENDING);
-        if (assignment.isAutoGrade()) autoGrade(assignment, submission);
         submission = submissionRepository.save(submission);
-        if (automaticChange != null && submission.getScore() != null) saveGradeChange(automaticChange, submission);
         return toSubmission(submission);
     }
 
     private static boolean finiteNumber(JsonNode value) {
         return value.isNumber() && Double.isFinite(value.asDouble());
-    }
-
-    private void autoGrade(Assignment assignment, AssignmentSubmission submission) {
-        JsonNode criteria = assignment.getGradingCriteria();
-        JsonNode prediction = submission.getPredictions();
-        if (criteria == null || prediction == null || !finiteNumber(criteria.path(EXPECTED_VALUE))
-                || !finiteNumber(prediction.path(ESTIMATED_VALUE))) return;
-        double expected = criteria.get(EXPECTED_VALUE).asDouble();
-        double actual = prediction.get(ESTIMATED_VALUE).asDouble();
-        double tolerance = criteria.has(TOLERANCE) ? Math.max(0d, criteria.get(TOLERANCE).asDouble()) : 0d;
-        submission.setMaxScore(assignment.getMaxScore());
-        submission.setScore(Math.abs(expected - actual) <= tolerance ? assignment.getMaxScore() : BigDecimal.ZERO);
-        submission.setGradingStatus(com.example.backend.system.assignment.model.enums.GradingStatus.AI_GRADED);
-        submission.setGradedAt(Instant.now()); submission.setRetryAllowed(false);
     }
 
     @Transactional
@@ -580,7 +553,7 @@ public class AssignmentService {
                 predictionSubmitted, ownSubmission != null && ownSubmission.getCompletedAt() != null,
                 ownSubmission == null ? null : ownSubmission.getCompletedAt(),
                 current.getRole() != null && RoleName.STUDENT.matches(current.getRole().getName())
-                        ? null : item.getGradingCriteria(), item.getMaxScore(), item.isAutoGrade(),
+                        ? null : item.getGradingCriteria(), item.getMaxScore(), false,
                 missed ? BigDecimal.ZERO : ownSubmission == null ? null : ownSubmission.getScore(), missed ? AssignmentDeadlinePolicy.FEEDBACK : ownSubmission == null ? null : ownSubmission.getFeedback(),
                 missed ? GradingStatus.MISSED_DEADLINE : ownSubmission == null ? null : ownSubmission.getGradingStatus(), !missed && ownSubmission != null && ownSubmission.isRetryAllowed(),
                 ownSubmission == null ? null : ownSubmission.getPredictions(), canManage,

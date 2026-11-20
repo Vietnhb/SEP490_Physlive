@@ -14,7 +14,7 @@ function gradingLabel(submission: AssignmentSubmission) {
   if (submission.gradingStatus === "RETURNED") return "Cần làm lại";
   if (!submission.completedAt) return "Đang làm";
   if (submission.gradingStatus === "TEACHER_CONFIRMED") return "Đã chấm";
-  if (submission.gradingStatus === "AI_GRADED") return "Điểm tự động";
+  if (submission.gradingStatus === "AI_GRADED") return "Điểm tạm";
   return "Chờ chấm";
 }
 
