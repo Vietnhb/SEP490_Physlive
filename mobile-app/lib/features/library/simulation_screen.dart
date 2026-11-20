@@ -5,6 +5,7 @@ import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
+import '../simulation/export.dart';
 import '../simulation/player.dart';
 import '../simulation/scene.dart';
 
@@ -56,6 +57,8 @@ class SimulationScreen extends StatelessWidget {
             scene: scene,
             recompute: session.user!.isTeacher ? (scene, values) => _recompute(api, scene, values) : null,
           ),
+          const SizedBox(height: 12),
+          _ExportBar(scene: scene, title: item.title),
           if (scene.description.trim().isNotEmpty) ...[
             const SizedBox(height: 16),
             Section(
@@ -74,6 +77,55 @@ class SimulationScreen extends StatelessWidget {
           ],
         ]),
       ),
+    );
+  }
+}
+
+/// Hands the simulation on screen out as files, through Android's share sheet.
+class _ExportBar extends StatefulWidget {
+  const _ExportBar({required this.scene, required this.title});
+  final SimulationScene scene;
+  final String title;
+
+  @override
+  State<_ExportBar> createState() => _ExportBarState();
+}
+
+class _ExportBarState extends State<_ExportBar> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) showMessage(context, 'Chưa xuất được: ${errorText(error)}', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scene = widget.scene;
+    final stem = SimulationExport.fileStem(scene);
+    return Section(
+      title: 'Xuất mô phỏng',
+      icon: Icons.ios_share_rounded,
+      child: Wrap(spacing: 10, runSpacing: 8, children: [
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _run(() => SimulationExport.share(
+              '$stem.csv', SimulationExport.csv(scene), 'text/csv', subject: widget.title)),
+          icon: const Icon(Icons.table_chart_outlined),
+          label: const Text('Số liệu (CSV)'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _busy || !scene.playable ? null : () => _run(() async => SimulationExport.share(
+              '$stem-phat-lai.html', await SimulationExport.replayPage(scene), 'text/html', subject: widget.title)),
+          icon: const Icon(Icons.play_circle_outline_rounded),
+          label: const Text('Trang phát lại (HTML)'),
+        ),
+      ]),
     );
   }
 }
