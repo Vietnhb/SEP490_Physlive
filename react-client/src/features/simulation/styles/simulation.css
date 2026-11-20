@@ -975,3 +975,9 @@
 .simulation-visual-edit label { font-size: 12px; color: var(--ink-2); }
 .simulation-visual-edit textarea { width: 100%; }
 .simulation-visual-edit .simulation-restart-button { justify-self: start; }
+
+/* Export menu on the player toolbar (unstyled Radix primitive: the workspace has no Radix Theme) */
+.sim-export-menu { z-index: 60; min-width: 260px; padding: 6px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); box-shadow: 0 10px 30px rgb(15 23 42 / 0.14); }
+.sim-export-menu__item { padding: 8px 10px; border-radius: 6px; font-size: 14px; color: var(--ink); cursor: pointer; outline: none; user-select: none; }
+.sim-export-menu__item[data-highlighted] { background: var(--accent-soft); color: var(--accent); }
