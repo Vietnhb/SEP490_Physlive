@@ -1,0 +1,128 @@
+
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 {
+ --tw-primary: #315da8; --tw-on-primary: #fff; --tw-primary-container: #dce7ff; --tw-on-primary-container: #153567;
+ --tw-surface: #fff; --tw-container: #f0f3fa; --tw-high: #e4e8f1; --tw-ink: #1a1c20; --tw-muted: #454954; --tw-outline: #dfe3ec;
+ --learn-blue: var(--tw-primary); --learn-ink: var(--tw-ink); --learn-muted: var(--tw-muted); --learn-line: var(--tw-outline);
+ background: var(--tw-container); color: var(--tw-ink);
+}
+:root[data-theme-effective="dark"] .learning-app.teacher-workspace-m3 {
+ --tw-primary: #abc7ff; --tw-on-primary: #003061; --tw-primary-container: #244779; --tw-on-primary-container: #d9e6ff;
+ --tw-surface: #1a1c21; --tw-container: #22252d; --tw-high: #394457; --tw-ink: #e3e5ec; --tw-muted: #c3c6d1; --tw-outline: #414650;
+}
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-workspace { padding: 20px; gap: 0; background: var(--tw-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout { gap: 16px; border: 0; border-radius: 0; background: transparent; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout > .learn-exploration { border: 0; border-radius: 0; background: transparent; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-stage, :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout > .learn-inspector, :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-pane {
+ border: 1px solid var(--tw-outline); border-radius: 24px; background: var(--tw-surface); box-shadow: none; color: var(--tw-ink);
+}
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-header { background: var(--tw-surface); border-color: var(--tw-outline); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-header .learn-mode-tabs { border-radius: 999px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-stage-input-container { max-width: 860px; padding: 24px; gap: 24px; scrollbar-gutter: stable; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps li { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 64px; padding: 12px; border: 0; border-radius: 16px; background: var(--tw-container); color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps li.active { background: var(--tw-primary-container); color: var(--tw-on-primary-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps li.done { background: var(--tw-container); color: var(--tw-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-number { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--tw-outline); font-size: 13px; font-weight: 500; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .active .simulation-step-number { border-color: transparent; background: var(--tw-primary); color: var(--tw-on-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .done .simulation-step-number { border-color: transparent; background: var(--tw-primary-container); color: var(--tw-on-primary-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-number .learn-icon { width: 16px; height: 16px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-label { min-width: 0; display: grid; gap: 4px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-label strong { font-size: 12px; line-height: 18px; font-weight: 500; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-label small { font-size: 10px; line-height: 16px; font-weight: 400; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-card { padding: 28px; border: 1px solid var(--tw-outline); border-radius: 24px; background: var(--tw-surface); box-shadow: none; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry { background: var(--tw-container); border-color: transparent; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 20px; border-radius: 16px; background: var(--tw-primary-container); color: var(--tw-on-primary-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry-icon .learn-icon { width: 28px; height: 28px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry h2 { margin: 0; font-size: clamp(21px, 2vw, 28px); line-height: 1.3; letter-spacing: -.4px; font-weight: 500; color: var(--tw-ink); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry-description { margin: 10px 0 24px; font-size: 13px; line-height: 22px; color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-input-label { display: block; margin-bottom: 10px; font-size: 12px; font-weight: 500; color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer { overflow: hidden; border: 1px solid var(--tw-outline); border-radius: 16px; background: var(--tw-surface); box-shadow: none; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer:focus-within { outline: 2px solid var(--tw-primary); outline-offset: 2px; border-color: var(--tw-primary); box-shadow: none; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer textarea, :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer textarea:focus { min-height: 168px; padding: 16px; background: var(--tw-surface); color: var(--tw-ink); border: 0; border-radius: 0; box-shadow: none; outline: 0; font-size: 14px; line-height: 24px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer textarea::placeholder { color: var(--tw-muted); opacity: .8; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer__bar { gap: 12px; padding: 12px; border-top: 1px solid var(--tw-outline); background: var(--tw-surface); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer__attach { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin: 0; padding: 10px 14px; border-radius: 999px; color: var(--tw-primary); font-size: 13px; font-weight: 500; cursor: pointer; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer__attach:hover { background: var(--tw-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer__attach:focus-within { outline: 2px solid var(--tw-primary); outline-offset: 2px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 :is(.simulation-primary-button, .simulation-restart-button, .simulation-reset, .learn-new-simulation, .learn-save-button), :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-actions > button {
+ min-height: 40px; padding: 10px 20px; gap: 8px; border-radius: 999px; border: 0; box-shadow: none; font-size: 13px; font-weight: 500; line-height: 20px; transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 :is(.simulation-primary-button, .learn-new-simulation, .learn-save-button) { background: var(--tw-primary); color: var(--tw-on-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 :is(.simulation-restart-button, .simulation-reset), :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-actions > button:not(.simulation-primary-button) { background: var(--tw-high); color: var(--tw-ink); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 :is(.simulation-primary-button, .learn-new-simulation, .learn-save-button):hover:not(:disabled) { background: color-mix(in srgb, var(--tw-primary), var(--tw-on-primary) 8%); color: var(--tw-on-primary); box-shadow: 0 1px 3px #0002; transform: none; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 button:disabled { cursor: not-allowed; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-card button.simulation-composer__send:disabled { background: var(--tw-high); color: var(--tw-muted); opacity: .7; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 :is(button, a, summary, input, select, [tabindex]):focus-visible { outline: 3px solid var(--tw-primary); outline-offset: 3px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-pane-header { flex: 0 0 auto; display: grid; gap: 12px; padding: 16px; border-color: var(--tw-outline); background: var(--tw-surface); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-heading span { font-size: 15px; line-height: 24px; font-weight: 600; letter-spacing: -.1px; text-transform: none; color: var(--tw-ink); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-heading strong { margin-top: 4px; font-size: 11px; line-height: 18px; font-weight: 400; color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-actions { margin: 0; gap: 8px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-new-simulation { flex: 1; padding: 10px 12px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-new-folder-trigger { width: 40px; min-height: 40px; padding: 10px; border: 0; border-radius: 12px; background: var(--tw-high); color: var(--tw-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-search { min-height: 40px; margin: 0; border-radius: 999px; background: var(--tw-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-search input { height: 40px; border: 0; border-radius: 999px; background: transparent; font-size: 12px; color: var(--tw-ink); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-search .learn-icon { color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-tree { padding: 10px 8px 16px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--tw-outline) transparent; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-folder-name { min-height: 40px; border-radius: 12px; padding: 8px; font-size: 12px; color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-folder-name:hover { background: var(--tw-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-folder-name strong { font-weight: 500; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-folder-name small { background: var(--tw-high); color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-items { padding-left: 8px; padding-right: 0; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-item { margin-bottom: 8px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-item > button:not(.library-more) { padding: 12px 34px 12px 12px; min-height: 76px; border: 1px solid transparent; border-radius: 14px; background: var(--tw-container); color: var(--tw-ink); gap: 6px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-item > button:not(.library-more):hover:not(:disabled) { background: color-mix(in srgb, var(--tw-container), var(--tw-primary) 8%); border-color: transparent; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-item > button.active { background: var(--tw-primary-container); border-color: var(--tw-primary); color: var(--tw-on-primary-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-items button > span { max-height: 36px; font-size: 12px; line-height: 18px; font-weight: 500; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-items button small { color: var(--tw-muted); font-size: 10px; line-height: 16px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-library-items .library-more { min-width: 28px; width: 28px; height: 32px; min-height: 32px; border-radius: 999px; padding: 4px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-folder-popover { background: var(--tw-surface); border-color: var(--tw-outline); border-radius: 16px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-nav { padding: 12px; background: var(--tw-surface); border-color: var(--tw-outline); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-nav .learn-tabs { border-radius: 999px; padding: 4px; gap: 2px; background: var(--tw-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-nav .learn-tabs button { min-height: 40px; border: 0; border-radius: 999px; padding: 10px 4px; color: var(--tw-muted); background: transparent; font-size: 12px; font-weight: 500; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-nav .learn-tabs button[aria-selected="true"] { background: var(--tw-primary-container); color: var(--tw-on-primary-container); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-nav .learn-tabs button:hover:not(:disabled) { background: color-mix(in srgb, var(--tw-container), var(--tw-primary) 8%); color: var(--tw-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-body { padding: 20px; scrollbar-gutter: stable; scrollbar-color: var(--tw-outline) transparent; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-footer { flex: 0 0 auto; padding: 10px 16px; background: var(--tw-surface); border-color: var(--tw-outline); color: var(--tw-muted); font-size: 11px; line-height: 18px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-footer span { min-width: 0; white-space: normal; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-footer .learn-icon { flex-shrink: 0; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcuts { margin-top: 24px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcuts:first-child { margin-top: 0; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcuts h3 { font-size: 15px; line-height: 24px; font-weight: 600; color: var(--tw-ink); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcuts > .simulation-muted { font-size: 12px; line-height: 20px; color: var(--tw-muted); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut-list { gap: 12px; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut { padding: 14px; gap: 12px; min-height: 88px; border: 1px solid transparent; border-radius: 16px; background: var(--tw-container); color: var(--tw-ink); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut:hover:not(:disabled) { background: color-mix(in srgb, var(--tw-container), var(--tw-primary) 8%); border-color: transparent; transform: none; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut[aria-current="true"] { background: var(--tw-primary-container); border-color: var(--tw-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut > .learn-icon { width: 20px; height: 20px; color: var(--tw-primary); }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut strong { color: var(--tw-ink); font-size: 13px; line-height: 20px; font-weight: 500; }
+:root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-shortcut small { margin-top: 4px; color: var(--tw-muted); font-size: 11px; line-height: 18px; }
+@media (min-width: 1251px) and (max-width: 1599px) {
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout[data-library-pane="true"] { grid-template-columns: 240px minmax(0, 1fr) 320px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout[data-library-pane="true"][data-library-collapsed="true"] { grid-template-columns: 48px minmax(0, 1fr) 320px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-stage-input-container { padding: 20px 16px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps li { gap: 8px; padding: 10px 8px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-label small { display: none; }
+}
+@media (min-width: 1600px) {
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout[data-library-pane="true"] { grid-template-columns: 280px minmax(0, 1fr) 380px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout[data-library-pane="true"][data-library-collapsed="true"] { grid-template-columns: 48px minmax(0, 1fr) 380px; }
+}
+@media (max-width: 900px) {
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-workspace { padding: 12px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout { gap: 0; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-mobile-nav { gap: 4px; padding: 4px; border: 1px solid var(--tw-outline); border-radius: 999px; background: var(--tw-surface); }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-mobile-nav button { border: 0; border-radius: 999px; min-height: 40px; color: var(--tw-muted); background: transparent; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-mobile-nav button[aria-pressed="true"] { background: var(--tw-primary-container); color: var(--tw-on-primary-container); }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-stage, :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-layout > .learn-inspector { border-radius: 20px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-stage-input-container { padding: 16px 12px 32px; gap: 20px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps { gap: 6px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-steps li { flex-direction: column; align-items: start; gap: 8px; padding: 12px 10px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-label strong { font-size: 11px; line-height: 18px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-step-label small { display: none; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-card { padding: 20px 16px; border-radius: 20px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry-icon { margin-bottom: 16px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-entry h2 { font-size: 24px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer textarea, :root[data-theme-effective] .learning-app.teacher-workspace-m3 .simulation-composer textarea:focus { min-height: 144px; }
+ :root[data-theme-effective] .learning-app.teacher-workspace-m3 .learn-inspector-body { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { :root[data-theme-effective] .learning-app.teacher-workspace-m3 button { transition: none; } }

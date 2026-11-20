@@ -9,6 +9,7 @@ import SimulationInspector from "../components/SimulationInspector";
 import { useSimulationWorkspace } from "../hooks/useSimulationWorkspace";
 import "../styles/learning.css";
 import "../styles/simulation.css";
+import "../styles/teacher-workspace.css";
 
 export default function SimulationWorkspace() {
   const [libraryCollapsed, setLibraryCollapsed] = useState(false);
@@ -17,7 +18,7 @@ export default function SimulationWorkspace() {
   const libraryState = useTeacherLibrary();
   const { canManageLearningContent, events, library, input, preview, experiment, explanation, save } = useSimulationWorkspace(libraryState);
   return (
-    <div className="learning-app simulation-workspace-app" onPaste={events.onPaste} onDrop={events.onDrop}
+    <div className="learning-app simulation-workspace-app teacher-workspace-m3" onPaste={events.onPaste} onDrop={events.onDrop}
       onDragOver={event => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); }}>
       {/* "Mô phỏng mới" lives in the library pane; the header offers it only when that pane is not on screen */}
       <LearningHeader onNewSimulation={!canManageLearningContent || libraryCollapsed ? input.reset : undefined} libraryCollapsed={libraryCollapsed}

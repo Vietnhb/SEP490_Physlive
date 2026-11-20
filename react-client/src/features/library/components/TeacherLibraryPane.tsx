@@ -49,7 +49,7 @@ export default function TeacherLibraryPane({ folders, items, currentSimulationId
 
   return <aside className="learn-library-pane" aria-label="Thư mục mô phỏng cá nhân">
     <div className="learn-library-pane-header">
-      <div className="learn-library-heading"><div><span>THƯ VIỆN CỦA TÔI</span><strong>{loading ? "Đang tải…" : `${folders.length} thư mục · ${items.length} mô phỏng`}</strong></div></div>
+      <div className="learn-library-heading"><div><span>Thư viện của tôi</span><strong>{loading ? "Đang tải…" : `${folders.length} thư mục · ${items.length} mô phỏng`}</strong></div></div>
       <div className="learn-library-actions">
         {onNewSimulation && <button type="button" className="learn-new-simulation" onClick={onNewSimulation}><Icon name="plus" />Mô phỏng mới</button>}
         <button className="learn-new-folder-trigger" type="button" aria-label="Thư mục mới" title="Thư mục mới" aria-expanded={creatorOpen} aria-controls="new-library-folder-form" onClick={() => setCreatorOpen(value => !value)}><Icon name="folderPlus" /></button>

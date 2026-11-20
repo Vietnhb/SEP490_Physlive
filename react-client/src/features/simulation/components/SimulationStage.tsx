@@ -18,6 +18,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
     intent, revision, setRevision, normalize, handleRecognition, handleRevision, generate, reset,
   } = input;
   const { simulation, liveTimeline, presentation, runValues, sandboxKey, validation, renderError, setRenderError, restartPreview, recomputing } = preview;
+  const currentStep = intent?.stage === "EXPLAIN" ? 3 : recognition || intent?.stage === "CLARIFY" ? 2 : 1;
   // "Báo lỗi" and "Dựng lại" live in the authored player's toolbar.
   const stageActions = <>
     {complaint && <button type="button" className="sim-action" title="Báo lỗi khi mô phỏng sai" onClick={() => setComplaintOpen(true)}><Icon name="message" />Báo lỗi</button>}
@@ -86,9 +87,13 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
           /* Layout giữa khi chưa có mô phỏng: mô tả, xác nhận, giải thích */
           <div className="simulation-stage-input-container">
             <ol className="simulation-steps" aria-label="Tiến trình dựng mô phỏng">
-              <li className={!recognition && !intent ? "active" : "done"}>1. Mô tả tình huống</li>
-              <li className={recognition ? "active" : intent ? "done" : ""}>2. Xác nhận</li>
-              <li className={intent ? "active" : ""}>3. Dựng mô phỏng</li>
+              {[
+                { title: "Mô tả tình huống", detail: "Văn bản hoặc ảnh đề bài" },
+                { title: "Xác nhận", detail: "Kiểm tra nội dung đã hiểu" },
+                { title: "Dựng mô phỏng", detail: "Khám phá và điều chỉnh" },
+              ].map((step, index) => <li key={step.title} className={currentStep === index + 1 ? "active" : currentStep > index + 1 ? "done" : ""} aria-current={currentStep === index + 1 ? "step" : undefined}>
+                <span className="simulation-step-number" aria-hidden="true">{currentStep > index + 1 ? <Icon name="check" /> : index + 1}</span><span className="simulation-step-label"><strong>{step.title}</strong><small>{step.detail}</small></span>
+              </li>)}
             </ol>
 
             {error && (
@@ -98,10 +103,13 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
             )}
 
             {!recognition && !intent && (
-              <section className="simulation-card simulation-entry">
-                <h2 id="simulation-entry-title">Bạn muốn mô phỏng tình huống nào?</h2>
+              <section className="simulation-card simulation-entry" aria-labelledby="simulation-entry-title">
+                <span className="simulation-entry-icon" aria-hidden="true"><Icon name="atom" /></span>
+                <h2 id="simulation-entry-title">Tạo mô phỏng vật lý</h2>
+                <p className="simulation-entry-description" id="simulation-input-help">Mô tả một tình huống hoặc thêm ảnh đề bài để bắt đầu khám phá.</p>
 
                 <form onSubmit={normalize}>
+                  <label className="simulation-input-label" id="simulation-input-label" htmlFor="simulation-input">Mô tả tình huống</label>
                   {/* one place for every kind of description: text, pasted LaTeX, or a photo with an optional note */}
                   <div className="simulation-composer">
                     {previewUrl && (
@@ -115,7 +123,8 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
                       value={text}
                       onChange={(event) => setText(event.target.value)}
                       rows={sourceFile ? 2 : 4}
-                      aria-labelledby="simulation-entry-title"
+                      aria-labelledby="simulation-input-label"
+                      aria-describedby="simulation-input-help"
                       placeholder={sourceFile ? "Ghi chú thêm (không bắt buộc)" : "Nhập hoặc dán đề bài…"}
                     />
                     <div className="simulation-composer__bar">
