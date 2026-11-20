@@ -1,3 +1,5 @@
+import { studentAssignmentSummary } from "../model/studentAssignmentState";
+import { useAssignmentClock } from "./useAssignmentClock";
 import { missedDeadline } from "../model/assignmentDeadline";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
@@ -21,6 +23,7 @@ const activityTypeOf = (assignment: Assignment): AssignmentActivityType =>
     : "PREDICT_OBSERVE_EXPLAIN";
 
 export function useAssignmentPractice(userId: number | undefined) {
+  const now = useAssignmentClock();
   // Assigned items
 
   // Selected assignment for practicing
@@ -72,6 +75,7 @@ export function useAssignmentPractice(userId: number | undefined) {
 
   const assignmentsResource = useResource<Assignment[]>("/assignments/mine/student", userId !== undefined);
   const assignments = assignmentsResource.data ?? [];
+  const summary = studentAssignmentSummary(assignments, now);
   const setAssignments = assignmentsResource.setData;
   const loading = assignmentsResource.loading;
   const error = assignmentsResource.error || "";
@@ -445,7 +449,8 @@ export function useAssignmentPractice(userId: number | undefined) {
 
   return {
     assignments, list, workbench, vectors, close: closeAssignment,
-    pending: assignments.filter(item => !missedDeadline(item) && (!item.submissionCompleted || item.retryAllowed)).length,
-    completed: assignments.filter(item => item.submissionCompleted && !item.retryAllowed).length,
+    summary,
+    pending: summary.pending,
+    completed: summary.submitted,
   };
 }

@@ -183,34 +183,3 @@
   .student-workspace .student-playback-controls output { min-width: 48px; font-size: 12px; }
   .student-workspace .student-form-actions > .rt-Button { width: 100%; }
 }
-
-/* Welcome band: same night surface as the public pages, calm inside the app. */
-.student-workspace .student-hero { position: relative; isolation: isolate; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: end; margin-bottom: 28px; padding: 36px 40px; border-radius: 20px; background: radial-gradient(50% 80% at 85% 10%, rgb(37 99 235 / 35%), transparent 70%), var(--night); color: var(--night-ink); }
-.student-workspace .student-hero .dot-field { z-index: -1; mask-image: linear-gradient(90deg, transparent, #000 60%); }
-.student-workspace .student-hero-school { display: inline-block; margin-bottom: 14px; padding: 4px 12px; border: 1px solid var(--night-line); border-radius: 999px; color: var(--night-muted); font-size: 13px; }
-.student-workspace .student-hero h1 { margin: 0; font-size: clamp(28px, 3vw, 40px); font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
-.student-workspace .student-hero-copy > p { margin: 10px 0 22px; color: var(--night-muted); font-size: 16px; }
-.student-workspace .student-hero-actions { display:flex; flex-wrap:wrap; align-items:center; gap:20px; }
-.student-workspace .student-hero-actions > .rt-Button { color:var(--night-ink); }
-.student-workspace button.student-hero-cta { min-height: 42px; padding: 0 18px; border-radius: 999px; box-shadow: 0 10px 28px -10px rgb(37 99 235 / 80%); }
-.student-workspace .student-hero-cta .learn-icon { width: 16px; height: 16px; }
-.student-workspace .student-hero-stats { display: grid; grid-template-columns: repeat(2, minmax(120px, auto)); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--night-line); border-radius: 14px; background: var(--night-line); }
-.student-workspace .student-hero-stats > div { padding: 14px 18px; background: rgb(10 16 32 / 85%); }
-.student-workspace .student-hero-stats dt { color: var(--night-muted); font-size: 12px; }
-.student-workspace .student-hero-stats dd { margin: 2px 0 0; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-@media (max-width: 760px) { .student-workspace .student-hero { grid-template-columns: 1fr; padding: 26px 22px; } }
-
-/* Home: the next few assignments still open */
-.student-workspace .student-up-next { margin-bottom: 28px; }
-.student-up-next__list ul { display: grid; margin: 0; padding: 0; list-style: none; }
-.student-up-next__list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 12px 8px; border-bottom: 1px solid var(--line); }
-.student-up-next__list li:last-child { border-bottom: 0; }
-.student-up-next__text { display: grid; gap: 2px; min-width: 0; }
-.student-up-next__text strong { overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.student-up-next__text small { color: var(--muted); font-size: 12px; }
-.student-up-next__more { margin: 4px 8px 6px; }
-@media (max-width: 640px) {
-  .student-up-next__list li { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
-  .student-up-next__list li .rt-Badge { grid-row: 1; grid-column: 2; }
-  .student-up-next__list li .rt-Button { grid-column: 1 / -1; justify-self: start; }
-}

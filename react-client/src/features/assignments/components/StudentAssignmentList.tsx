@@ -1,3 +1,4 @@
+import { compareStudentWork, studentAssignmentState, studentAssignmentSummary } from "../model/studentAssignmentState";
 import { missedDeadline } from "../model/assignmentDeadline";
 import { useState } from "react";
 import { Badge, Button, Callout, Card, Heading, SegmentedControl, Select, Table, Text, TextField, VisuallyHidden } from "@radix-ui/themes";
@@ -15,7 +16,7 @@ type AssignmentListProps = {
   onSelect: (item: Assignment) => void;
 };
 type Filter = "todo" | "submitted" | "expired" | "all";
-const needsWork = (item: Assignment, now: number) => !missedDeadline(item, now) && (!item.submissionCompleted || item.retryAllowed);
+const needsWork = (item: Assignment, now: number) => studentAssignmentState(item, now).actionable;
 const activityLabels: Record<AssignmentActivityType, string> = {
   PREDICT_OBSERVE_EXPLAIN: "Dự đoán · Quan sát · Giải thích",
   MEASUREMENT: "Đo lường",
@@ -33,13 +34,11 @@ export function AssignmentList({ assignments, loading, error, onRefresh, onSelec
   const classes = Array.from(new Map(assignments.filter(item => item.classId).map(item => [item.classId!, item.className || "Lớp học"])).entries());
   const keyword = search.trim().toLocaleLowerCase("vi");
   const visible = assignments.filter(item =>
-    (filter === "all" || (filter === "todo" ? needsWork(item, now) : filter === "expired" ? missedDeadline(item, now) : Boolean(item.submissionCompleted))) &&
+    (filter === "all" || (filter === "todo" ? needsWork(item, now) : filter === "expired" ? missedDeadline(item, now) : Boolean(item.submissionCompleted && !item.retryAllowed && !missedDeadline(item, now)))) &&
     (!classFilter || item.classId === classFilter) &&
     [item.title, item.className, item.libraryItemTitle].filter(Boolean).join(" ").toLocaleLowerCase("vi").includes(keyword),
-  ).sort((a, b) => Number(Boolean(b.retryAllowed)) - Number(Boolean(a.retryAllowed)) ||
-    (a.dueAt ? new Date(a.dueAt).getTime() : Infinity) - (b.dueAt ? new Date(b.dueAt).getTime() : Infinity) ||
-    new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime());
-  const counts: Record<Filter, number> = { todo: pending, submitted: assignments.filter(item => item.submissionCompleted).length, expired: assignments.filter(item => missedDeadline(item, now)).length, all: assignments.length };
+  ).sort((a, b) => compareStudentWork(a, b, now));
+  const counts: Record<Filter, number> = { todo: pending, submitted: studentAssignmentSummary(assignments, now).submitted, expired: assignments.filter(item => missedDeadline(item, now)).length, all: assignments.length };
   const hasSearch = Boolean(keyword || classFilter);
   const emptyTitle = assignments.length === 0 ? "Chưa có bài tập được giao" : hasSearch ? "Không tìm thấy bài tập phù hợp" : filter === "todo" ? "Không có bài tập cần làm" : filter === "expired" ? "Không có bài tập bị quá hạn" : "Chưa có bài tập đã nộp";
   const emptyDescription = assignments.length === 0 ? "Bài tập của giáo viên sẽ xuất hiện tại đây." : hasSearch ? "Thử đổi từ khóa hoặc bộ lọc lớp học." : filter === "todo" ? "Xem tất cả bài tập để theo dõi kết quả, điểm số và các bài đã hết hạn." : "Bài tập sau khi nộp sẽ xuất hiện trong mục này.";
@@ -56,11 +55,8 @@ export function AssignmentList({ assignments, loading, error, onRefresh, onSelec
     {error && <Callout.Root color="red" size="1" className="student-inline-alert"><Callout.Text>{error}</Callout.Text><Button type="button" variant="ghost" color="red" onClick={onRefresh}>Thử lại</Button></Callout.Root>}
     {loading ? <TableLoadingSkeleton label="Đang tải bài tập…" headers={["Bài tập", "Hạn nộp", "Trạng thái", "Thao tác"]} /> : !error && visible.length === 0 ? <div className="student-list-state"><span className="student-empty-icon"><LearningIcon name="book" /></span><Heading as="h3" size="4">{emptyTitle}</Heading><Text as="p" color="gray">{emptyDescription}</Text>{assignments.length > 0 && <Button type="button" variant="soft" onClick={() => { setFilter("all"); setSearch(""); setClassFilter(""); }}>Xem tất cả</Button>}</div> : (!error || assignments.length > 0) && <Table.Root className="student-assignment-table" variant="ghost" size="2"><Table.Header><Table.Row><Table.ColumnHeaderCell>Bài tập</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Hạn nộp</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Trạng thái</Table.ColumnHeaderCell><Table.ColumnHeaderCell><VisuallyHidden>Thao tác</VisuallyHidden></Table.ColumnHeaderCell></Table.Row></Table.Header><Table.Body>{visible.map(item => {
       const missed = missedDeadline(item, now);
-      const overdue = Boolean(item.dueAt && new Date(item.dueAt).getTime() < now);
-      const status = missed ? "Quá hạn · 0 điểm" : item.retryAllowed ? "Cần làm lại" : item.gradingStatus === "TEACHER_CONFIRMED" ? "Đã chấm" : item.submissionCompleted ? "Chờ chấm" : item.predictionSubmitted ? "Đang làm" : overdue ? "Quá hạn" : "Chưa làm";
-      const color = missed ? "red" : item.retryAllowed || (!item.submissionCompleted && overdue) ? "amber" : item.submissionCompleted ? "cyan" : item.predictionSubmitted ? "indigo" : "gray";
+      const { label: status, color, action } = studentAssignmentState(item, now);
       const activityType = typeof item.questions === "object" && item.questions ? item.questions.activityType || "PREDICT_OBSERVE_EXPLAIN" : "PREDICT_OBSERVE_EXPLAIN";
-      const action = missed ? "Xem kết quả" : item.retryAllowed ? "Làm lại" : item.submissionCompleted ? "Xem bài" : item.predictionSubmitted ? "Tiếp tục" : overdue ? "Nộp muộn" : "Làm bài";
       return <Table.Row key={item.id}>
         <Table.Cell className="student-assignment-title"><Heading as="h3" size="3">{item.title}</Heading><Text as="p" color="gray" size="2">{item.className && <>{item.className}<span aria-hidden="true"> · </span></>}{activityLabels[activityType]}</Text>{item.feedback && <details className="student-assignment-feedback"><summary>Nhận xét của giáo viên</summary><p>{item.feedback}</p></details>}</Table.Cell>
         <Table.Cell className="student-assignment-deadline">{item.dueAt ? <><Text asChild size="2"><time dateTime={item.dueAt}>{new Date(item.dueAt).toLocaleDateString("vi-VN")}</time></Text><Text as="div" color="gray" size="1">{new Date(item.dueAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</Text></> : <Text color="gray" size="2">Không giới hạn</Text>}</Table.Cell>

@@ -1,3 +1,4 @@
+import { StudentRecentResults } from "../components/StudentRecentResults";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { AssignmentList } from "../components/StudentAssignmentList";
@@ -12,6 +13,7 @@ import { useSessionStore } from "../../../shared/auth/sessionStore";
 import type { User } from "../../../shared/auth/types";
 import AppSidebarLayout, { type SidebarGroup } from "../../../shared/layout/AppSidebar";
 import "./student-workspace.css";
+import "./student-dashboard.css";
 
 type StudentContext = {
   user: User | null;
@@ -57,12 +59,15 @@ export function StudentHomePage() {
       loading={resources.classesLoading}
       pendingAssignments={practice.pending}
       completedAssignments={practice.completed}
+      totalAssignments={practice.summary.total}
+      expiredAssignments={practice.summary.expired}
       assignmentsLoading={practice.list.loading}
       assignmentsError={practice.list.error}
       classesError={resources.classesError}
       onRetryClasses={() => void resources.loadClasses()}
       onAssignments={() => navigate("/student/assignments")}
       onExplore={() => navigate("/student/community")}
+      results={<StudentRecentResults {...practice.list} onSelect={assignment => navigate(`/student/assignments?bai=${encodeURIComponent(assignment.id)}`)} />}
       upNext={<StudentUpNext {...practice.list} onSelect={assignment => navigate(`/student/assignments?bai=${encodeURIComponent(assignment.id)}`)} onAll={() => navigate("/student/assignments")} />}
     />
   </StudentPage>;
