@@ -219,7 +219,6 @@ export default function Assignments({
         dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
         allowLateSubmission,
         maxScore: Number(maxScore) || 10,
-        autoGrade: activityType === "MEASUREMENT",
       });
       setFormVersion(version => version + 1);
       // The workspace keeps assignment history in the right rail, so switch

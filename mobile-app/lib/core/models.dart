@@ -94,7 +94,6 @@ class Assignment {
   bool get predictionSubmitted => asBool(json['predictionSubmitted']);
   bool get submissionCompleted => asBool(json['submissionCompleted']);
   bool get retryAllowed => asBool(json['retryAllowed']);
-  bool get autoGrade => asBool(json['autoGrade']);
   double get maxScore => asDouble(json['maxScore']) ?? 10;
   double? get score => asDouble(json['score']);
   String? get feedback => asString(json['feedback']);

@@ -93,14 +93,8 @@ class _StudentAssignmentScreenState extends State<StudentAssignmentScreen> {
       setState(() => _predictionError = 'Hãy viết dự đoán của bạn.');
       return;
     }
-    final estimate = double.tryParse(_estimate.text.trim().replaceAll(',', '.'));
-    if (_a.autoGrade && estimate == null) {
-      setState(() => _predictionError = 'Vui lòng nhập kết quả dự đoán bằng số.');
-      return;
-    }
     final payload = {
       'answerText': answer,
-      if (_a.autoGrade) 'estimatedValue': estimate,
       if (_reasoning.text.trim().isNotEmpty) 'reasoning': _reasoning.text.trim(),
     };
     setState(() {
@@ -333,16 +327,6 @@ class _StudentAssignmentScreenState extends State<StudentAssignmentScreen> {
           decoration: const InputDecoration(
               labelText: 'Lập luận hoặc công thức (không bắt buộc)', alignLabelWithHint: true),
         ),
-        if (_a.autoGrade) ...[
-          const SizedBox(height: 4),
-          TextField(
-            controller: _estimate,
-            enabled: !busy,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-            decoration: const InputDecoration(
-                labelText: 'Kết quả dự đoán bằng số *', helperText: 'Dùng đơn vị trong đề bài.'),
-          ),
-        ],
         if (_predictionError != null) ...[
           const SizedBox(height: 10),
           Text(_predictionError!, style: TextStyle(color: p.danger)),

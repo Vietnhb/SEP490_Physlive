@@ -259,7 +259,6 @@ export function useAssignmentPractice(userId: number | undefined) {
     e.preventDefault();
     if (!isCurrentSession() || !selectedAssignment || !predictionInput.trim() || predictionLockRef.current) return;
     if (missedDeadline(selectedAssignment)) { setPredictionError("Đã hết hạn nộp bài. Bài này không cho phép nộp trễ."); return; }
-    if (selectedAssignment.autoGrade && (!estimatedValue.trim() || !Number.isFinite(Number(estimatedValue)))) { setPredictionError("Vui lòng nhập kết quả dự đoán bằng số."); return; }
     const assignmentId = selectedAssignment.id;
     const requestId = ++assignmentRequestRef.current;
 
@@ -270,7 +269,6 @@ export function useAssignmentPractice(userId: number | undefined) {
 
     const payload: PredictionPayload = {
       answerText: predictionInput.trim(),
-      estimatedValue: selectedAssignment.autoGrade ? Number(estimatedValue) : undefined,
       reasoning: reasoningInput.trim() || undefined,
     };
 

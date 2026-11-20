@@ -112,7 +112,7 @@ public class SchoolClassGradeService {
     private static String stateLabel(String state) {
         return switch (state) {
             case "MISSED_DEADLINE" -> "Quá hạn · Không nộp (0 điểm)"; case "NOT_STARTED" -> "Chưa làm"; case "IN_PROGRESS" -> "Đang làm"; case SUBMITTED -> "Chưa chấm";
-            case "RETURNED" -> "Trả làm lại"; case "AI_GRADED" -> "AI đã chấm"; case "TEACHER_CONFIRMED" -> "Giáo viên đã xác nhận";
+            case "RETURNED" -> "Trả làm lại"; case "AI_GRADED" -> "Điểm tạm, chưa xác nhận"; case "TEACHER_CONFIRMED" -> "Giáo viên đã xác nhận";
             default -> state;
         };
     }
