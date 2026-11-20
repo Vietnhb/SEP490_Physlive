@@ -195,6 +195,268 @@ try {
   assert.equal(validation.errors.length, 0, validation.errors.join("\n"));
   results.push("Manager validation: server filters combine topic status and dates, reset pagination and clear correctly PASS");
   await validation.context.close();
+
+  if (process.argv.includes("--teacher-dashboard-only")) {
+    const check=await fixture("STAFF","/",false,false,false,false,true);
+    await expect(check.page).toHaveURL(/\/teacher$/);
+    await expect(check.page.getByRole("heading",{name:/Xin chào/})).toBeVisible();
+    await expect(check.page.getByRole("link",{name:"Tổng quan",exact:true}).first()).toHaveAttribute("aria-current","page");
+    await expect(check.page.getByRole("region",{name:"Thống kê giảng dạy"})).toContainText("Lớp phụ trách");
+    await expect(check.page.getByRole("heading",{name:"Lớp đang phụ trách",exact:true})).toBeVisible();
+    await expect(check.page.getByRole("heading",{name:"Bài giao gần đây",exact:true})).toBeVisible();
+    await expect(check.page.getByRole("link",{name:"Tạo mô phỏng",exact:true})).toHaveAttribute("href","/workspace");
+    await expect(check.page.getByRole("link",{name:/Giao bài mới/}).first()).toHaveAttribute("href","/assignments/workspace");
+    assert.equal(check.requests.filter(url=>/\/submissions$/.test(url)).length,0,"Dashboard must not fetch every assignment's submissions");
+    await check.page.screenshot({path:path.join(outDir,"teacher-dashboard-desktop.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"dark"});await check.page.screenshot({path:path.join(outDir,"teacher-dashboard-dark.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"light"});await check.page.setViewportSize({width:390,height:844});
+    assert.ok(await check.page.locator("main").evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+    await check.page.screenshot({path:path.join(outDir,"teacher-dashboard-mobile.png"),fullPage:true,animations:"disabled"});
+    await navigate(check.page,"/workspace");await expect(check.page.getByRole("heading",{name:"Tạo mô phỏng vật lý",exact:true})).toBeVisible();
+    await navigate(check.page,"/teacher");await expect(check.page.getByRole("heading",{name:/Xin chào/})).toBeVisible();
+    assert.equal(check.requests.filter(url=>url==="/api/assignments/mine/teacher").length,1,"Dashboard revisits reuse cache");
+    assert.equal(check.errors.length,0,check.errors.join("\n"));await check.context.close();
+    results.push("Teacher dashboard: default staff landing, navigation, scoped metrics, cached revisits, no per-assignment requests, dark/mobile layout PASS");
+  }
+
+  if (process.argv.includes("--teacher-workspace-m3-only")) {
+    const check=await fixture("STAFF","/");
+    let folders=[{id:"m3-folder",name:"Chuyển động",createdAt:"2026-11-01T10:00:00Z"}];
+    const items=Array.from({length:10},(_,i)=>({id:"m3-item-"+i,folderId:"m3-folder",simulationId:"saved-"+i,title:i===0?"Bài đặc biệt chuyển động tròn":"Mô phỏng "+i+" "+"Chuyển động và các thông số vật lý ".repeat(8),topic:"KINEMATICS",visibility:"PERSONAL",createdAt:"2026-11-"+String(i+1).padStart(2,"0")+"T10:00:00Z"}));
+    await check.context.route("**/api/library/folders",route=>{check.requests.push("/api/library/folders");if(route.request().method()==="POST"){const body=route.request().postDataJSON();folders=[...folders,{id:"new-folder",name:body.name,createdAt:new Date().toISOString()}];check.writes.push({api:"/api/library/folders",body});return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(folders.at(-1))});}return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(folders)});});
+    await check.context.route("**/api/library/mine",route=>{check.requests.push("/api/library/mine");return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(items)});});
+    const explanation={sessionId:"m3-session",stage:"EXPLAIN",description:"Mô tả đã xác nhận",schemaId:"kinematics",schemaVersion:"1.0",explanation:"Kiểm tra các đại lượng trước khi dựng mô phỏng.",formulas:[],validation:{status:"UNDERSTOOD",flags:[]}};
+    let failNextUnderstanding=false;
+    await check.context.route("**/api/simulation/understand",route=>{const multipart=route.request().headers()["content-type"]?.includes("multipart/");const body=multipart?{}:route.request().postDataJSON();check.writes.push({api:"/api/simulation/understand",body,multipart});if(failNextUnderstanding){failNextUnderstanding=false;return route.fulfill({status:500,contentType:"application/json",body:JSON.stringify({message:"Không đọc được tình huống thử nghiệm"})});}return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(multipart?{sessionId:"m3-image",stage:"RECOGNITION",recognizedText:"Vật rơi từ độ cao 20 m",displayText:"Vật rơi từ độ cao 20 m",sourceMode:"IMAGE",confidence:.99}:body.recognizedText?explanation:{...explanation,stage:"CLARIFY",question:"Vận tốc ban đầu là bao nhiêu?",choices:[]})});});
+    await check.context.route("**/api/simulation/revise",route=>{check.writes.push({api:"/api/simulation/revise",body:route.request().postDataJSON()});return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(explanation)});});
+    await navigate(check.page,"/workspace");
+    const app=check.page.locator(".teacher-workspace-m3"), input=check.page.getByRole("textbox",{name:"Mô tả tình huống",exact:true}), entry=check.page.getByRole("region",{name:"Tạo mô phỏng vật lý",exact:true});
+    await expect(entry).toBeVisible();await expect(entry.getByRole("button",{name:"Tiếp tục",exact:true})).toBeDisabled();await expect(app.locator(".learn-library-item")).toHaveCount(10);
+    await check.page.getByRole("button",{name:"Thư mục mới",exact:true}).click();await check.page.locator("#new-library-folder").fill("Thư mục kiểm thử");await check.page.getByRole("button",{name:"Tạo thư mục",exact:true}).click();await expect(app).toContainText("Thư mục kiểm thử");
+    const search=check.page.getByRole("searchbox",{name:"Tìm trong thư viện",exact:true});await search.fill("đặc biệt");await expect(app.locator(".learn-library-item")).toHaveCount(1);await search.fill("");
+    await check.page.getByRole("button",{name:"Thu gọn thư viện",exact:true}).click();await expect(app.locator(".learn-layout")).toHaveAttribute("data-library-collapsed","true");await check.page.getByRole("button",{name:"Mở thư viện",exact:true}).click();
+    await check.page.getByRole("button",{name:/^Ô tô hãm phanh/}).click();await expect(input).toHaveValue(/Một ô tô đang chạy/);await expect(input).toBeFocused();
+    const action=entry.getByRole("button",{name:"Tiếp tục",exact:true}),before=await action.boundingBox();await action.hover();const after=await action.boundingBox();assert.ok(Math.abs(before.y-after.y)<1&&before.height>=40);
+    await check.page.screenshot({path:path.join(outDir,"teacher-workspace-m3-desktop.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"dark"});await expect(app).toHaveCSS("color","rgb(227, 229, 236)");await check.page.screenshot({path:path.join(outDir,"teacher-workspace-m3-dark.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"light"});await check.page.setViewportSize({width:1800,height:1050});await check.page.screenshot({path:path.join(outDir,"teacher-workspace-m3-wide.png"),fullPage:true,animations:"disabled"});
+    await check.page.getByRole("tab",{name:"Giải thích",exact:true}).click();await expect(app).toContainText("Phần giải thích hiện tượng");await check.page.getByRole("tab",{name:"Chi tiết",exact:true}).click();await check.page.getByRole("tab",{name:"Thử nghiệm",exact:true}).click();
+    await check.page.setViewportSize({width:390,height:844});await expect(entry).toBeVisible();assert.ok(await app.evaluate(el=>el.scrollWidth<=el.clientWidth+1),"Teacher workspace must fit mobile width");
+    await check.page.screenshot({path:path.join(outDir,"teacher-workspace-m3-mobile.png"),fullPage:true,animations:"disabled"});
+    await check.page.getByRole("button",{name:"Thông số & Chi tiết",exact:true}).click();await check.page.getByRole("button",{name:/^Ném ngang/}).click();await expect(input).toHaveValue(/Ném một vật/);await expect(input).toBeFocused();
+    await action.click();await expect(check.page.getByRole("heading",{name:"Cần làm rõ một chút",exact:true})).toBeVisible();await expect(app.locator('.simulation-steps [aria-current="step"]')).toContainText("Xác nhận");
+    const clarify=app.locator(".simulation-card").filter({has:check.page.getByRole("heading",{name:"Cần làm rõ một chút",exact:true})});await clarify.locator("textarea").fill("Vận tốc ban đầu 15 m/s");await clarify.locator('button[type="submit"]').click();await expect(check.page.getByRole("heading",{name:"Xem lại mô phỏng sẽ dựng",exact:true})).toBeVisible();await expect(app.locator('.simulation-steps [aria-current="step"]')).toContainText("Dựng mô phỏng");
+    await app.getByRole("button",{name:"Làm lại từ đầu",exact:true}).click();
+    await app.locator('input[type="file"]').setInputFiles({name:"physics-fixture.png",mimeType:"image/png",buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS9sAAAAASUVORK5CYII=","base64")});await expect(app.getByRole("img",{name:"Ảnh đề bài đã thêm",exact:true})).toBeVisible();await action.click();
+    await expect(check.page.getByRole("heading",{name:"Hệ thống hiểu mô tả của bạn như sau, đúng chưa?",exact:true})).toBeVisible();await expect(app.locator('.simulation-steps [aria-current="step"]')).toContainText("Xác nhận");await app.getByRole("button",{name:"Sửa lại",exact:true}).click();await app.locator("#simulation-correction").fill("Vật rơi từ độ cao 30 m");await app.getByRole("button",{name:"Kiểm tra lại",exact:true}).click();await expect(check.page.getByRole("heading",{name:"Xem lại mô phỏng sẽ dựng",exact:true})).toBeVisible();
+    await app.getByRole("button",{name:"Làm lại từ đầu",exact:true}).click();failNextUnderstanding=true;await input.fill("Tình huống thử lỗi");await action.click();await expect(app.getByRole("alert")).toContainText("Không đọc được tình huống thử nghiệm");
+    assert.equal(check.requests.filter(api=>api==="/api/library/mine").length,2);assert.equal(check.errors.length,0,check.errors.join("\n"));await check.context.close();
+    results.push("Teacher M3 workspace: library search/folders/collapse, example selection, clarification, image recognition/correction, step states, errors, dark mode, mobile panels and no layout overflow PASS");
+  }
+
+
+  if (process.argv.includes("--reviewer-dashboard-only")) {
+    async function reviewerDashboard(permissions = ["CONTENT_EDIT", "CONTENT_REVIEW"], delayDrafts = false) {
+      const check = await fixture("REVIEWER", "/");
+      let failed = false, empty = false, releaseSchemas; const schemasGate = new Promise(resolve => { releaseSchemas = resolve; }); if (!delayDrafts) releaseSchemas();
+      await check.context.route("**/api/user/me", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...actor("REVIEWER"), permissions }) }));
+      const sources = [
+        ["**/api/reviewer/library**", "/api/reviewer/library?status=PENDING", [{ id:"pending-1",createdAt:"2026-11-18T08:00:00Z" }, { id:"pending-2",createdAt:"2026-11-19T08:00:00Z" }]],
+        ["**/api/support/complaints/review", "/api/support/complaints/review", ["OPEN","READ","RESOLVED"].map((status,i)=>({ id:"report-"+i,kind:"COMPLAINT",subject:"Báo lỗi "+i,content:"Kiểm tra mô phỏng",senderName:"Teacher",senderEmail:"teacher@test.invalid",status,createdAt:i===2?"2026-10-01T08:00:00Z":"2026-11-0"+(i+1)+"T08:00:00Z" }))],
+        ["**/api/reviewer/schemas", "/api/reviewer/schemas", ["DRAFT","APPROVED","RETIRED"].map((lifecycleStatus,i)=>({id:"schema-"+i,name:"Chủ đề "+i,schemaId:"schema",version:"1."+i,lifecycleStatus,createdAt:"2026-11-10T08:00:00Z"}))],
+        ["**/api/reviewer/law-gaps**", "/api/reviewer/law-gaps?status=OPEN", [{id:"gap-1",occurrences:7}]],
+      ];
+      for (const [pattern,api,data] of sources) await check.context.route(pattern, async route => { check.requests.push(api); if (api==="/api/reviewer/schemas") await schemasGate; return route.fulfill({status:failed&&api==="/api/reviewer/schemas"?503:200,contentType:"application/json",body:JSON.stringify(failed&&api==="/api/reviewer/schemas"?{message:"Fixture schemas unavailable"}:empty?[]:data)}); });
+      await check.page.reload(); await navigate(check.page,"/reviewer");
+      return {...check, releaseSchemas, failSchemas:()=>{failed=true;}, emptyAll:()=>{failed=false;empty=true;}};
+    }
+    const check=await reviewerDashboard(undefined,true), dashboard=check.page.getByTestId("reviewer-dashboard");
+    const task=id=>dashboard.locator('article[data-task="'+id+'"]'), priority=check.page.getByRole("region",{name:"Ưu tiên xử lý",exact:true});
+    await expect(task("complaints").locator(":scope > strong")).toHaveText("2"); await expect(task("drafts").locator(":scope > strong")).toHaveText("—");
+    await expect(dashboard.locator("header")).toContainText("Đang kiểm tra"); check.releaseSchemas();
+    await expect(dashboard.locator("header")).toContainText("Hiện có 6 việc"); await expect(priority.locator("li")).toHaveCount(4);
+    await expect(priority.locator("li").first()).toContainText("Khiếu nại mô phỏng"); await expect(priority.locator("li").nth(1)).toContainText("Bản nháp chờ phê duyệt");
+    await expect(task("moderation").locator(":scope > strong")).toHaveText("2"); await expect(task("gaps").locator(":scope > strong")).toHaveText("1");
+    const action=dashboard.locator("header").getByRole("button",{name:"Tiếp tục xử lý",exact:true}); const before=await action.boundingBox(); await action.hover(); const after=await action.boundingBox(); assert.ok(Math.abs(before.y-after.y)<1&&before.height>=40); await action.focus(); await expect(action).toBeFocused();
+    await check.page.screenshot({path:path.join(outDir,"reviewer-dashboard-desktop.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"dark"}); await expect(dashboard).toHaveCSS("color","rgb(227, 229, 236)");
+    await check.page.screenshot({path:path.join(outDir,"reviewer-dashboard-dark.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"light"}); await check.page.setViewportSize({width:1600,height:1000}); await check.page.screenshot({path:path.join(outDir,"reviewer-dashboard-wide.png"),fullPage:true,animations:"disabled"});
+    await check.page.setViewportSize({width:390,height:844}); assert.ok(await dashboard.evaluate(el=>el.scrollWidth<=el.clientWidth+1),"Reviewer dashboard must fit mobile width");
+    await check.page.screenshot({path:path.join(outDir,"reviewer-dashboard-mobile.png"),fullPage:true,animations:"disabled"});
+    await action.click(); await expect(check.page).toHaveURL(/\/reviewer\/complaints$/); await navigate(check.page,"/reviewer");
+    await expect(task("complaints").locator(":scope > strong")).toHaveText("2");
+    for (const api of ["/api/reviewer/library?status=PENDING","/api/support/complaints/review","/api/reviewer/schemas","/api/reviewer/law-gaps?status=OPEN"]) assert.equal(check.requests.filter(item=>item===api).length,1,"Sidebar, overview and desks must share "+api);
+    check.failSchemas(); await dashboard.getByRole("button",{name:"Làm mới",exact:true}).click(); await expect(dashboard.getByRole("alert")).toContainText("Bản nháp chờ phê duyệt");
+    await expect(dashboard).not.toContainText("Đã xử lý hết công việc"); await expect(task("complaints").locator(":scope > strong")).toHaveText("2");
+    check.emptyAll(); await dashboard.getByRole("button",{name:"Làm mới",exact:true}).click(); await expect(priority.getByRole("heading",{name:"Đã xử lý hết công việc",exact:true})).toBeVisible();
+    await expect(dashboard.locator("header")).toContainText("Không còn công việc đang chờ xử lý"); await expect(task("drafts").locator(":scope > strong")).toHaveText("0"); await expect(action).toHaveCount(0); await check.context.close();
+    for (const permissions of [["CONTENT_REVIEW"],["CONTENT_EDIT"],[]]) {
+      const scoped=await reviewerDashboard(permissions), home=scoped.page.getByTestId("reviewer-dashboard");
+      if (!permissions.length) { await expect(scoped.page.getByRole("heading",{name:"Tài khoản chưa được cấp quyền",exact:true})).toBeVisible(); await expect(home).toHaveCount(0); }
+      else { await expect(home.locator("article")).toHaveCount(permissions[0]==="CONTENT_REVIEW"?2:3); await expect(home.locator("header")).toContainText("Hiện có 4 việc"); }
+      if (!permissions.includes("CONTENT_EDIT")) assert.ok(!scoped.requests.some(api=>api.includes("/reviewer/schemas")||api.includes("/reviewer/law-gaps")),"No editorial requests without edit permission");
+      if (!permissions.includes("CONTENT_REVIEW")) assert.ok(!scoped.requests.some(api=>api.includes("/reviewer/library")),"No moderation requests without review permission");
+      await scoped.context.close();
+    }
+    results.push("Reviewer M3 dashboard: per-group loading, open-only counts, oldest-first work, scoped permissions, shared cache, partial failure, empty queues, navigation, dark mode and mobile fit PASS");
+  }
+
+
+  if (process.argv.includes("--admin-dashboard-only")) {
+    const check = await fixture("ADMIN", "/");
+    const managers = Array.from({ length: 7 }, (_, index) => ({ ...actor("MANAGER"), id: 200 + index, fullName: "Manager " + index + " " + "Tên rất dài ".repeat(10), email: "manager" + index + "@test.invalid", active: index !== 1, accountStatus: index === 1 ? "SUSPENDED_READ_ONLY" : index === 2 ? "WARNED" : "ACTIVE" }));
+    const accounts = [actor("ADMIN"), ...managers, ...people.slice(0, 2), { ...actor("STAFF"), id: 300 }, { ...actor("SCHOOL"), id: 301 }, { ...actor("REVIEWER"), id: 302 }];
+    let analytics = { postsThisWeek: 3, postsThisMonth: 7, operationsThisWeek: 56, operationsThisMonth: 210, postBreakdown: { totalCumulativePosts: 21, cumulative: { periodTotalPosts: 21, publicPosts: 2, privatePosts: 16, deletedOrHiddenPosts: 3 }, weekly: { periodTotalPosts: 3, publicPosts: 1, privatePosts: 2, deletedOrHiddenPosts: 0 }, monthly: { periodTotalPosts: 7, publicPosts: 1, privatePosts: 5, deletedOrHiddenPosts: 1 } }, revenue: { totalVnd: 490000000, weeklyVnd: 30000000, monthlyVnd: 80000000, paidCount: 10, pendingCount: 1, failedCount: 2, byPlan: [{planCode:"STARTER",name:"Starter",amountVnd:240000000,count:8},{planCode:"PRO",name:"Professional",amountVnd:50000000,count:1},{planCode:"ENTERPRISE",name:"Enterprise",amountVnd:200000000,count:1}], timeline: [10000000,0,20000000,50000000].map((amountVnd,i)=>({period:"Tuần "+(i+1),amountVnd,posts:0,operations:0})), recentTransactions: ["PAID","PAID","FAILED","PENDING"].map((status,i)=>({ id:"tx-"+i,schoolName:"Trường học "+i+" "+"Tên trường rất dài ".repeat(10),planCode:"STARTER",planName:"Starter",amountVnd:30000000,status,createdAt:"2026-11-19T08:00:00Z" })) } };
+    let releaseAnalytics; const analyticsGate = new Promise(resolve=>{releaseAnalytics=resolve;});
+    let failed = false;
+    await check.context.route("**/api/admin/users", route => { check.requests.push("/api/admin/users"); return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify(accounts)}); });
+    await check.context.route("**/api/admin/analytics", async route => { check.requests.push("/api/admin/analytics"); await analyticsGate; return route.fulfill({status:failed?503:200,contentType:"application/json",body:JSON.stringify(failed?{message:"Fixture statistics unavailable"}:analytics)}); });
+    await navigate(check.page,"/admin");
+    const dashboard=check.page.getByTestId("admin-dashboard"), metrics=check.page.getByRole("region",{name:"Chỉ số hoạt động và doanh thu",exact:true});
+    const managersPanel=check.page.getByRole("region",{name:"Tài khoản vận hành",exact:true}), roles=check.page.getByRole("region",{name:"Tài khoản theo vai trò",exact:true});
+    const metric=label=>metrics.locator("article").filter({has:check.page.getByRole("heading",{name:label,exact:true})}).locator(":scope > strong [data-full-value]");
+    await expect(managersPanel.locator("li")).toHaveCount(6); await expect(metric("Doanh thu tuần này")).toHaveText("—");
+    await expect(metric("Tài khoản hoạt động")).toHaveText("12"); releaseAnalytics();
+    await expect(metric("Doanh thu tuần này")).toHaveText("30.000.000 ₫"); await expect(metric("Mô phỏng mới tuần này")).toHaveText("3");
+    await expect(roles.locator("li")).toHaveCount(6); await expect(managersPanel).toContainText("Hiển thị 6 / 7"); await expect(managersPanel.getByText("Tạm khóa",{exact:true})).toBeVisible();
+    await expect(managersPanel.getByText("Cảnh báo",{exact:true})).toBeVisible();
+    await check.page.getByRole("radio",{name:"Tháng này",exact:true}).click();
+    await expect(metric("Doanh thu tháng này")).toHaveText("80.000.000 ₫"); await expect(metric("Mô phỏng mới tháng này")).toHaveText("7"); await expect(metric("Thao tác tháng này")).toHaveText("210");
+    const revenuePanel=check.page.getByRole("region",{name:"Doanh thu 4 tuần gần nhất",exact:true}), tx=check.page.getByRole("region",{name:"Giao dịch",exact:true});
+    await expect(revenuePanel.getByRole("img")).toContainText("Tuần 1"); await expect(revenuePanel.getByRole("progressbar")).toHaveCount(3); await expect(tx.locator("li")).toHaveCount(4);
+    await check.page.getByRole("radio",{name:"Tuần này",exact:true}).click();
+    const manage=dashboard.getByRole("link",{name:"Quản lý tài khoản",exact:true}); await expect(manage).toHaveAttribute("href","/admin/users");
+    const before=await manage.boundingBox(); await manage.hover(); const after=await manage.boundingBox(); assert.ok(Math.abs(before.y-after.y)<1 && before.height>=40); await manage.focus(); await expect(manage).toBeFocused();
+    await check.page.screenshot({path:path.join(outDir,"admin-dashboard-desktop.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"dark"}); await expect(dashboard).toHaveCSS("color","rgb(227, 229, 236)");
+    await check.page.screenshot({path:path.join(outDir,"admin-dashboard-dark.png"),fullPage:true,animations:"disabled"});
+    await check.page.emulateMedia({colorScheme:"light"}); await check.page.setViewportSize({width:1600,height:1000});
+    await check.page.screenshot({path:path.join(outDir,"admin-dashboard-wide.png"),fullPage:true,animations:"disabled"});
+    await check.page.setViewportSize({width:390,height:844}); await expect(metrics.locator("article").first().locator("strong")).toHaveAttribute("title", "30.000.000 ₫"); assert.ok(await dashboard.evaluate(el=>el.scrollWidth<=el.clientWidth+1),"Admin dashboard must fit mobile width");
+    await check.page.screenshot({path:path.join(outDir,"admin-dashboard-mobile.png"),fullPage:true,animations:"disabled"});
+    await manage.click(); await expect(check.page).toHaveURL(/\/admin\/users$/); await navigate(check.page,"/admin");
+    await expect(metric("Doanh thu tuần này")).toHaveText("30.000.000 ₫");
+    assert.equal(check.requests.filter(item=>item==="/api/admin/analytics").length,1); assert.equal(check.requests.filter(item=>item==="/api/admin/users").length,1);
+    failed=true; await dashboard.getByRole("button",{name:"Làm mới",exact:true}).click(); await expect(dashboard.getByRole("alert")).toContainText("Chưa cập nhật được thống kê"); await expect(managersPanel.locator("li")).toHaveCount(6);
+    failed=false; analytics={...analytics,postsThisWeek:0,postsThisMonth:0,postBreakdown:undefined,operationsThisWeek:0,operationsThisMonth:0,revenue:{totalVnd:0,weeklyVnd:0,monthlyVnd:0,paidCount:0,pendingCount:0,failedCount:0,byPlan:[],timeline:[],recentTransactions:[]}};
+    await dashboard.getByRole("button",{name:"Làm mới",exact:true}).click(); await expect(metric("Doanh thu tuần này")).toHaveText("0 ₫"); await expect(revenuePanel).toContainText("Chưa có giao dịch đã thanh toán trong 4 tuần qua"); await expect(tx).toContainText("Chưa có giao dịch nào");
+    assert.ok(!check.requests.some(item=>item.startsWith("/api/manager/")),"Admin redesign must not require manager-only APIs");
+    await check.context.close(); results.push("Admin M3 dashboard: independent loading, week/month metrics, chart and cumulative scopes, manager status/limits, cache reuse, errors, empty revenue, dark mode and mobile fit PASS");
+  }
+
+
+  if (process.argv.includes("--school-dashboard-only")) {
+    const check = await fixture("SCHOOL", "/", true);
+    let data = { schoolId, schoolName: "Trường Vật lý Thực nghiệm", students: 91, teachers: 4, managers: 1, activeClasses: 12, enrolledStudents: 90, usedTokens: 207361, tokenQuota: 1000000, studentQuota: 5000, planCode: "ENTERPRISE", licenseStart: "2026-09-22", licenseEnd: "2027-09-21", licenseStatus: "ACTIVE", usageMonth: "2026-11-01" };
+    let licenseData = { active: true, canPerformWriteOperations: true, showRenewalBanner: false, inGraceMode: false, daysUntilExpiry: 305, licenseEnd: "2027-09-21" }, failLicense = false;
+    await check.context.route("**/api/schools/*/reports/summary", route => { check.requests.push(new URL(route.request().url()).pathname); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) }); });
+    await check.context.route("**/api/user/me/license", route => { check.requests.push("/api/user/me/license"); return route.fulfill({ status: failLicense ? 503 : 200, contentType: "application/json", body: JSON.stringify(failLicense ? { message: "Fixture temporarily unavailable" } : licenseData) }); });
+    await navigate(check.page, "/school");
+    const stats = check.page.getByRole("region", { name: "Chỉ số trường học", exact: true }), recent = check.page.getByRole("region", { name: "Lớp học gần đây", exact: true });
+    const usage = check.page.getByRole("region", { name: "Hạn mức sử dụng", exact: true }), license = check.page.getByRole("region", { name: "Gói sử dụng", exact: true });
+    const header = check.page.locator("header").filter({ has: check.page.getByRole("heading", { name: data.schoolName, exact: true }) });
+    await expect(stats).toContainText("207.361"); await expect(stats).toContainText("91");
+    await expect(recent.getByText("Class 01", { exact: true })).toHaveCount(0);
+    await expect(license).toContainText("305 ngày"); await expect(license).toContainText("ENTERPRISE");
+    check.releaseRoster(); await expect(recent.locator("tbody tr")).toHaveCount(5);
+    assert.equal(check.requests.filter(item => item === "/api/user/me/license").length, 1);
+    await expect(usage.getByRole("progressbar")).toHaveCount(2);
+    await expect(usage.getByRole("progressbar", { name: "Token AI tháng này: đã dùng 21% hạn mức", exact: true })).toHaveAttribute("value", "21");
+    await expect(recent.getByRole("link", { name: "Xem lớp Class 01", exact: true })).toHaveAttribute("href", "/school/classes/" + classrooms[0].id);
+    const manage = header.getByRole("link", { name: "Quản lý lớp học", exact: true }); const before = await manage.boundingBox(); await manage.hover(); const after = await manage.boundingBox();
+    assert.ok(Math.abs(before.y-after.y) < 1 && before.height >= 40, "Material button target and hover must remain stable");
+    await manage.focus(); await expect(manage).toBeFocused();
+    await check.page.screenshot({ path: path.join(outDir, "school-dashboard-desktop.png"), fullPage: true, animations: "disabled" });
+    await check.page.emulateMedia({ colorScheme: "dark" }); await expect(check.page.locator("html")).toHaveClass(/dark/);
+    await expect(check.page.getByTestId("school-dashboard")).toHaveCSS("color", "rgb(227, 229, 236)");
+    await check.page.screenshot({ path: path.join(outDir, "school-dashboard-dark.png"), fullPage: true, animations: "disabled" });
+    await check.page.emulateMedia({ colorScheme: "light" }); await check.page.setViewportSize({ width: 1600, height: 1000 });
+    await check.page.screenshot({ path: path.join(outDir, "school-dashboard-wide.png"), fullPage: true, animations: "disabled" });
+    await check.page.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await check.page.locator(".admin-content").evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Dashboard must fit mobile width");
+    assert.ok(await recent.locator("table").evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Class table must fit mobile width");
+    await check.page.screenshot({ path: path.join(outDir, "school-dashboard-mobile.png"), fullPage: true, animations: "disabled" });
+    await check.page.setViewportSize({ width: 1280, height: 900 });
+    data = { ...data, usedTokens: 900000, tokenQuota: 1000000 };
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click();
+    await expect(usage.getByRole("progressbar", { name: "Token AI tháng này: đã dùng 90% hạn mức", exact: true })).toHaveAttribute("value", "90");
+    data = { ...data, usedTokens: 0, students: 0, studentQuota: 0, tokenQuota: 0 };
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click();
+    await expect(usage.getByRole("progressbar").first()).toHaveAttribute("value", "0");
+    await expect(usage.getByRole("progressbar").last()).toHaveAttribute("value", "0");
+    data = { ...data, usedTokens: 207361, students: 91, studentQuota: null, tokenQuota: null };
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click();
+    await expect(usage.getByRole("progressbar")).toHaveCount(0); await expect(usage).toContainText("Gói không giới hạn token AI");
+    licenseData = { ...licenseData, active: false, canPerformWriteOperations: false, daysUntilExpiry: -3 }; data = { ...data, licenseStatus: "EXPIRED" };
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click(); await expect(license.getByText("Đã hết hạn", { exact: true })).toHaveCount(2);
+    data = { ...data, licenseStatus: "UNLICENSED", planCode: null, licenseEnd: null }; licenseData = { ...licenseData, licenseEnd: null };
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click(); await expect(license.getByText("Chưa mua gói", { exact: true })).toHaveCount(2);
+    await check.context.route("**/api/schools/*/classes/page**", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [], totalElements: 0, totalPages: 0, page: 0, size: 5 }) }));
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click(); await expect(recent.getByRole("heading", { name: "Chưa có lớp đang hoạt động", exact: true })).toBeVisible();
+    failLicense = true;
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click();
+    await expect(license).toContainText("Chưa tải được thời gian còn lại");
+    await expect(license).toContainText("Chưa xác minh"); await expect(stats).toContainText("207.361");
+    await check.context.route("**/api/schools/*/classes/page**", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Unavailable fixture" }) }));
+    await header.getByRole("button", { name: "Làm mới", exact: true }).click();
+    await expect(recent.getByRole("alert")).toContainText("Không thể tải danh sách lớp");
+    await check.context.close();
+    results.push("School M3 dashboard: independent loading, finite/unlimited/zero quotas, expired/unlicensed states, partial failures, links, stable actions, dark mode and mobile fit PASS");
+  }
+
+
+  if (process.argv.includes("--student-dashboard-only")) {
+    const learner = await fixture("STUDENT", "/");
+    const common = { libraryItemId: "fixture", specificationId: "fixture", questions: { activityType: "PREDICT_OBSERVE_EXPLAIN", prompt: "Predict" }, studentIds: [102], status: "ACTIVE", assignedAt: "2026-11-01T10:00:00Z", maxScore: 10, className: "Class 01" };
+    const items = [
+      { ...common, id: "strict", title: "Strict deadline work", dueAt: "2020-01-01T10:00:00Z", allowLateSubmission: false },
+      { ...common, id: "late", title: "Late permitted work", dueAt: "2020-01-01T10:00:00Z", allowLateSubmission: true },
+      { ...common, id: "returned", title: "Returned work", retryAllowed: true },
+      ...Array.from({ length: 4 }, (_, i) => ({ ...common, id: "done-" + i, title: "Submitted work " + i, submissionCompleted: true, completedAt: "2026-11-" + (10+i) + "T10:00:00Z", gradingStatus: i < 2 ? "TEACHER_CONFIRMED" : "PENDING", score: i < 2 ? 8 : null, feedback: i < 2 ? "Teacher feedback " + "Useful comment. ".repeat(40) : null })),
+    ];
+    await learner.context.route("**/api/assignments/mine/student", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(items) }));
+    await learner.context.route("**/api/student/classes", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ ...classrooms[0], schoolName: "Fixture school", classmateCount: 26, teachers: [{ id: 200, fullName: "Fixture teacher" }] }]) }));
+    await navigate(learner.page, "/student");
+    const hero = learner.page.locator(".student-hero"), next = learner.page.locator(".student-up-next"), recent = learner.page.locator(".student-results");
+    const stat = label => hero.locator("dl > div").filter({ has: learner.page.locator("dt", { hasText: label }) }).locator("dd");
+    await expect(stat("Tổng bài tập")).toHaveText("7");
+    await expect(stat("Cần làm / làm lại")).toHaveText("2"); await expect(stat("Đã nộp")).toHaveText("4");
+    await expect(next.locator("li")).toHaveCount(2); await expect(next.locator("li").first()).toContainText("Returned work");
+    await expect(next).not.toContainText("Strict deadline work"); await expect(next.getByRole("button", { name: "Nộp muộn: Late permitted work", exact: true })).toBeVisible();
+    await expect(recent.locator("li")).toHaveCount(3); await expect(recent).toContainText("Đã chấm 2"); await expect(recent).toContainText("Chờ chấm / xác nhận 2");
+    await expect(recent).toContainText("8 / 10"); await expect(recent).toContainText("Teacher feedback");
+    await learner.page.screenshot({ path: path.join(outDir, "student-dashboard-desktop.png"), fullPage: true, animations: "disabled" });
+    const action = next.getByRole("button", { name: "Làm lại: Returned work", exact: true });
+    const before = await action.boundingBox(); await action.hover(); const after = await action.boundingBox();
+    assert.ok(Math.abs(before.y-after.y) < 1 && Math.abs(before.height-after.height) < 1, "Hover must not shift the action");
+    assert.ok(before.width >= 88 && before.height >= 40, "Material action must have a usable target");
+    await action.focus(); await expect(action).toBeFocused();
+    assert.equal(await action.evaluate(el => getComputedStyle(el).outlineStyle), "solid");
+    await learner.page.emulateMedia({ colorScheme: "dark" });
+    await expect(learner.page.locator("html")).toHaveClass(/dark/);
+    await expect(learner.page.locator(".student-dashboard")).toHaveCSS("color", "rgb(227, 229, 236)");
+    await learner.page.screenshot({ path: path.join(outDir, "student-dashboard-dark.png"), fullPage: true, animations: "disabled" });
+    await learner.page.emulateMedia({ colorScheme: "light" });
+    await learner.page.setViewportSize({ width: 1600, height: 1000 });
+    await learner.page.screenshot({ path: path.join(outDir, "student-dashboard-wide.png"), fullPage: true, animations: "disabled" });
+    await learner.page.setViewportSize({ width: 1280, height: 900 });
+
+    await next.getByRole("button", { name: "Tất cả bài tập (7)", exact: true }).click();
+    await expect(learner.page.locator(".student-assignment-table tbody tr")).toHaveCount(2);
+    await learner.page.getByRole("radio", { name: /Quá hạn/ }).click();
+    await expect(learner.page.getByText("Quá hạn · 0 điểm", { exact: true })).toBeVisible();
+    await expect(learner.page.getByRole("button", { name: "Xem kết quả: Strict deadline work", exact: true })).toBeVisible();
+    await navigate(learner.page, "/student"); await learner.page.setViewportSize({ width: 390, height: 844 });
+    await expect(stat("Tổng bài tập")).toHaveText("7");
+    assert.ok(await learner.page.locator(".student-workspace").evaluate(el => el.scrollWidth <= el.clientWidth + 1), "Dashboard must fit mobile width");
+    await learner.page.screenshot({ path: path.join(outDir, "student-dashboard-mobile.png"), fullPage: true, animations: "disabled" });
+    await learner.context.route("**/api/assignments/mine/student", route => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await learner.page.reload(); await expect(stat("Tổng bài tập")).toHaveText("0"); await expect(next).toContainText("Chưa có bài tập được giao"); await expect(recent).toHaveCount(0);
+    assert.equal(learner.errors.length, 0, learner.errors.join("\n")); await learner.context.close();
+    results.push("Student dashboard: seven assignments, strict/allowed deadlines, consistent counts, recent grades/feedback, navigation, mobile and empty state PASS");
+  }
+
   if (process.argv.includes("--reviewer-redesign-only")) {
     const reviewer = await fixture("REVIEWER", "/");
     let reports = Array.from({ length: 23 }, (_, index) => ({ id: String(index + 1).padStart(8, "0") + "-fixture", kind: "COMPLAINT", senderId: 100 + index, senderName: "Teacher " + (index + 1), senderEmail: "teacher" + (index + 1) + "@test.invalid", subject: "Báo lỗi mô phỏng " + (index + 1), content: (index === 22 ? "Nội dung đầy đủ. ".repeat(200) + "END FULL REPORT" : "Nội dung ngắn") + "\n— Đề bài —\nĐề bài vật lý\n— Thông số đang dùng —\ny0 = 28; vx = 6; g = 9.8", status: ["OPEN", "READ", "RESOLVED"][index % 3], createdAt: new Date(Date.UTC(2026, 10, index + 1, 8)).toISOString(), adminResponse: index % 3 === 2 ? "Đã kiểm tra kết quả." : null }));
@@ -454,7 +716,7 @@ try {
     results.push("Teacher classes: scoped rosters, per-class assignments, grading history, gradebook and preselected class creation PASS");
     await teaching.context.close();
   }
-  if (!process.argv.includes("--reviewer-redesign-only") && !process.argv.includes("--gradebook-pages-only") && !process.argv.includes("--deadline-only") && !process.argv.includes("--gradebook-layout-only") && !process.argv.includes("--validation-only") && !process.argv.includes("--teacher-classes-only") && !process.argv.includes("--complaint-dates-only")) {
+  if (!process.argv.includes("--teacher-dashboard-only") && !process.argv.includes("--teacher-workspace-m3-only") && !process.argv.includes("--reviewer-dashboard-only") && !process.argv.includes("--admin-dashboard-only") && !process.argv.includes("--school-dashboard-only") && !process.argv.includes("--student-dashboard-only") && !process.argv.includes("--reviewer-redesign-only") && !process.argv.includes("--gradebook-pages-only") && !process.argv.includes("--deadline-only") && !process.argv.includes("--gradebook-layout-only") && !process.argv.includes("--validation-only") && !process.argv.includes("--teacher-classes-only") && !process.argv.includes("--complaint-dates-only")) {
   const manager = await fixture("MANAGER", "/manager/users");
   const { page, requests } = manager;
   await expect(page.getByText("Student 01", { exact: true })).toBeVisible();
