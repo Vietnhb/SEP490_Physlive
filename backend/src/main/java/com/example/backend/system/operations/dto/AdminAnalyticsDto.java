@@ -10,8 +10,12 @@ public record AdminAnalyticsDto(
         long operationsThisWeek,
         long operationsThisMonth,
         RevenueData revenue,
-        PostBreakdown postBreakdown
+        PostBreakdown postBreakdown,
+        OperationBreakdown operationBreakdown
 ) {
+    public record OperationStats(long simulationRuns, long submissions, long gradedSubmissions) {}
+    public record OperationBreakdown(OperationStats weekly, OperationStats monthly, Instant weekStart, Instant monthStart, Instant measuredAt) {}
+
     public record PostBreakdown(
             long totalCumulativePosts,
             PostStats cumulative,

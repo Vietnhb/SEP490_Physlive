@@ -77,7 +77,11 @@ public class AdminAnalyticsService {
         RevenueData revenue = new RevenueData(payment.getTotalVnd(), payment.getWeeklyVnd(), payment.getMonthlyVnd(),
             payment.getPaidCount(), payment.getPendingCount(), payment.getFailedCount(), byPlan, timeline, recentTransactions);
 
-        return new AdminAnalyticsDto(postsThisWeek, postsThisMonth, operationsThisWeek, operationsThisMonth, revenue, postBreakdown);
+        return new AdminAnalyticsDto(postsThisWeek, postsThisMonth, operationsThisWeek, operationsThisMonth, revenue, postBreakdown,
+                new AdminAnalyticsDto.OperationBreakdown(
+                        new AdminAnalyticsDto.OperationStats(runs.getWeek(), work.getSubmittedWeek(), work.getGradedWeek()),
+                        new AdminAnalyticsDto.OperationStats(runs.getMonth(), work.getSubmittedMonth(), work.getGradedMonth()),
+                        startOfWeek, startOfMonth, now));
     }
 
     /** The name a plan is sold under; its code where the catalogue no longer lists it. */
