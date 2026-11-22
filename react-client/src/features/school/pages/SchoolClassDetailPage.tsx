@@ -1,7 +1,7 @@
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { AlertDialog, Badge, Button, Card, Popover, Select, Table, TextField } from "@radix-ui/themes";
-import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, DownloadIcon, MagnifyingGlassIcon, Pencil1Icon } from "@radix-ui/react-icons";
+import { AlertDialog, Avatar, Badge, Button, Popover, Select, Table, TextField } from "@radix-ui/themes";
+import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, DownloadIcon, MagnifyingGlassIcon, PersonIcon, Pencil1Icon } from "@radix-ui/react-icons";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   assignClassTeacher,
@@ -22,6 +22,11 @@ import { ClassDetailLoading } from "../components/SchoolLoading";
 import SchoolClassGrades from "../components/SchoolClassGrades";
 import SchoolAccountProfileDialog from "../../account/components/SchoolAccountProfileDialog";
 import s from "../components/SchoolClasses.module.css";
+import layout from "./SchoolClassDetailPage.module.css";
+
+function MemberAvatar({ name, src, onOpen }: Readonly<{ name: string; src?: string | null; onOpen: () => void }>) {
+  return <button type="button" className={layout.avatarButton} aria-label={"Xem ảnh và hồ sơ của " + name} title={"Xem hồ sơ " + name} onClick={onOpen}><Avatar size="3" radius="full" src={src || undefined} alt="" fallback={<PersonIcon width="22" height="22" aria-hidden="true" />} /></button>;
+}
 
 type Option = { value: string; label: string };
 type Feedback = { type: "success" | "error"; message: string };
@@ -55,6 +60,7 @@ export default function SchoolClassDetailPage() {
   const [replacement, setReplacement] = useState<{ teacherId: number; teacherName: string; previousId: number; previousName: string } | null>(null);
   const [profileId, setProfileId] = useState<number | null>(null);
   const [studentId, setStudentId] = useState("");
+  const [studentQuery, setStudentQuery] = useState("");
   const [studentPageSize, setStudentPageSize] = useState(10);
   const [studentPage, setStudentPage] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -92,10 +98,11 @@ export default function SchoolClassDetailPage() {
 
   const teachers = useMemo(() => users.filter(item => item.role === "STAFF" && item.active !== false), [users]);
   const students = useMemo(() => users.filter(item => item.role === "STUDENT" && item.active !== false), [users]);
-  const pageCount = Math.max(1, Math.ceil((detail?.students.length ?? 0) / studentPageSize));
+  const filteredStudents = (detail?.students ?? []).filter(student => searchable(student.fullName + " " + student.email).includes(searchable(studentQuery.trim())));
+  const pageCount = Math.max(1, Math.ceil(filteredStudents.length / studentPageSize));
   const currentPage = Math.min(studentPage, pageCount);
   const pageStart = (currentPage - 1) * studentPageSize;
-  const visibleStudents = detail?.students.slice(pageStart, pageStart + studentPageSize) ?? [];
+  const visibleStudents = filteredStudents.slice(pageStart, pageStart + studentPageSize);
 
   const runAction = async (work: () => Promise<unknown>, successMessage: string) => {
     if (busy) return;
@@ -136,23 +143,23 @@ export default function SchoolClassDetailPage() {
 
   if (!schoolId || !classId) return null;
 
-  return <div className="admin-content">
+  return <div className={"admin-content " + layout.page} data-class-mode={editMode ? "edit" : gradeMode ? "grades" : "view"}>
     {profileId !== null && <SchoolAccountProfileDialog schoolId={schoolId} userId={profileId} onClose={() => setProfileId(null)} />}
-    <div className={s.pageToolbar}><Button variant="ghost" color="gray" onClick={() => navigate("/school/classes")}><ArrowLeftIcon />Quay lại quản lý lớp học</Button><div><Button variant={gradeMode ? "soft" : "solid"} onClick={() => setSearchParams({})}>Thông tin lớp</Button> <Button variant={gradeMode ? "solid" : "soft"} onClick={() => setSearchParams({ view: "grades" })}>Bảng điểm</Button>{editMode && <Button variant="soft" color="gray" onClick={() => changeMode(false)}>Xem chi tiết</Button>}</div></div>
-    {!editMode && !gradeMode && <header className="admin-content-header">
-      <div><h1 className="admin-content-title">Chi tiết lớp học</h1><p className="admin-content-description">Thông tin lớp, giáo viên và học sinh.</p></div>
-      <Button onClick={() => changeMode(true)}><Pencil1Icon />Chỉnh sửa</Button>
-    </header>}
+    <header className={layout.header}>
+      <Button variant="ghost" color="gray" className={layout.back} onClick={() => navigate("/school/classes")}><ArrowLeftIcon />Quản lý lớp học</Button>
+      <div className={layout.classHeading}>{!editMode && detail && <div><h2>{detail.name}</h2><p>Khối {detail.gradeLevel} · {detail.schoolYear} · {detail.subject || "Chưa cập nhật môn học"}</p></div>}<div className={layout.headerActions}>{!editMode && detail && <Badge color={detail.active === false ? "gray" : "green"}>{detail.active === false ? "Ngừng hoạt động" : "Hoạt động"}</Badge>}{!gradeMode && <Button variant={editMode ? "soft" : "solid"} onClick={() => changeMode(!editMode)}>{editMode ? "Đóng chỉnh sửa" : <><Pencil1Icon />Chỉnh sửa</>}</Button>}</div></div>
+      <nav className={layout.tabs} aria-label="Nội dung lớp học"><button type="button" aria-current={!gradeMode ? "page" : undefined} onClick={() => setSearchParams({})}>Thành viên lớp</button><button type="button" aria-current={gradeMode ? "page" : undefined} onClick={() => setSearchParams({ view: "grades" })}>Bảng điểm</button></nav>
+    </header>
     {error && <div className="admin-error-banner" role="alert">{error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
     {feedback && <div className={`${s.feedbackToast} ${feedback.type === "success" ? s.feedbackSuccess : s.feedbackError}`} role={feedback.type === "error" ? "alert" : "status"} aria-live="polite">{feedback.message}</div>}
     {loading && !gradeMode && <ClassDetailLoading />}
 
-    {gradeMode && <SchoolClassGrades key={classId} schoolId={schoolId} classId={classId} />}
-    {!gradeMode && !loading && detail && <Card asChild size="3"><section className="admin-panel">
-      {!editMode && <div className="admin-panel-heading"><div><h2>{detail.name}</h2><p className="admin-panel-description">Khối {detail.gradeLevel} · {detail.schoolYear} · {detail.subject || "Chưa cập nhật môn học"}</p></div><Badge color="green" variant="soft">Hoạt động</Badge></div>}
+    {gradeMode && <SchoolClassGrades key={classId} schoolId={schoolId} classId={classId} embedded />}
+    {!gradeMode && !loading && detail && <section className={layout.content}>
+
 
       {editMode && form ? <form className={`admin-form-grid ${s.editForm}`} onSubmit={saveClass} aria-labelledby="detail-class-heading">
-        <div className={s.editFormFields}>
+        <div className={`${s.editFormFields} ${layout.fields}`}>
           <div className={`${s.sectionHeading} ${s.classFormHeading}`}><h3 id="detail-class-heading">Lớp</h3></div>
           <label><span className={s.fieldLabel}>Tên lớp</span><TextField.Root required maxLength={100} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label>
           <label><span className={s.fieldLabel}>Khối</span><Select.Root value={String(form.gradeLevel)} onValueChange={value => setForm({ ...form, gradeLevel: Number(value) })}><Select.Trigger /><Select.Content position="popper" side="bottom" align="start" sideOffset={6} className={s.gradeSelectContent}>{[10, 11, 12].map(value => <Select.Item key={value} value={String(value)}>Khối {value}</Select.Item>)}</Select.Content></Select.Root></label>
@@ -160,26 +167,25 @@ export default function SchoolClassDetailPage() {
           <label><span className={s.fieldLabel}>Môn học</span><TextField.Root maxLength={50} value={form.subject} onChange={event => setForm({ ...form, subject: event.target.value })} /></label>
         </div>
         <div className="admin-form-actions"><Button type="submit" loading={busy} disabled={busy}>Lưu thông tin lớp</Button></div>
-      </form> : <div className={s.summary}>
-        <article><span>Khối</span><strong>{detail.gradeLevel}</strong></article><article><span>Giáo viên</span><strong>{detail.teachers.length}</strong></article><article><span>Học sinh</span><strong>{detail.students.length}</strong></article><article><span>Trạng thái</span><Badge color="green" variant="soft">Hoạt động</Badge></article>
-      </div>}
+      </form> : null}
 
-      <section className={`${s.memberSection} ${editMode ? s.editSection : ""}`} aria-labelledby="detail-teachers-heading">
+      <section className={`${s.memberSection} ${layout.teacherSection} ${editMode ? s.editSection : ""}`} aria-labelledby="detail-teachers-heading">
         <div className={s.sectionHeading}><h3 id="detail-teachers-heading">Giáo viên</h3></div>
         {editMode && <div className="admin-member-add"><AccountPicker value={teacherId} disabled={busy || detail.teachers.length > 1} label={detail.teachers.length ? "Chọn giáo viên thay thế" : "Chọn giáo viên"} placeholder={detail.teachers.length ? "Chọn giáo viên thay thế" : "Chọn giáo viên"} emptyLabel="Không tìm thấy giáo viên phù hợp." options={teachers.filter(user => !detail.teachers.some(item => item.id === user.id)).map(user => ({ value: String(user.id), label: `${user.fullName} · ${user.email}` }))} onValueChange={setTeacherId} /><Button variant="soft" disabled={!teacherId || busy || detail.teachers.length > 1} onClick={() => { if (detail.teachers.length === 1) { const teacher = teachers.find(item => item.id === Number(teacherId)); if (teacher) { setError(""); setReplacement({ teacherId: teacher.id, teacherName: teacher.fullName, previousId: detail.teachers[0].id, previousName: detail.teachers[0].fullName }); } } else void runAction(async () => { await assignClassTeacher(schoolId, detail.id, Number(teacherId)); setTeacherId(""); }, "Đã phân công giáo viên."); }}>{detail.teachers.length ? "Thay giáo viên" : "Phân công"}</Button></div>}
         {detail.teachers.length > 1 && <div className="admin-error-banner" role="alert">Lớp có nhiều giáo viên từ phân công cũ. Hãy gỡ các phân công dư để chỉ giữ lại một giáo viên.</div>}
-        {detail.teachers.length === 0 ? <p className={s.empty}>Lớp chưa có giáo viên được phân công.</p> : <ul className={editMode ? s.manageList : s.teacherList}>{detail.teachers.map(item => <li key={item.id}>{!editMode && <span className={s.avatar}>{item.fullName.charAt(0).toLocaleUpperCase("vi")}</span>}<div><strong><button type="button" className={s.profileName} aria-label={"Xem hồ sơ " + item.fullName} onClick={() => setProfileId(item.id)}>{item.fullName}</button></strong><small>{item.email}</small></div>{editMode && <Button size="1" variant="soft" color="red" disabled={busy} onClick={() => setRemoveTarget({ kind: "teacher", id: item.id, name: item.fullName })}>Gỡ</Button>}</li>)}</ul>}
+        {detail.teachers.length === 0 ? <p className={s.empty}>Lớp chưa có giáo viên được phân công.</p> : <ul className={editMode ? s.manageList : s.teacherList}>{detail.teachers.map(item => <li key={item.id}><MemberAvatar name={item.fullName} src={item.avatarUrl} onOpen={() => setProfileId(item.id)} /><div><strong><button type="button" className={s.profileName} aria-label={"Xem hồ sơ " + item.fullName} onClick={() => setProfileId(item.id)}>{item.fullName}</button></strong><small>{item.email}</small></div>{editMode && <Button size="1" variant="soft" color="red" disabled={busy} onClick={() => setRemoveTarget({ kind: "teacher", id: item.id, name: item.fullName })}>Gỡ</Button>}</li>)}</ul>}
       </section>
 
-      <section className={`${s.memberSection} ${editMode ? s.editSection : ""}`} aria-labelledby="detail-students-heading">
-        <div className={s.sectionHeading}><h3 id="detail-students-heading">Học sinh</h3><div className={s.sectionActions}><span>{detail.students.length} người</span><Button type="button" size="2" variant="soft" loading={exporting} disabled={busy || exporting || detail.students.length === 0} title={detail.students.length ? "Xuất toàn bộ học sinh của lớp, gồm cả các trang khác" : "Lớp chưa có học sinh để xuất"} onClick={() => void exportStudents()}><DownloadIcon />Xuất danh sách học sinh</Button></div></div>
+      <section className={`${s.memberSection} ${layout.studentSection} ${editMode ? s.editSection : ""}`} aria-labelledby="detail-students-heading">
+        <div className={s.sectionHeading}><h3 id="detail-students-heading">Học sinh</h3><div className={s.sectionActions}><Button type="button" size="2" variant="soft" loading={exporting} disabled={busy || exporting || detail.students.length === 0} title={detail.students.length ? "Xuất toàn bộ học sinh của lớp, gồm cả các trang khác" : "Lớp chưa có học sinh để xuất"} onClick={() => void exportStudents()}><DownloadIcon />Xuất danh sách học sinh</Button></div></div>
         {editMode && <div className="admin-member-add"><AccountPicker value={studentId} disabled={busy} label="Chọn học sinh" placeholder="Chọn học sinh" emptyLabel="Không tìm thấy học sinh phù hợp." options={students.filter(user => !detail.students.some(item => item.id === user.id)).map(user => ({ value: String(user.id), label: `${user.fullName} · ${user.email}` }))} onValueChange={setStudentId} /><Button variant="soft" color="cyan" disabled={!studentId || busy} onClick={() => void runAction(async () => { await enrollClassStudent(schoolId, detail.id, Number(studentId)); setStudentId(""); }, "Đã thêm học sinh vào lớp.")}>Thêm vào lớp</Button></div>}
+        <div className={layout.studentSearch}><TextField.Root aria-label="Tìm học sinh trong lớp" placeholder="Tìm tên hoặc email học sinh…" value={studentQuery} onChange={event => { setStudentQuery(event.target.value); setStudentPage(1); }}><TextField.Slot><MagnifyingGlassIcon /></TextField.Slot></TextField.Root><span>{filteredStudents.length} học sinh</span></div>
         {detail.students.length === 0 ? <p className={s.empty}>Lớp chưa có học sinh.</p> : <>
-          <div className={s.studentTableScroll} role="region" aria-labelledby="detail-students-heading"><Table.Root size="2" variant="surface"><Table.Header><Table.Row><Table.ColumnHeaderCell>STT</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Họ và tên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Email</Table.ColumnHeaderCell>{editMode && <Table.ColumnHeaderCell className={s.actionColumn}>Thao tác</Table.ColumnHeaderCell>}</Table.Row></Table.Header><Table.Body>{visibleStudents.map((item, index) => <Table.Row key={item.id}><Table.Cell>{pageStart + index + 1}</Table.Cell><Table.RowHeaderCell><button type="button" className={s.profileName} aria-label={"Xem hồ sơ " + item.fullName} onClick={() => setProfileId(item.id)}>{item.fullName}</button></Table.RowHeaderCell><Table.Cell>{item.email}</Table.Cell>{editMode && <Table.Cell><div className={s.studentActions}><Select.Root disabled={busy} onValueChange={targetId => { const target = classes.find(candidate => candidate.id === targetId); if (target) setTransferTarget({ studentId: item.id, studentName: item.fullName, classId: target.id, className: target.name }); }}><Select.Trigger className={s.transferSelect} placeholder="Chuyển lớp…" aria-label={`Chuyển lớp cho ${item.fullName}`} /><Select.Content>{classes.filter(candidate => candidate.id !== detail.id && candidate.schoolYear === detail.schoolYear).map(candidate => <Select.Item key={candidate.id} value={candidate.id}>{candidate.name}</Select.Item>)}</Select.Content></Select.Root><Button size="1" variant="soft" color="red" disabled={busy} onClick={() => setRemoveTarget({ kind: "student", id: item.id, name: item.fullName })}>Gỡ</Button></div></Table.Cell>}</Table.Row>)}</Table.Body></Table.Root></div>
-          <div className={s.studentFooter}><Select.Root size="1" value={String(studentPageSize)} onValueChange={value => { setStudentPageSize(Number(value)); setStudentPage(1); }}><Select.Trigger aria-label="Số học sinh trên mỗi trang" /><Select.Content>{[10, 20, 30].map(size => <Select.Item key={size} value={String(size)}>{size} dòng</Select.Item>)}</Select.Content></Select.Root><div className={`${s.pagination} ${s.compactPagination}`}><span>Hiển thị {pageStart + 1}–{Math.min(pageStart + studentPageSize, detail.students.length)} / {detail.students.length}</span><div><Button size="1" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setStudentPage(Math.max(1, currentPage - 1))}>Trước</Button><span>Trang {currentPage}/{pageCount}</span><Button size="1" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setStudentPage(Math.min(pageCount, currentPage + 1))}>Sau</Button></div></div></div>
+          <div className={s.studentTableScroll} role="region" aria-labelledby="detail-students-heading"><Table.Root size="2" variant="surface"><Table.Header><Table.Row><Table.ColumnHeaderCell>STT</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Họ và tên</Table.ColumnHeaderCell><Table.ColumnHeaderCell>Email</Table.ColumnHeaderCell>{editMode && <Table.ColumnHeaderCell className={s.actionColumn}>Thao tác</Table.ColumnHeaderCell>}</Table.Row></Table.Header><Table.Body>{visibleStudents.map((item, index) => <Table.Row key={item.id}><Table.Cell>{pageStart + index + 1}</Table.Cell><Table.RowHeaderCell><div className={layout.studentIdentity}><MemberAvatar name={item.fullName} src={item.avatarUrl} onOpen={() => setProfileId(item.id)} /><button type="button" className={s.profileName} aria-label={"Xem hồ sơ " + item.fullName} onClick={() => setProfileId(item.id)}>{item.fullName}</button></div></Table.RowHeaderCell><Table.Cell>{item.email}</Table.Cell>{editMode && <Table.Cell><div className={s.studentActions}><Select.Root disabled={busy} onValueChange={targetId => { const target = classes.find(candidate => candidate.id === targetId); if (target) setTransferTarget({ studentId: item.id, studentName: item.fullName, classId: target.id, className: target.name }); }}><Select.Trigger className={s.transferSelect} placeholder="Chuyển lớp…" aria-label={`Chuyển lớp cho ${item.fullName}`} /><Select.Content>{classes.filter(candidate => candidate.id !== detail.id && candidate.schoolYear === detail.schoolYear).map(candidate => <Select.Item key={candidate.id} value={candidate.id}>{candidate.name}</Select.Item>)}</Select.Content></Select.Root><Button size="1" variant="soft" color="red" disabled={busy} onClick={() => setRemoveTarget({ kind: "student", id: item.id, name: item.fullName })}>Gỡ</Button></div></Table.Cell>}</Table.Row>)}{visibleStudents.length === 0 && <Table.Row><Table.Cell colSpan={editMode ? 4 : 3}><p className={s.empty}>Không tìm thấy học sinh phù hợp.</p></Table.Cell></Table.Row>}</Table.Body></Table.Root></div>
+          <div className={s.studentFooter}><Select.Root size="1" value={String(studentPageSize)} onValueChange={value => { setStudentPageSize(Number(value)); setStudentPage(1); }}><Select.Trigger aria-label="Số học sinh trên mỗi trang" /><Select.Content>{[10, 20, 30].map(size => <Select.Item key={size} value={String(size)}>{size} dòng</Select.Item>)}</Select.Content></Select.Root><div className={`${s.pagination} ${s.compactPagination}`}><span>Hiển thị {filteredStudents.length ? pageStart + 1 : 0}–{Math.min(pageStart + studentPageSize, filteredStudents.length)} / {filteredStudents.length}</span><div><Button size="1" variant="soft" color="gray" disabled={currentPage <= 1} onClick={() => setStudentPage(Math.max(1, currentPage - 1))}>Trước</Button><span>Trang {currentPage}/{pageCount}</span><Button size="1" variant="soft" color="gray" disabled={currentPage >= pageCount} onClick={() => setStudentPage(Math.min(pageCount, currentPage + 1))}>Sau</Button></div></div></div>
         </>}
       </section>
-    </section></Card>}
+    </section>}
     <AlertDialog.Root open={!!replacement} onOpenChange={open => { if (!open && !busy) setReplacement(null); }}><AlertDialog.Content maxWidth="560px">
       <AlertDialog.Title>Thay giáo viên phụ trách</AlertDialog.Title>
       <AlertDialog.Description>Thay {replacement?.previousName} bằng {replacement?.teacherName} cho lớp {detail?.name}?</AlertDialog.Description>

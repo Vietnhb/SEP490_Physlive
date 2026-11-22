@@ -247,7 +247,7 @@ public class AssignmentService {
                 .map(schoolClass -> new TeacherClassOption(schoolClass.getId(), schoolClass.getName(),
                         schoolClass.getGradeLevel(), schoolClass.getSchoolYear(), schoolClass.getSubject(),
                         classEnrollments.findActiveStudentsByClassId(schoolClass.getId()).stream()
-                                .map(enrollment -> new TeacherClassStudent(enrollment.getStudent().getId(), enrollment.getStudent().getFullName(), enrollment.getStudent().getEmail()))
+                                .map(enrollment -> new TeacherClassStudent(enrollment.getStudent().getId(), enrollment.getStudent().getFullName(), enrollment.getStudent().getEmail(), enrollment.getStudent().getAvatarUrl()))
                                 .toList()))
                 .toList();
     }
@@ -521,7 +521,7 @@ public class AssignmentService {
             userRepository.findAllById(missing).forEach(student -> response.add(new AssignmentSubmissionResponse(null, assignmentId,
                     student.getId(), student.getFullName(), JsonNodeFactory.instance.objectNode(), assignment.getDueAt(), null,
                     BigDecimal.ZERO, assignment.getMaxScore(), AssignmentDeadlinePolicy.FEEDBACK, GradingStatus.MISSED_DEADLINE,
-                    assignment.getDueAt(), false, null, null)));
+                    assignment.getDueAt(), false, null, null, student.getAvatarUrl())));
         }
         return response;
     }
@@ -677,6 +677,6 @@ public class AssignmentService {
                 item.getStudent().getFullName(), item.getPredictions(), item.getSubmittedAt(), item.getCompletedAt(), missed ? BigDecimal.ZERO : item.getScore(), item.getMaxScore() == null ? item.getAssignment().getMaxScore() : item.getMaxScore(),
                 missed ? AssignmentDeadlinePolicy.FEEDBACK : item.getFeedback(), missed ? GradingStatus.MISSED_DEADLINE : item.getGradingStatus(), item.getGradedAt(), !missed && item.isRetryAllowed(),
                 item.getGradedBy() == null ? null : item.getGradedBy().getId(),
-                item.getGradedBy() == null ? null : item.getGradedBy().getFullName());
+                item.getGradedBy() == null ? null : item.getGradedBy().getFullName(), item.getStudent().getAvatarUrl());
     }
 }

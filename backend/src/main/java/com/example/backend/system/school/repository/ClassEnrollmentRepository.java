@@ -47,5 +47,7 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
     @Query("SELECT COUNT(DISTINCT e.student.id) FROM ClassEnrollment e WHERE e.schoolClass.school.id = :schoolId AND e.status = 'ACTIVE'")
     Long countActiveStudentsBySchoolId(@Param("schoolId") UUID schoolId);
 
+    boolean existsBySchoolClassIdAndStudentId(UUID classId, Integer studentId);
+
     java.util.Optional<ClassEnrollment> findBySchoolClassIdAndStudentIdAndStatus(UUID classId, Integer studentId, ClassEnrollment.EnrollmentStatus status);
 }

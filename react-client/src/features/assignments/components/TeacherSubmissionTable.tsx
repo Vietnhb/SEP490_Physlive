@@ -1,8 +1,11 @@
+import SchoolAccountProfileDialog from "../../account/components/SchoolAccountProfileDialog";
+import profileStyles from "./StudentAvatar.module.css";
+import StudentAvatar from "./StudentAvatar";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { Dialog, Tabs } from "radix-ui";
 import type { AssignmentSubmission } from "../../../shared/types/physlive";
 import type { SubmissionTableProps } from "../model/teacherSubmissionTypes";
-import { formatDateTime, initials, predictionDetails } from "../model/teacherSubmissionUtils";
+import { formatDateTime, predictionDetails } from "../model/teacherSubmissionUtils";
 import GradeHistory from "./GradeHistory";
 import { apiMessage } from "../../../shared/lib/apiError";
 
@@ -17,6 +20,7 @@ function gradingLabel(submission: AssignmentSubmission) {
 
 export function TeacherSubmissionTable({ record, students, filter, query, onGrade, onReopen }: Readonly<SubmissionTableProps>) {
   const [gradingId, setGradingId] = useState("");
+  const [profileId, setProfileId] = useState<number | null>(null);
   const [tab, setTab] = useState("work");
   const [score, setScore] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -80,6 +84,7 @@ export function TeacherSubmissionTable({ record, students, filter, query, onGrad
 
   return <>
     {notice && <p className="lab-grade-success" role="status">{notice}</p>}
+    {profileId != null && record.assignment.classId && <SchoolAccountProfileDialog teacherClassId={record.assignment.classId} userId={profileId} onClose={()=>setProfileId(null)} />}
     <div className="modern-table-wrapper lab-submission-table-wrapper">
       <table className="modern-table lab-submission-table">
         <colgroup><col style={{ width: "22%" }} /><col style={{ width: "28%" }} /><col style={{ width: "18%" }} /><col style={{ width: "17%" }} /><col style={{ width: "15%" }} /></colgroup>
@@ -91,7 +96,7 @@ export function TeacherSubmissionTable({ record, students, filter, query, onGrad
           const completed = Boolean(submission?.completedAt);
           const missed = submission?.gradingStatus === "MISSED_DEADLINE";
           return <tr key={studentId}>
-            <td data-label="Học sinh"><div className="lab-student-cell"><span className="lab-student-avatar" aria-hidden="true">{initials(studentName, studentId)}</span><span><strong title={studentName}>{studentName}</strong></span></div></td>
+            <td data-label="Học sinh"><button type="button" className={"lab-student-cell " + profileStyles.profileButton} disabled={!record.assignment.classId} aria-label={"Xem hồ sơ " + studentName} onClick={()=>setProfileId(studentId)}><StudentAvatar src={submission?.studentAvatarUrl || students.get(studentId)?.avatarUrl} /><span><strong title={studentName}>{studentName}</strong></span></button></td>
             <td data-label="Kết luận" className={submission ? "" : "lab-muted-cell"}>{missed ? "Không nộp trước hạn" : submission ? <div className="lab-answer-preview"><small>{details.conclusion ? "Kết luận" : "Dự đoán"}</small><p>{preview}</p></div> : "Chưa bắt đầu"}</td>
             <td data-label="Nộp lúc">{submission?.completedAt ? <><time dateTime={submission.completedAt}>{formatDateTime(submission.completedAt)}</time>{record.assignment.dueAt && new Date(submission.completedAt).getTime() > new Date(record.assignment.dueAt).getTime() && <small className="lab-late-badge">Nộp muộn</small>}</> : "—"}</td>
             <td data-label="Trạng thái"><div className="lab-grade-status"><span className={`lab-status ${missed ? "pending" : completed ? "submitted" : submission ? "progress" : "pending"}`}><span className="lab-status-dot" aria-hidden="true" />{submission ? gradingLabel(submission) : "Chưa bắt đầu"}</span>{(completed || missed) && submission?.score != null && <strong>{submission.score}/{submission.maxScore ?? maxScore}</strong>}</div></td>

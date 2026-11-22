@@ -94,6 +94,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/support/**").hasAnyRole(APPLICATION_ROLES)
                 .requestMatchers("/api/school/billing", "/api/school/billing/**").hasRole(SCHOOL)
                 // Match assignment actions before the broader shared reads.
+                .requestMatchers(GET, "/api/assignments/mine/teacher/classes/*/students/*/profile").hasRole(STAFF)
                 .requestMatchers(GET, "/api/assignments/mine/teacher/classes/*/report", "/api/assignments/mine/teacher/classes/*/report/csv").hasRole(STAFF)
                 .requestMatchers(GET, "/api/assignments/mine/teacher/classes/*/grades", "/api/assignments/mine/teacher/classes/*/grades/page").hasRole(STAFF)
                 .requestMatchers(GET, "/api/assignments/*/grades.csv").hasRole(STAFF)

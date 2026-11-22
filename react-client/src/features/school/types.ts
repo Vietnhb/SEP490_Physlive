@@ -34,10 +34,10 @@ export interface SchoolClassSummary {
   studentCount: number;
 }
 export interface SchoolClassDetail extends SchoolClassSummary {
-  teachers: { id: number; fullName: string; email: string }[];
-  students: { id: number; fullName: string; email: string }[];
+  teachers: { id: number; fullName: string; email: string; avatarUrl?: string | null }[];
+  students: { id: number; fullName: string; email: string; avatarUrl?: string | null }[];
 }
 export interface SchoolClassOverview extends Omit<SchoolClassSummary, "teacherCount"> {
-  teachers: { id: number; fullName: string; email: string }[];
+  teachers: { id: number; fullName: string; email: string; avatarUrl?: string | null }[];
 }
 export interface SchoolClassRequest { name: string; gradeLevel: number; schoolYear: string; subject: string; }

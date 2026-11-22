@@ -1,5 +1,5 @@
 import { Avatar, Badge, Button, Dialog, IconButton } from "@radix-ui/themes";
-import { Cross2Icon, ReloadIcon } from "@radix-ui/react-icons";
+import { Cross2Icon, PersonIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { useState } from "react";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { getRoleLabel } from "../../../shared/auth/roles";
@@ -15,23 +15,23 @@ type Profile = {
   classes: { id: string; name: string; gradeLevel: number; schoolYear: string; subject: string | null }[];
 };
 
-export default function SchoolAccountProfileDialog({ schoolId, userId, onClose }: Readonly<{
-  schoolId: string; userId: number; onClose: () => void;
+export default function SchoolAccountProfileDialog({ schoolId, teacherClassId, userId, onClose }: Readonly<{
+  schoolId?: string; teacherClassId?: string; userId: number; onClose: () => void;
 }>) {
   const [opener] = useState(() => document.activeElement instanceof HTMLElement ? document.activeElement : null);
-  const resource = useResource<Profile>("/schools/" + schoolId + "/users/" + userId + "/profile");
+  const resource = useResource<Profile>(teacherClassId ? "/assignments/mine/teacher/classes/" + teacherClassId + "/students/" + userId + "/profile" : "/schools/" + schoolId + "/users/" + userId + "/profile");
   const profile = resource.data;
   return <Dialog.Root open onOpenChange={open => { if (!open) onClose(); }}>
     <Dialog.Content className={modal.dialog} maxWidth="720px" aria-describedby="school-profile-description" onCloseAutoFocus={event => { if (opener?.isConnected) { event.preventDefault(); opener.focus({ preventScroll: true }); } }}>
       <div className={s.heading}>
-        <div><Dialog.Title mb="1">Hồ sơ tài khoản</Dialog.Title><Dialog.Description id="school-profile-description" size="2">Thông tin giáo viên, học sinh và các lớp đang tham gia trong trường.</Dialog.Description></div>
+        <div><Dialog.Title mb="1">Hồ sơ tài khoản</Dialog.Title><Dialog.Description id="school-profile-description" size="2">{teacherClassId ? "Thông tin học sinh trong phạm vi lớp bạn phụ trách." : "Thông tin giáo viên, học sinh và các lớp đang tham gia trong trường."}</Dialog.Description></div>
         <Dialog.Close><IconButton variant="soft" color="gray" aria-label="Đóng hồ sơ"><Cross2Icon /></IconButton></Dialog.Close>
       </div>
       <div className={modal.body}>
         {resource.error && <div className={s.error} role="alert"><span>{resource.error}</span><Button variant="soft" size="1" onClick={() => void resource.refresh()}>Thử lại</Button></div>}
         {resource.loading ? <CardLoadingSkeleton cards={1} label="Đang tải hồ sơ tài khoản…" /> : profile && <>
           <div className={s.identity}>
-            <Avatar size="6" radius="full" src={profile.avatarUrl || undefined} fallback={(profile.fullName || profile.email).slice(0, 1).toUpperCase()} />
+            <Avatar size="6" radius="full" src={profile.avatarUrl || undefined} fallback={<PersonIcon width="36" height="36" aria-hidden="true" />} />
             <div className={s.identityText}><h2>{profile.fullName}</h2><p>{profile.email}</p><div className={s.badges}>
               <Badge color={profile.role === "STAFF" ? "orange" : "blue"}>{getRoleLabel(profile.role)}</Badge>
               <Badge color={!profile.active ? "amber" : profile.accountStatus === "WARNED" ? "orange" : "green"}>{!profile.active ? "Tạm khóa" : profile.accountStatus === "WARNED" ? "Cảnh báo" : "Hoạt động"}</Badge>
@@ -40,14 +40,14 @@ export default function SchoolAccountProfileDialog({ schoolId, userId, onClose }
           <dl className={s.details}>
             <div><dt>Ngày sinh</dt><dd>{profile.dateOfBirth ? new Date(profile.dateOfBirth + "T00:00:00").toLocaleDateString("vi-VN") : "Chưa cập nhật"}</dd></div>
             <div><dt>Trường</dt><dd>{profile.schoolName}</dd></div>
-            <div><dt>Đăng nhập gần nhất</dt><dd>{profile.lastLogin ? new Date(profile.lastLogin).toLocaleString("vi-VN") : "Chưa đăng nhập"}</dd></div>
+            {!teacherClassId && <div><dt>Đăng nhập gần nhất</dt><dd>{profile.lastLogin ? new Date(profile.lastLogin).toLocaleString("vi-VN") : "Chưa đăng nhập"}</dd></div>}
             {profile.role === "STAFF" && <div><dt>Quyền trong trường</dt><dd>{profile.permissions.map(code => PERMISSION_LABELS[code] ?? code).join(" · ") || "Chưa cấp quyền"}</dd></div>}
           </dl>
           <section aria-labelledby="profile-classes-heading" className={s.classes}>
-            <div className={s.sectionHeading}><h3 id="profile-classes-heading">{profile.role === "STAFF" ? "Lớp đang được phân công" : "Lớp đang học"}</h3></div>
+            <div className={s.sectionHeading}><h3 id="profile-classes-heading">{teacherClassId ? "Lớp trong phạm vi phụ trách" : profile.role === "STAFF" ? "Lớp đang được phân công" : "Lớp đang học"}</h3></div>
             {profile.classes.length ? <ul>{profile.classes.map(item => <li key={item.id}>
               <div><strong>{item.name}</strong><p>Khối {item.gradeLevel} · {item.schoolYear}{item.subject ? " · " + item.subject : ""}</p></div>
-            </li>)}</ul> : <p className={s.empty}>{profile.role === "STAFF" ? "Chưa được phân công vào lớp đang hoạt động." : "Chưa được xếp vào lớp đang hoạt động."}</p>}
+            </li>)}</ul> : <p className={s.empty}>{teacherClassId ? "Học sinh đã rời lớp này. Bài nộp và kết quả cũ vẫn được giữ lại." : profile.role === "STAFF" ? "Chưa được phân công vào lớp đang hoạt động." : "Chưa được xếp vào lớp đang hoạt động."}</p>}
           </section>
         </>}
       </div>

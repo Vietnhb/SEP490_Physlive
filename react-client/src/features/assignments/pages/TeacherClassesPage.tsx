@@ -1,3 +1,6 @@
+import SchoolAccountProfileDialog from "../../account/components/SchoolAccountProfileDialog";
+import StudentAvatar from "../components/StudentAvatar";
+import RefreshButton from "../../../shared/ui/RefreshButton";
 import { useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Badge, Button, Select, Tabs, Tooltip } from "@radix-ui/themes";
@@ -12,6 +15,7 @@ import type { SubmissionFilter } from "../model/teacherSubmissionTypes";
 import SchoolClassGrades from "../../school/components/SchoolClassGrades";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { DownloadIcon } from "@radix-ui/react-icons";
+import LearningIcon from "../../../shared/ui/LearningIcon";
 import styles from "./TeacherClassesPage.module.css";
 
 const due = (value?: string) => value ? new Date(value).toLocaleString("vi-VN") : "Không giới hạn";
@@ -21,6 +25,11 @@ export default function TeacherClassesPage() {
   const classes = useResource<TeacherClassOption[]>("/assignments/mine/teacher/classes");
   const work = useResource<Assignment[]>("/assignments/mine/teacher");
   const [query, setQuery] = useState("");
+  const [grade, setGrade] = useState("ALL");
+  const [classPage, setClassPage] = useState(1);
+  const filteredClasses = (classes.data ?? []).filter(item => (grade === "ALL" || String(item.gradeLevel) === grade) && (item.name + " " + item.gradeLevel + " " + item.schoolYear).toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi")));
+  const classPages = Math.max(1, Math.ceil(filteredClasses.length / 9));
+  const visibleClassPage = Math.min(classPage, classPages);
   const classroom = classes.data?.find(item => item.id === classId);
   const refresh = () => { void classes.refresh(); void work.refresh(); };
   if (classes.loading) return <main className={"lab-main " + styles.page}><TableLoadingSkeleton headers={["Lớp", "Năm học", "Học sinh", "Bài đã giao"]} /></main>;
@@ -28,15 +37,21 @@ export default function TeacherClassesPage() {
     {(classes.error || work.error) && <p className={styles.error} role="alert">{classes.error || work.error}<Button variant="outline" onClick={refresh}>Thử lại</Button></p>}
     {classId ? classroom ? <ClassWorkspace key={classId} classroom={classroom} assignments={(work.data ?? []).filter(item => item.classId === classId)} assignmentsLoading={work.loading} assignmentsError={work.error} onRefresh={refresh} /> : <section className={styles.panel}><h1>Không truy cập được lớp</h1><p>Lớp không còn trong danh sách phân công của bạn hoặc đã ngừng hoạt động.</p><Link to="/lab/classes">Quay lại lớp phụ trách</Link></section>
       : <>
-        <header className={styles.heading}><div><h1>Lớp phụ trách</h1><p>Chọn lớp để xem học sinh, giao bài và theo dõi kết quả học tập.</p></div><Button variant="outline" disabled={classes.refreshing || work.refreshing} onClick={refresh}>Làm mới</Button></header>
-        <section className={styles.panel}>
-          <div className={styles.toolbar}><strong>{classes.data?.length ?? 0} lớp đang phụ trách</strong><input type="search" aria-label="Tìm lớp phụ trách" placeholder="Tìm lớp, khối hoặc năm học…" value={query} onChange={event => setQuery(event.target.value)} /></div>
-          <div className={styles.scroll}><table className={styles.table}><thead><tr><th>Lớp</th><th>Khối / Năm học</th><th>Học sinh</th><th>Bài đã giao</th><th>Thao tác</th></tr></thead><tbody>
-            {(classes.data ?? []).filter(item => (item.name + " " + item.gradeLevel + " " + item.schoolYear).toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))).map(item => <tr key={item.id}><td><Link className={styles.className} to={"/lab/classes/" + item.id}>{item.name}</Link><small>{item.subject || "Vật lý"}</small></td><td>Khối {item.gradeLevel}<small>{item.schoolYear}</small></td><td>{item.students.length}</td><td>{work.loading || work.error ? "—" : work.data?.filter(lesson => lesson.classId === item.id).length ?? 0}</td><td><Button asChild variant="soft"><Link to={"/lab/classes/" + item.id}>Xem lớp</Link></Button></td></tr>)}
-          </tbody></table></div>
-          {classes.data?.length === 0 && <p className={styles.empty}>Bạn chưa được nhà trường phân công lớp nào.</p>}
-          {Boolean(classes.data?.length) && !(classes.data ?? []).some(item => (item.name + " " + item.gradeLevel + " " + item.schoolYear).toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi"))) && <p className={styles.empty}>Không có lớp phù hợp.</p>}
-        </section>
+        <header className={styles.listHeading}><div><h1>Lớp phụ trách</h1><p>{classes.data?.length ?? 0} lớp · {(classes.data ?? []).reduce((sum,item)=>sum+item.students.length,0)} lượt học sinh</p></div><Button asChild variant="soft"><Link to="/lab/reports"><LearningIcon name="chart" />Báo cáo kết quả</Link></Button><RefreshButton disabled={classes.refreshing || work.refreshing} onClick={refresh} /></header>
+        <div className={styles.classFilters}><label className={styles.search}><LearningIcon name="search" /><input type="search" aria-label="Tìm lớp phụ trách" placeholder="Tìm lớp hoặc năm học…" value={query} onChange={event => {setQuery(event.target.value);setClassPage(1);}} /></label><Select.Root value={grade} onValueChange={value=>{setGrade(value);setClassPage(1);}}><Select.Trigger aria-label="Lọc khối lớp phụ trách" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả khối</Select.Item>{[10,11,12].map(value=><Select.Item key={value} value={String(value)}>Khối {value}</Select.Item>)}</Select.Content></Select.Root><span>{filteredClasses.length} lớp</span></div>
+        <div className={styles.classGrid}>
+          {filteredClasses.slice((visibleClassPage-1)*9,visibleClassPage*9).map(item=>{
+            const count=work.loading||work.error?null:(work.data??[]).filter(lesson=>lesson.classId===item.id).length;
+            return <article className={styles.classCard} key={item.id} data-grade={item.gradeLevel}>
+              <header><span className={styles.classSymbol}><LearningIcon name="book" /></span><Badge variant="soft">Khối {item.gradeLevel}</Badge><h2><Link to={"/lab/classes/"+item.id} title={item.name}>{item.name}</Link></h2><p>{item.subject||"Vật lý"} · {item.schoolYear}</p></header>
+              <div className={styles.cardMetrics}><span><LearningIcon name="users" /><strong>{item.students.length}</strong> học sinh</span><span><LearningIcon name="file" /><strong>{count??"—"}</strong> bài đã giao</span></div>
+              <nav aria-label={"Mở lớp "+item.name}><Link to={"/lab/classes/"+item.id}>Học sinh</Link><Link to={"/lab/classes/"+item.id+"?tab=assignments"}>Chấm bài</Link><Link to={"/lab/classes/"+item.id+"?tab=grades"}>Bảng điểm<LearningIcon name="arrow" /></Link></nav>
+            </article>;
+          })}
+        </div>
+        {!filteredClasses.length&&<section className={styles.emptyState}><LearningIcon name="book" /><h2>{classes.data?.length?"Không tìm thấy lớp phù hợp":"Chưa có lớp được phân công"}</h2><p>{classes.data?.length?"Thử đổi từ khóa hoặc khối lớp.":"Các lớp do nhà trường phân công sẽ xuất hiện tại đây."}</p>{Boolean(classes.data?.length)&&<Button variant="soft" onClick={()=>{setQuery("");setGrade("ALL");setClassPage(1);}}>Xóa bộ lọc</Button>}</section>}
+        {classPages>1&&<footer className={styles.footer}><span>Hiển thị {(visibleClassPage-1)*9+1}–{Math.min(visibleClassPage*9,filteredClasses.length)} / {filteredClasses.length} lớp</span><div><Button variant="soft" disabled={visibleClassPage===1} onClick={()=>setClassPage(visibleClassPage-1)}>Trước</Button><span>Trang {visibleClassPage}/{classPages}</span><Button variant="soft" disabled={visibleClassPage===classPages} onClick={()=>setClassPage(visibleClassPage+1)}>Sau</Button></div></footer>}
+
       </>}
   </main>;
 }
@@ -46,6 +61,7 @@ function ClassWorkspace({ classroom, assignments, assignmentsLoading, assignment
   const tab = ["students", "assignments", "grades"].includes(params.get("tab") ?? "") ? params.get("tab")! : "students";
   const selected = assignments.find(item => item.id === params.get("assignment")) ?? assignments[0];
   const [studentQuery, setStudentQuery] = useState("");
+  const [profileId, setProfileId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
   const [submissionQuery, setSubmissionQuery] = useState("");
@@ -85,14 +101,18 @@ function ClassWorkspace({ classroom, assignments, assignmentsLoading, assignment
     void queryClient.invalidateQueries({ predicate: query => String(query.queryKey[2]).startsWith("/assignments/mine/teacher/classes/" + classroom.id + "/grades/page?") });
   };
   return <>
-    <Link className={styles.back} to="/lab/classes">← Lớp phụ trách</Link>
-    <header className={styles.heading}><div><h1>{classroom.name}</h1><p>Khối {classroom.gradeLevel} · {classroom.schoolYear} · {classroom.subject || "Vật lý"}</p></div><Button asChild><Link to={"/assignments/workspace?classId=" + encodeURIComponent(classroom.id)}>Giao bài cho lớp này</Link></Button></header>
-    <div className={styles.stats}><span><strong>{classroom.students.length}</strong> Học sinh đang học</span><span><strong>{assignmentsLoading || assignmentsError ? "—" : assignments.length}</strong> Bài đã giao</span></div>
+    {profileId != null && <SchoolAccountProfileDialog teacherClassId={classroom.id} userId={profileId} onClose={()=>setProfileId(null)} />}
+    <header className={styles.classHeader}>
+      <div className={styles.classIdentity}><Link className={styles.back} to="/lab/classes"><LearningIcon name="back" />Lớp phụ trách</Link><h1>{classroom.name}</h1><p>Khối {classroom.gradeLevel} · {classroom.schoolYear} · {classroom.subject || "Vật lý"}</p></div>
+      <div className={styles.headerActions}><Button asChild variant="outline"><Link to={"/lab/reports?classId="+classroom.id}><LearningIcon name="chart" />Báo cáo kết quả</Link></Button><Button asChild><Link to={"/assignments/workspace?classId="+encodeURIComponent(classroom.id)}><LearningIcon name="plus" />Giao bài</Link></Button></div>
+      <div className={styles.classSummary}><span><LearningIcon name="users" /><strong>{classroom.students.length}</strong> học sinh đang học</span><span><LearningIcon name="file" /><strong>{assignmentsLoading||assignmentsError?"—":assignments.length}</strong> bài đã giao</span></div>
+    </header>
+    {tab !== "grades" && <RefreshButton onClick={()=>{onRefresh();if(tab === "assignments" && selected)void submissions.refresh();}} disabled={submissions.refreshing} />}
     <Tabs.Root value={tab} onValueChange={value => { navigateTab(value); setSubmissionQuery(""); }}>
       <Tabs.List className={styles.tabs}><Tabs.Trigger value="students">Học sinh</Tabs.Trigger><Tabs.Trigger value="assignments">Bài đã giao & chấm điểm</Tabs.Trigger><Tabs.Trigger value="grades">Bảng điểm</Tabs.Trigger></Tabs.List>
       <Tabs.Content value="students"><section className={styles.panel}>
         <div className={styles.toolbar}><h2>Danh sách học sinh</h2><input type="search" aria-label="Tìm học sinh của lớp" placeholder="Tìm tên hoặc email học sinh…" value={studentQuery} onChange={event => { setStudentQuery(event.target.value); setPage(1); }} /></div>
-        <div className={styles.scroll}><table className={styles.table}><thead><tr><th>STT</th><th>Họ và tên</th><th>Email</th></tr></thead><tbody>{matchingStudents.slice((current - 1) * size, current * size).map((student, index) => <tr key={student.id}><td>{(current - 1) * size + index + 1}</td><td>{student.fullName}</td><td>{student.email || "—"}</td></tr>)}</tbody></table></div>
+        <div className={styles.scroll}><table className={styles.table}><thead><tr><th>STT</th><th>Họ và tên</th><th>Email</th></tr></thead><tbody>{matchingStudents.slice((current - 1) * size, current * size).map((student, index) => <tr key={student.id}><td>{(current - 1) * size + index + 1}</td><td><span className={styles.studentIdentity}><button type="button" className={styles.studentProfile} aria-label={"Xem hồ sơ " + student.fullName} onClick={()=>setProfileId(student.id)}><StudentAvatar src={student.avatarUrl} /><span>{student.fullName}</span></button></span></td><td>{student.email || "—"}</td></tr>)}</tbody></table></div>
         {matchingStudents.length === 0 && <p className={styles.empty}>Không có học sinh phù hợp.</p>}
         <footer className={styles.footer}><span>{matchingStudents.length} học sinh</span><div><label>Số dòng <select aria-label="Số học sinh mỗi trang" value={size} onChange={event => { setSize(Number(event.target.value)); setPage(1); }}>{[10, 25, 50].map(value => <option key={value} value={value}>{value}</option>)}</select></label><Button variant="soft" disabled={current === 1} onClick={() => setPage(current - 1)}>Trước</Button><span>Trang {current}/{pages}</span><Button variant="soft" disabled={current === pages} onClick={() => setPage(current + 1)}>Sau</Button></div></footer>
       </section></Tabs.Content>
@@ -125,7 +145,7 @@ function ClassWorkspace({ classroom, assignments, assignmentsLoading, assignment
           {submissions.loading ? <TeacherSubmissionTableLoading /> : submissions.data && <TeacherSubmissionTable key={selected.id} record={{ assignment: selected, submissions: submissions.data }} students={students} filter={filter} query={submissionQuery} onGrade={save} onReopen={reopen} />}
         </>}
       </section></Tabs.Content>
-      <Tabs.Content value="grades"><SchoolClassGrades classId={classroom.id} teacherMode onReviewSubmission={(assignmentId, studentId) => { setSubmissionQuery(students.get(studentId)?.fullName ?? ""); setFilter("all"); navigateTab("assignments", assignmentId); }} /></Tabs.Content>
+      <Tabs.Content value="grades"><SchoolClassGrades classId={classroom.id} embedded teacherMode onReviewSubmission={(assignmentId, studentId) => { setSubmissionQuery(students.get(studentId)?.fullName ?? ""); setFilter("all"); navigateTab("assignments", assignmentId); }} /></Tabs.Content>
     </Tabs.Root>
   </>;
 }

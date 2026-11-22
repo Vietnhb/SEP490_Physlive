@@ -30,7 +30,7 @@ public final class SchoolClassContracts {
     public record StudentOptionResponse(Integer id, String fullName) {
     }
 
-    public record Person(Integer id, String fullName, String email) { }
+    public record Person(Integer id, String fullName, String email, String avatarUrl) { }
     public record ClassSummary(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
                                boolean active, long teacherCount, long studentCount, List<String> teacherNames) { }
     public record ClassOverview(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,

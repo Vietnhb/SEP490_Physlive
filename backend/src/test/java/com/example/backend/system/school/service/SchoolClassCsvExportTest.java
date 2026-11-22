@@ -80,7 +80,7 @@ class SchoolClassCsvExportTest {
     @Test
     void escapesCommasQuotesLineBreaksAndSpreadsheetFormulas() {
         ClassDetail detail = new ClassDetail(classId, "12A,\"1\"", 12, "2026-2027", null, true, List.of(),
-                List.of(new Person(1, " =SUM(1,2)", "hs@example.test"), new Person(2, "Nguyễn\nAn", "a@example.test")));
+                List.of(new Person(1, " =SUM(1,2)", "hs@example.test", null), new Person(2, "Nguyễn\nAn", "a@example.test", null)));
         String csv = new String(SchoolClassCsv.students(detail), StandardCharsets.UTF_8);
         assertTrue(csv.contains("\"12A,\"\"1\"\"\""));
         assertTrue(csv.contains("\"' =SUM(1,2)\""));

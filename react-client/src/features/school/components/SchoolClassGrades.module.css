@@ -56,3 +56,9 @@
 @media (max-width: 600px) { .filters { padding: 12px; gap: 12px; }.filters > label:first-child, .presets, .assignmentChooser { grid-column: 1 / -1; }.scroll th, .scroll td { padding: 9px 7px; font-size: 12px; }.scroll button.gradeCell { padding: 8px 5px; min-height: 70px; }.scroll small { font-size: 11px; }.studentIdentity { align-items: flex-start; flex-direction: column; gap: 4px; }.studentName { max-width: 100%; }.studentPager > div { width: 100%; }.studentPager .pageSize { width: 100%; } }
 
 .scroll tbody tr { height: 96px; }
+
+/* Compact gradebook workspace inspired by dedicated classroom grade views. */
+.panel { padding:18px; border-radius:10px; }.panel .heading { margin-bottom:14px; }.panel .heading h2 { font-size:17px; }.panel .heading p { font-size:12px; margin-top:4px; }.panel .heading .assignedBy { font-size:11px; }.panel .filters { gap:10px 14px; padding:14px; border-radius:8px; }.panel .filters label { font-size:11px; gap:6px; }.panel .assignmentPager { margin:14px 0 10px; font-size:12px; }.panel .scroll th,.panel .scroll td { padding:10px; }.panel .scroll thead th { height:44px; font-size:12px; }.panel .gradeCell { min-height:58px; font-size:12px; border-radius:6px; }.panel .gradeCell strong { font-size:14px; }.panel .gradeCell small { font-size:11px; }.panel .studentName { font-size:12px; }.panel .scroll small { font-size:11px; }.panel .studentPager { margin-top:12px; font-size:12px; }
+@media(max-width:700px) { .panel { padding:14px; }.panel .filters { padding:12px; }.panel .scroll th,.panel .scroll td { padding:8px; } }
+
+.panel .scroll .studentColumn small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }

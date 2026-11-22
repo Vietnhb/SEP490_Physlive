@@ -46,6 +46,19 @@ class SchoolClassRestoreTest {
     }
 
     @Test
+    void classDetailIncludesStudentAvatarAndPreservesMissingAvatar() {
+        classroom.setIsActive(true);
+        User first = new User(); first.setId(1); first.setFullName("Student One"); first.setAvatarUrl("https://example.test/avatar.png");
+        User second = new User(); second.setId(2); second.setFullName("Student Two");
+        var firstEnrollment = new com.example.backend.system.school.model.entity.ClassEnrollment(); firstEnrollment.setStudent(first);
+        var secondEnrollment = new com.example.backend.system.school.model.entity.ClassEnrollment(); secondEnrollment.setStudent(second);
+        when(enrollments.findActiveStudentsByClassId(classId)).thenReturn(List.of(firstEnrollment, secondEnrollment));
+        var detail = service.get(schoolId, classId);
+        assertEquals("https://example.test/avatar.png", detail.students().getFirst().avatarUrl());
+        assertNull(detail.students().get(1).avatarUrl());
+    }
+
+    @Test
     void classListIncludesTeacherNamesInOneBatchedRead() {
         classroom.setIsActive(true);
         when(classes.findBySchoolIdAndIsActiveTrue(schoolId)).thenReturn(List.of(classroom));

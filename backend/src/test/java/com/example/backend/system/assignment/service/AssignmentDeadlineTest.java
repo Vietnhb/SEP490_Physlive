@@ -40,7 +40,9 @@ class AssignmentDeadlineTest {
     }
     @Test void lateAllowedAcceptsPredictionAndFinalWork() {
         assignment.setAllowLateSubmission(true);
+        student.setAvatarUrl("https://example.test/student.png");
         var prediction = service.submit(assignment.getId(), new SubmitPredictionRequest(JsonNodeFactory.instance.objectNode().put("answerText", "prediction")));
+        assertEquals("https://example.test/student.png", prediction.studentAvatarUrl());
         assertNull(prediction.completedAt()); assertEquals(GradingStatus.PENDING, prediction.gradingStatus());
         var result = service.complete(assignment.getId(), new CompleteAssignmentRequest("conclusion"));
         assertNotNull(result.completedAt()); assertTrue(result.completedAt().isAfter(assignment.getDueAt())); assertNull(result.score());

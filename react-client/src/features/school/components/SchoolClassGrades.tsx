@@ -15,7 +15,7 @@ const STATES: Record<string, string> = { MISSED_DEADLINE: "Quá hạn · Không 
 const STATE_COLORS: Record<string, "gray" | "blue" | "amber" | "red" | "purple" | "green"> = { MISSED_DEADLINE: "red", NOT_STARTED: "gray", IN_PROGRESS: "blue", SUBMITTED: "amber", RETURNED: "red", AI_GRADED: "purple", TEACHER_CONFIRMED: "green" };
 const time = (value?: string | null) => value ? new Date(value).toLocaleString("vi-VN") : "—";
 
-export default function SchoolClassGrades({ schoolId, classId, teacherMode = false, onReviewSubmission }: Readonly<{ schoolId?: string; classId: string; teacherMode?: boolean; onReviewSubmission?: (assignmentId: string, studentId: number) => void }>) {
+export default function SchoolClassGrades({ schoolId, classId, teacherMode = false, embedded = false, onReviewSubmission }: Readonly<{ schoolId?: string; classId: string; teacherMode?: boolean; embedded?: boolean; onReviewSubmission?: (assignmentId: string, studentId: number) => void }>) {
   const [actionError, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -75,7 +75,7 @@ export default function SchoolClassGrades({ schoolId, classId, teacherMode = fal
     finally { setExporting(false); }
   };
   return <section ref={panel} className={s.panel} aria-label="Bảng điểm lớp học">
-    <Flex className={s.heading} justify="between" align="center" gap="3" wrap="wrap"><div><h2>Bảng điểm {book?.className}</h2><p>Năm học {book?.schoolYear ?? "…"} · {teacherMode ? "Chọn kết quả để xem bài nộp" : "Bảng điểm chỉ xem"}</p>{assignedBy && <p className={s.assignedBy}>Giáo viên giao bài: {assignedBy}</p>}</div><Flex gap="3"><RefreshButton onClick={() => void load()} disabled={loading || invalidDates} />{!teacherMode && <Button variant="soft" loading={exporting} disabled={!book || exporting} onClick={() => void exportCsv()}><DownloadIcon />Xuất toàn bộ CSV</Button>}</Flex></Flex>
+    <Flex className={s.heading} justify="between" align="center" gap="3" wrap="wrap"><div><h2>Bảng điểm{!embedded && " " + (book?.className ?? "")}</h2><p>{!embedded && <>Năm học {book?.schoolYear ?? "…"} · </>}{teacherMode ? "Chọn kết quả để xem bài nộp" : "Bảng điểm chỉ xem"}</p>{assignedBy && <p className={s.assignedBy}>Giáo viên giao bài: {assignedBy}</p>}</div><Flex gap="3"><RefreshButton onClick={() => void load()} disabled={loading || invalidDates} />{!teacherMode && <Button variant="soft" loading={exporting} disabled={!book || exporting} onClick={() => void exportCsv()}><DownloadIcon />Xuất toàn bộ CSV</Button>}</Flex></Flex>
     <div className={s.filters}>
       <label>Tìm bài tập<TextField.Root aria-label="Tìm bài tập trong bảng điểm" placeholder="Nhập tên bài tập…" value={title} onChange={event => { setTitle(event.target.value); setAssignmentId("ALL"); resetPages(); }} /></label>
       <label>Ngày giao từ<input type="date" aria-label="Ngày giao từ" value={from} onChange={event => { setFrom(event.target.value); setAssignmentId("ALL"); resetPages(); }} /></label>

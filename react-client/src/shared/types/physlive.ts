@@ -166,7 +166,7 @@ export type LibraryFolder = { id: string; name: string; itemCount: number; creat
 
 export type LibraryItem = { id: string; simulationId: string; folderId?: string; lessonId: string; specificationId: string; title: string; topic?: string; validationStatus: string; visibility: "PERSONAL" | "SHARED" | "PUBLIC"; createdAt: string; moderationStatus?: "PENDING" | "APPROVED" | "REJECTED" | "FEATURED"; moderationComment?: string | null; sharedById?: number | null; sharedByName?: string | null; schoolId?: string | null; schoolName?: string | null };
 
-export type StudentOption = { id: number; fullName: string; email?: string };
+export type StudentOption = { id: number; fullName: string; email?: string; avatarUrl?: string | null };
 
 export type TeacherClassOption = { id: string; name: string; gradeLevel: number; schoolYear: string; subject?: string | null; students: StudentOption[] };
 
@@ -178,4 +178,4 @@ export type Assignment = { canManage?: boolean; assignedById?: number; assignedB
 
 export type CreateAssignment = { libraryItemId: string; classId?: string; title: string; description?: string; questions: AssignmentQuestions; studentIds: number[]; dueAt?: string; allowLateSubmission?: boolean; gradingCriteria?: { expectedValue?: number; tolerance?: number; seriesSource?: string; sampleTime?: number; unit?: string }; maxScore?: number; autoGrade?: boolean };
 
-export type AssignmentSubmission = { id: string; assignmentId: string; studentId: number; studentName: string; predictions: unknown; submittedAt: string; completedAt?: string | null; score?: number | null; maxScore?: number | null; feedback?: string | null; gradingStatus?: "PENDING" | "AI_GRADED" | "TEACHER_CONFIRMED" | "RETURNED" | "MISSED_DEADLINE"; gradedAt?: string | null; gradedById?: number | null; gradedByName?: string | null; retryAllowed?: boolean };
+export type AssignmentSubmission = { id: string; assignmentId: string; studentId: number; studentName: string; studentAvatarUrl?: string | null; predictions: unknown; submittedAt: string; completedAt?: string | null; score?: number | null; maxScore?: number | null; feedback?: string | null; gradingStatus?: "PENDING" | "AI_GRADED" | "TEACHER_CONFIRMED" | "RETURNED" | "MISSED_DEADLINE"; gradedAt?: string | null; gradedById?: number | null; gradedByName?: string | null; retryAllowed?: boolean };

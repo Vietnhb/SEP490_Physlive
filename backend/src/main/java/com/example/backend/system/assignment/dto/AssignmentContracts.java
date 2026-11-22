@@ -110,7 +110,7 @@ public final class AssignmentContracts {
                                                String studentName, JsonNode predictions, Instant submittedAt, Instant completedAt,
                                                BigDecimal score, BigDecimal maxScore, String feedback,
                                                GradingStatus gradingStatus, Instant gradedAt, boolean retryAllowed,
-                                               Integer gradedById, String gradedByName) {
+                                               Integer gradedById, String gradedByName, String studentAvatarUrl) {
     }
 
     public record StudentActionLogRequest(
@@ -129,7 +129,7 @@ public final class AssignmentContracts {
 
     public record AssignmentReport(long assigned, long submitted, long pending, long graded, long confirmed,
                                    long retryAllowed, BigDecimal averageScore, BigDecimal maxScore) { }
-    public record TeacherClassStudent(Integer id, String fullName, String email) { }
+    public record TeacherClassStudent(Integer id, String fullName, String email, String avatarUrl) { }
     public record TeacherClassOption(UUID id, String name, Integer gradeLevel, String schoolYear,
                                      String subject, List<TeacherClassStudent> students) { }
 

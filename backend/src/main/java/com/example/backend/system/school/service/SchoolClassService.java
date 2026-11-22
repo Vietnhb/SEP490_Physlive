@@ -354,7 +354,7 @@ public class SchoolClassService {
         return user;
     }
 
-    private static Person person(User user) { return new Person(user.getId(), user.getFullName(), user.getEmail()); }
+    private static Person person(User user) { return new Person(user.getId(), user.getFullName(), user.getEmail(), user.getAvatarUrl()); }
     private static String clean(String value) { return value == null ? "" : value.trim(); }
     private static String blankToNull(String value) { String cleaned = clean(value); return cleaned.isBlank() ? null : cleaned; }
 }
