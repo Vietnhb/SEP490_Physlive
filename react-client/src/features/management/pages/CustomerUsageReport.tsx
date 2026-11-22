@@ -88,8 +88,8 @@ export default function CustomerUsageReport() {
     </form>
     {(error || notice) && <p role={error ? "alert" : "status"} className={error ? s.error : s.notice}>{error || notice}</p>}
     {resource.error ? <section className={s.panel} role="alert"><h2>Chưa tải được báo cáo</h2><p>{resource.error}</p><Button onClick={() => void resource.refresh()}>Thử lại</Button></section> : resource.loading || !data ? null : <>
-    
-    
+
+
     <section className={s.charts} data-usage-analysis>
       <article className={s.panel + " " + s.trendPanel} data-usage-trend><header className={s.panelHeading}><div><h2>Nhịp sử dụng theo {filter.month ? "ngày" : "tháng"}</h2><p>{period} · Toàn bộ trường phù hợp bộ lọc</p></div><div className={s.segment} role="group" aria-label="Chỉ số biểu đồ">{(["aiCalls", "activeUsers", "revenue"] as const).map(key => <button key={key} type="button" aria-pressed={metric === key} onClick={() => setMetric(key)}>{key === "aiCalls" ? "Dùng AI" : key === "activeUsers" ? "Người dùng" : "Doanh thu"}</button>)}</div></header><Trend points={data.trend} metric={metric} asOf={data.asOf} /></article>
       <article data-panel className={s.panel} data-usage-care><header className={s.panelHeading}><div><h2>Ưu tiên chăm sóc</h2><p>Trạng thái hiện tại · Chọn nhóm để lọc</p></div></header><div className={s.careContent}><div className={s.donut} style={{ background: donut ? "conic-gradient(" + donut + ")" : "var(--outline)" }} role="img" aria-label={data.attention.map(g => care[g.key].label + ": " + g.count).join(", ")}><div><strong>{totalCare}</strong><span>cần theo dõi</span></div></div><div className={s.careLegend}>{data.attention.map(group => <button key={group.key} type="button" aria-pressed={filter.attention === group.key} onClick={() => chooseAttention(filter.attention === group.key ? "ALL" : group.key)}><i style={{ background: care[group.key].color }} /><span>{care[group.key].label}</span><strong>{numbers(group.count)}</strong></button>)}</div></div></article>

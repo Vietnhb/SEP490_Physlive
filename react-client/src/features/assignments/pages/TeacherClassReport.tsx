@@ -21,8 +21,8 @@ export default function TeacherClassReport() {
   const permitted = classes.data?.some(item=>item.id===classId) ?? false;
   const controls = <div className={styles.classPicker}><label htmlFor="report-class">Lớp báo cáo</label><Select.Root value={classId || undefined} onValueChange={id=>setParams({classId:id})}><Select.Trigger id="report-class" placeholder="Chọn lớp phụ trách"/><Select.Content position="popper">{classes.data?.map(item=><Select.Item key={item.id} value={item.id}>{item.name} · {item.schoolYear}</Select.Item>)}</Select.Content></Select.Root></div>;
   return <main className={"lab-main "+styles.page} data-analytics="report" data-report-design="teacher">
-    
-    
+
+
     {(!permitted || classes.loading || classes.error) && controls}
     {classes.loading ? <TableLoadingSkeleton headers={["Bài tập","Đã nộp","Điểm trung bình"]}/> : classes.error ? <div role="alert" className={styles.error}>{classes.error}<Button variant="outline" onClick={()=>void classes.refresh()}>Thử lại</Button></div> : !classes.data?.length ? <p className={styles.empty}>Bạn chưa được phân công lớp để xem báo cáo.</p> : !permitted ? <p role="alert" className={styles.error}>Lớp không thuộc danh sách đang phụ trách. Hãy chọn một lớp khác.</p> : <Report key={classId} classId={classId} controls={controls}/>}
   </main>;
@@ -54,7 +54,7 @@ function Report({classId,controls}:{classId:string;controls: import("react").Rea
       <Button type="submit">Áp dụng</Button><Button type="button" variant="soft" onClick={clear}>Xóa bộ lọc</Button>
     </form>
     {error && <p role="alert" className={styles.error}>{error}</p>}{notice && <p role="status" className={styles.success}>{notice}</p>}
-    
+
     {summary && !report.error && !report.loading && <div className={styles.analysis}><ReportChart title="Tình hình nộp bài" description="Toàn bộ lượt giao theo bộ lọc." variant="donut" unit="lượt giao" items={[{label:"Đã nộp",value:summary.submitted},{label:"Chưa nộp",value:summary.notSubmitted}]}/><ReportChart title="Điểm trung bình từng bài" description="Tối đa 8 bài trên trang hiện tại · Điểm chính thức, thang 10." unit="/10" max={10} items={data?.items.slice(0,8).map(item=>({label:item.title,value:item.average10})) ?? []}/></div>}
     <section data-panel className={styles.panel} aria-label="Danh sách kết quả bài tập">
       <header className={styles.toolbar}><div><h2>Kết quả bài tập{data?.className ? " · "+data.className : ""}</h2>{data && <small>Năm học {data.schoolYear} · Cập nhật {new Date(data.asOf).toLocaleString("vi-VN")}</small>}</div><div><RefreshButton onClick={()=>void report.refresh()} disabled={report.refreshing} /><Button variant="soft" onClick={()=>void exportCsv()} disabled={exporting || report.loading || Boolean(report.error) || !data?.totalElements}><LearningIcon name="download" />{exporting ? "Đang xuất…" : "Xuất CSV"}</Button></div></header>
