@@ -40,3 +40,51 @@
 @media (max-width: 500px) {
   .tokenToolbar { grid-template-columns: 1fr; }
 }
+
+/* School reports: one filter scope for the class charts and class register. */
+.reports[data-report-design="school"] { gap:16px; --chart-1:#167d8d; --chart-2:#52a395; --chart-3:#d89b35; }
+.reports[data-report-design="school"] [data-kpis] { gap:0; margin:0; }
+.reports[data-report-design="school"] [data-kpi] { min-height:104px!important; padding:16px 20px!important; border-radius:0!important; }
+.reports[data-report-design="school"] [data-kpi]:first-child { background:var(--teal-2)!important; }
+.reports[data-report-design="school"] [data-kpi] > span:first-child { position:static; width:auto; height:auto; padding:0; background:none; color:var(--report-muted)!important; }
+.reports[data-report-design="school"] [data-kpi] > strong { color:var(--teal-11)!important; }
+.reports[data-report-design="school"] .dataPanel { padding:18px 20px; }
+.reports[data-report-design="school"] .dataPanel :global(.admin-panel-heading) { margin-bottom:14px; }
+.reports[data-report-design="school"] h2 { font-size:16px; }
+.reports[data-report-design="school"] :global(.admin-panel-description) { font-size:12px; margin-top:4px; }
+.analysisGrid { display:grid; grid-template-columns:minmax(0,2fr) minmax(270px,.85fr); gap:14px; margin:0 0 18px; align-items:start; }
+.charts { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:14px; min-width:0; }
+.charts :global(.report-chart) { padding:16px; height:100%; border-color:var(--gray-6); background:var(--gray-2); }
+.charts :global(.report-chart header) { margin-bottom:18px; }
+.charts :global(.report-chart h2) { font-size:14px; }
+.charts :global(.report-chart header p) { font-size:11px; }
+.charts :global(.report-chart-bars) { gap:14px; max-height:210px; overflow:auto; padding-right:4px; scrollbar-width:thin; }
+.charts :global(.report-chart-track) { height:8px; }
+.charts :global(.report-chart-distribution) { min-height:142px; gap:14px; flex-wrap:nowrap; }
+.charts :global(.report-chart-donut) { width:100px; height:100px; }
+.charts :global(.report-chart-donut > span) { width:74px; height:74px; background:var(--gray-2); }
+.charts :global(.report-chart-donut strong) { font-size:23px; }
+.charts :global(.report-chart-donut small) { font-size:9px; }
+.charts :global(.report-chart-distribution ul) { min-width:0; gap:14px; }
+.charts :global(.report-chart-distribution li) { font-size:11px; gap:6px; }
+.reports[data-report-design="school"] .licencePanel { padding:16px; border:1px solid var(--gray-6); border-radius:10px; background:var(--gray-2); }
+.reports[data-report-design="school"] .licencePanel :global(.admin-panel-heading) { align-items:start; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+.reports[data-report-design="school"] .licencePanel h2 { font-size:14px; }
+.licencePanel .licenceGrid { grid-template-columns:minmax(0,1fr); gap:10px; }
+.licencePanel .licenceGrid > div { gap:5px; }
+.licencePanel .licenceGrid > div + div { padding:10px 0 0; border-left:0; border-top:1px solid var(--gray-6); }
+.licencePanel .licenceGrid span,.licencePanel .licenceGrid small { font-size:11px; }
+.licencePanel .licenceGrid strong { font-size:13px; }
+.classToolbar,.tokenToolbar { margin-bottom:14px; }
+.tableScroll :global(.rt-TableCell),.tableScroll :global(.rt-TableColumnHeaderCell),.tableScroll :global(.rt-TableRowHeaderCell) { font-size:12px; padding:10px 12px; }
+.tableScroll :global(.rt-TableRowHeaderCell) { font-weight:400; }
+@media(max-width:1250px) { .analysisGrid { grid-template-columns:minmax(0,1fr); } .licencePanel .licenceGrid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; } .licencePanel .licenceGrid > div + div { padding:0 0 0 16px; border-top:0; border-left:1px solid var(--gray-6); } }
+@media(max-width:700px) { .reports[data-report-design="school"] .dataPanel { padding:14px; } .charts { grid-template-columns:minmax(0,1fr); } .licencePanel .licenceGrid { grid-template-columns:minmax(0,1fr); } .licencePanel .licenceGrid > div + div { padding:10px 0 0; border-left:0; border-top:1px solid var(--gray-6); } .reports[data-report-design="school"] [data-kpi] { padding:12px!important; } .reports[data-report-design="school"] .dataPanel :global(.admin-panel-heading) { flex-wrap:wrap; } }
+
+.reports[data-report-design="school"] { display:grid!important; gap:16px!important; }
+.analysisGrid { margin-bottom:0; }
+.classResults { display:grid; align-content:start; gap:14px; min-width:0; }
+.classResults .reportPaging { padding-top:0; }
+.charts :global(.report-chart-distribution) { min-height:124px; }
+.charts :global(.report-chart header) { margin-bottom:14px; }
+.classResults .tableScroll :global(.rt-TableRootTable) { min-width:540px; }

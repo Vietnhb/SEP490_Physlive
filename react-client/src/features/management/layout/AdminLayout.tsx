@@ -29,6 +29,7 @@ export default function AdminLayout() {
       { to: "/manager/schools", label: "Trường học", icon: "book" },
       { to: "/manager/users", label: "Người dùng", icon: "users", title: "Quản lý người dùng" },
       { to: "/manager/plans", label: "Gói dịch vụ", icon: "sliders" },
+      { to: "/manager/customer-usage", label: "Sử dụng khách hàng", icon: "activity" },
       { to: "/manager/payments", label: "Thanh toán", icon: "chart", badge: toReconcile },
     ] },
     { label: "Hỗ trợ", items: [

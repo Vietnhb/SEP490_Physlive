@@ -1,3 +1,4 @@
+import ReportChart from "../../../shared/ui/ReportChart";
 import PageActions from "../../../shared/layout/PageActions";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
@@ -77,38 +78,44 @@ export default function SchoolReports() {
   };
 
   if (!schoolId) return null;
-  return <div className={`admin-content ${s.reports}`}>
+  return <div className={`admin-content ${s.reports}`} data-analytics="report" data-report-design="school">
+    {summary && <section data-kpis aria-label="Tổng hợp báo cáo trường">{[{label:"Học sinh đang hoạt động",value:summary.students,note:"Tài khoản thuộc trường"},{label:"Giáo viên",value:summary.teachers,note:"Tài khoản giảng dạy"},{label:"Lớp đang hoạt động",value:summary.activeClasses,note:"Toàn bộ năm học"},{label:"Token AI tháng này",value:summary.usedTokens,note:monthLabel(summary.usageMonth)}].map(item=><article data-kpi key={item.label}><span>{item.label}</span><strong>{number(item.value)}</strong><small>{item.note}</small></article>)}</section>}
     <PageActions><RefreshButton onClick={() => { void load(); void tokensResource.refresh(); }} disabled={refreshing} /></PageActions>
     {error && <Callout.Root color="red" role="alert"><Callout.Text>{error}</Callout.Text><Button variant="soft" onClick={() => void load()}>Thử lại</Button></Callout.Root>}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {loading && !summary ? <DashboardLoadingSkeleton cards={4} label="Đang tải báo cáo…" /> : summary && <>
-      <Card size="3" asChild><section className={`admin-panel ${s.licencePanel}`} aria-label="Bản quyền và hạn mức">
-        <div className="admin-panel-heading"><div><h2>Bản quyền và hạn mức</h2><p className="admin-panel-description">{summary.planCode ? `Gói ${planName(summary.planCode)}` : "Gói chưa được thiết lập"}</p></div><Badge color={summary.licenseStatus === "ACTIVE" ? "green" : "orange"}>{licenceLabels[summary.licenseStatus]}</Badge></div>
-        <div className={s.licenceGrid}>
-          <div><span>Thời hạn bản quyền</span><strong>{dateLabel(summary.licenseStart)} – {dateLabel(summary.licenseEnd)}</strong><Button asChild size="1" variant="soft"><Link to="/school/billing">Xem gói / gia hạn</Link></Button></div>
-          <div><span>Hạn mức học sinh</span><strong>{number(summary.students)} / {summary.studentQuota == null ? "Không giới hạn" : number(summary.studentQuota)}</strong>{summary.studentQuota != null && <><Progress value={summary.studentQuota > 0 ? Math.min(100, summary.students / summary.studentQuota * 100) : summary.students > 0 ? 100 : 0} color={summary.students >= summary.studentQuota ? "orange" : "indigo"} aria-label="Mức sử dụng hạn mức học sinh" /><small>{summary.students > summary.studentQuota ? `Vượt ${number(summary.students - summary.studentQuota)} học sinh` : `Còn ${number(summary.studentQuota - summary.students)} chỗ`}</small></>}</div>
-          <div><span>Token AI · {monthLabel(summary.usageMonth)}</span><strong>{number(summary.usedTokens)} / {summary.tokenQuota == null ? "Không giới hạn" : number(summary.tokenQuota)}</strong>{summary.tokenQuota != null && <Progress value={summary.tokenQuota > 0 ? Math.min(100, summary.usedTokens / summary.tokenQuota * 100) : summary.usedTokens > 0 ? 100 : 0} aria-label="Mức sử dụng token AI tháng này" />}<small>Hạn mức token được tính lại mỗi tháng.</small></div>
-        </div>
-      </section></Card>
 
-      <Card size="3" asChild><section className={`admin-panel ${s.dataPanel}`}>
-        <div className="admin-panel-heading"><div><h2 id="report-classes">Thống kê lớp học</h2><p className="admin-panel-description">{number(filteredClasses.length)} lớp đang hoạt động phù hợp bộ lọc. CSV xuất toàn bộ kết quả đã lọc.</p></div><Button variant="soft" loading={exporting} disabled={exporting || loading || !filteredClasses.length} onClick={() => void exportClasses()}><LearningIcon name="download" />Xuất CSV</Button></div>
+      <Card size="3" asChild><section data-panel className={`admin-panel ${s.dataPanel}`}>
+        <div className="admin-panel-heading"><div><h2 id="report-classes">Thống kê lớp học</h2><p className="admin-panel-description">{number(filteredClasses.length)} lớp đang hoạt động phù hợp bộ lọc. Biểu đồ và bảng dùng chung bộ lọc.</p></div><Button variant="soft" loading={exporting} disabled={exporting || loading || !filteredClasses.length} onClick={() => void exportClasses()}><LearningIcon name="download" />Xuất CSV</Button></div>
         <div className={s.classToolbar}>
           <TextField.Root value={classQuery} onChange={event => { setClassQuery(event.target.value); setClassPage(0); }} placeholder="Tìm tên lớp…" aria-label="Tìm lớp trong báo cáo"><TextField.Slot><LearningIcon name="search" /></TextField.Slot></TextField.Root>
           <Select.Root value={classGrade} onValueChange={value => { setClassGrade(value); setClassPage(0); }}><Select.Trigger aria-label="Khối lớp báo cáo" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả khối</Select.Item>{[10, 11, 12].map(grade => <Select.Item key={grade} value={String(grade)}>Khối {grade}</Select.Item>)}</Select.Content></Select.Root>
           <Select.Root value={classYear} onValueChange={value => { setClassYear(value); setClassPage(0); }}><Select.Trigger aria-label="Năm học báo cáo" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả năm học</Select.Item>{years.map(year => <Select.Item key={year} value={year}>{year}</Select.Item>)}</Select.Content></Select.Root>
         </div>
+        <div className={s.analysisGrid}>
+          <div className={s.classResults}><div className={s.charts}><ReportChart title="Quy mô lớp học" description="8 lớp đông học sinh nhất trong kết quả lọc." unit="học sinh" items={[...filteredClasses].sort((a,b)=>b.students-a.students).slice(0,8).map(item=>({label:item.name,value:item.students}))}/><ReportChart title="Học sinh theo khối" description="Lượt xếp lớp trong phạm vi đang lọc." variant="donut" unit="lượt xếp lớp" items={[10,11,12].map(grade=>({label:"Khối "+grade,value:filteredClasses.filter(item=>item.gradeLevel===grade).reduce((sum,item)=>sum+item.students,0)}))}/></div>
         <div className={s.tableScroll} role="region" aria-labelledby="report-classes"><Table.Root size="2" variant="surface"><Table.Header><Table.Row>{["Lớp", "Khối", "Năm học", "Giáo viên", "Học sinh"].map(label => <Table.ColumnHeaderCell key={label}>{label}</Table.ColumnHeaderCell>)}</Table.Row></Table.Header><Table.Body>{visibleClasses.length ? visibleClasses.map(item => <Table.Row key={item.id}><Table.RowHeaderCell>{item.name}</Table.RowHeaderCell><Table.Cell><Badge>{item.gradeLevel}</Badge></Table.Cell><Table.Cell>{item.schoolYear}</Table.Cell><Table.Cell>{item.teachers}</Table.Cell><Table.Cell>{item.students}</Table.Cell></Table.Row>) : <Table.Row><Table.Cell colSpan={5}>Không có lớp phù hợp với bộ lọc.</Table.Cell></Table.Row>}</Table.Body></Table.Root></div>
         <Paging page={currentClassPage} size={10} total={filteredClasses.length} onPage={setClassPage} />
+          </div>
+      <section data-panel className={`admin-panel ${s.licencePanel}`} aria-label="Bản quyền và hạn mức">
+        <div className="admin-panel-heading"><div><h2>Gói & hạn mức</h2><p className="admin-panel-description">{summary.planCode ? `Gói ${planName(summary.planCode)}` : "Gói chưa được thiết lập"}</p></div><Badge color={summary.licenseStatus === "ACTIVE" ? "green" : "orange"}>{licenceLabels[summary.licenseStatus]}</Badge></div>
+        <div className={s.licenceGrid}>
+          <div><span>Thời hạn bản quyền</span><strong>{dateLabel(summary.licenseStart)} – {dateLabel(summary.licenseEnd)}</strong><Button asChild size="1" variant="soft"><Link to="/school/billing">Xem gói / gia hạn</Link></Button></div>
+          <div><span>Hạn mức học sinh</span><strong>{number(summary.students)} / {summary.studentQuota == null ? "Không giới hạn" : number(summary.studentQuota)}</strong>{summary.studentQuota != null && <><Progress value={summary.studentQuota > 0 ? Math.min(100, summary.students / summary.studentQuota * 100) : summary.students > 0 ? 100 : 0} color={summary.students >= summary.studentQuota ? "orange" : "indigo"} aria-label="Mức sử dụng hạn mức học sinh" /><small>{summary.students > summary.studentQuota ? `Vượt ${number(summary.students - summary.studentQuota)} học sinh` : `Còn ${number(summary.studentQuota - summary.students)} chỗ`}</small></>}</div>
+          <div><span>Token AI · {monthLabel(summary.usageMonth)}</span><strong>{number(summary.usedTokens)} / {summary.tokenQuota == null ? "Không giới hạn" : number(summary.tokenQuota)}</strong>{summary.tokenQuota != null && <Progress value={summary.tokenQuota > 0 ? Math.min(100, summary.usedTokens / summary.tokenQuota * 100) : summary.usedTokens > 0 ? 100 : 0} aria-label="Mức sử dụng token AI tháng này" />}<small>Hạn mức token được tính lại mỗi tháng.</small></div>
+        </div>
+      </section>
+
+        </div>
       </section></Card>
 
-      <Card size="3" asChild><section className={`admin-panel ${s.dataPanel}`}>
-        <div className="admin-panel-heading"><div><h2 id="report-token-history">Lịch sử sử dụng AI</h2><p className="admin-panel-description">Tra cứu toàn bộ lịch sử theo tháng. Bộ lọc này chỉ áp dụng cho bảng bên dưới.</p></div></div>
+      <Card size="3" asChild><section data-panel className={`admin-panel ${s.dataPanel}`}>
+        <div className="admin-panel-heading"><div><h2 id="report-token-history">Lịch sử sử dụng AI</h2><p className="admin-panel-description">Tra cứu theo tài khoản, hoạt động và tháng sử dụng.</p></div></div>
         <div className={s.tokenToolbar}>
-          <TextField.Root size="3" value={tokenQuery} onChange={event => { setTokenQuery(event.target.value); setTokenPage(0); }} placeholder="Tìm theo email tài khoản…" aria-label="Tìm lịch sử token AI"><TextField.Slot><LearningIcon name="search" /></TextField.Slot></TextField.Root>
-          <Select.Root size="3" value={tokenOperation} onValueChange={value => { setTokenOperation(value); setTokenPage(0); }}><Select.Trigger aria-label="Lọc theo hoạt động" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả hoạt động</Select.Item>{options.operations.map(operation => <Select.Item key={operation} value={operation}>{operationLabel(operation)}</Select.Item>)}</Select.Content></Select.Root>
-          <Select.Root size="3" value={tokenMonth} onValueChange={value => { setTokenMonth(value); setTokenPage(0); }}><Select.Trigger aria-label="Lọc theo tháng" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả tháng</Select.Item>{options.months.map(month => <Select.Item key={month} value={month.slice(0, 7)}>{monthLabel(month)}</Select.Item>)}</Select.Content></Select.Root>
-          <Button size="3" variant="soft" color="gray" disabled={!hasTokenFilters} onClick={() => { setTokenQuery(""); setTokenOperation("ALL"); setTokenMonth("ALL"); setTokenPage(0); }}>Xóa bộ lọc</Button>
+          <TextField.Root size="2" value={tokenQuery} onChange={event => { setTokenQuery(event.target.value); setTokenPage(0); }} placeholder="Tìm theo email tài khoản…" aria-label="Tìm lịch sử token AI"><TextField.Slot><LearningIcon name="search" /></TextField.Slot></TextField.Root>
+          <Select.Root size="2" value={tokenOperation} onValueChange={value => { setTokenOperation(value); setTokenPage(0); }}><Select.Trigger aria-label="Lọc theo hoạt động" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả hoạt động</Select.Item>{options.operations.map(operation => <Select.Item key={operation} value={operation}>{operationLabel(operation)}</Select.Item>)}</Select.Content></Select.Root>
+          <Select.Root size="2" value={tokenMonth} onValueChange={value => { setTokenMonth(value); setTokenPage(0); }}><Select.Trigger aria-label="Lọc theo tháng" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả tháng</Select.Item>{options.months.map(month => <Select.Item key={month} value={month.slice(0, 7)}>{monthLabel(month)}</Select.Item>)}</Select.Content></Select.Root>
+          <Button size="2" variant="soft" color="gray" disabled={!hasTokenFilters} onClick={() => { setTokenQuery(""); setTokenOperation("ALL"); setTokenMonth("ALL"); setTokenPage(0); }}>Xóa bộ lọc</Button>
         </div>
         {tokenError && <Callout.Root color="red" role="alert"><Callout.Text>{tokenError}</Callout.Text><Button variant="soft" onClick={() => void tokensResource.refresh()}>Thử lại lịch sử</Button></Callout.Root>}
         {tokenLoading && !tokenResult ? <TableLoadingSkeleton headers={["Thời điểm", "Tài khoản", "Hoạt động", "Tháng", "Token"]} label="Đang tải lịch sử sử dụng AI…" /> : (!tokenError || tokenResult) && <>

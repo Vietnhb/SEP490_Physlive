@@ -178,7 +178,15 @@ export default function AdminPayments() {
   const visibleItems = items;
 
   const kpis = analytics?.kpis;
-  return <div className="admin-content">
+  const peak = analytics?.trend.reduce<PaymentAnalytics["trend"][number] | null>((best, point) => !best || point.revenueVnd > best.revenueVnd ? point : best, null);
+  return <div className="admin-content" data-analytics="report" data-report-design="payments">
+    {loading && !analytics ? <DashboardSkeleton /> : analytics && <section data-kpis data-payment-kpis className={styles.kpiGrid} aria-label={`Tổng quan ${periodDescription(filter)}`}>
+        <article data-kpi className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.blue}`}><LearningIcon name="chart" /></div><span>Doanh thu đã thanh toán</span><strong title={formatVnd(kpis?.grossPaidVnd ?? 0)}>{formatVnd(kpis?.grossPaidVnd ?? 0)}</strong><small>{periodDescription(filter)}</small></article>
+        <article data-kpi className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.green}`}><LearningIcon name="check" /></div><span>Đã thanh toán</span><strong>{kpis?.paidTransactions ?? 0}</strong><small>Giao dịch thành công</small></article>
+        <article data-kpi className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.amber}`}><LearningIcon name="activity" /></div><span>Chờ thanh toán</span><strong>{kpis?.pendingTransactions ?? 0}</strong><small>Đang chờ kết quả</small></article>
+        <article data-kpi className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.purple}`}><LearningIcon name="shield" /></div><span>Cần đối soát</span><strong>{kpis?.reviewTransactions ?? 0}</strong><small>Cần kiểm tra thêm</small></article>
+        <article data-kpi className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.red}`}><LearningIcon name="close" /></div><span>Thanh toán thất bại</span><strong>{kpis?.failedTransactions ?? 0}</strong><small>Không ghi nhận doanh thu</small></article>
+      </section>}
     <header className={styles.pageHeader}>
       <div className={styles.headerActions}>
         <div className={styles.periodFilters} aria-label="Bộ lọc thời gian">
@@ -194,21 +202,15 @@ export default function AdminPayments() {
     </header>
 
     {(error || report.error || transactions.error) && <ErrorNotice error={error || report.error || transactions.error || ""} onRetry={() => void load()} />}
-    {loading && !analytics ? <DashboardSkeleton /> : analytics && <>
-      <section className={styles.kpiGrid} aria-label={`Tổng quan ${periodDescription(filter)}`}>
-        <article className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.blue}`}><LearningIcon name="chart" /></div><span>Doanh thu đã thanh toán</span><strong title={formatVnd(kpis?.grossPaidVnd ?? 0)}>{formatVnd(kpis?.grossPaidVnd ?? 0)}</strong><small>{periodDescription(filter)}</small></article>
-        <article className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.green}`}><LearningIcon name="check" /></div><span>Đã thanh toán</span><strong>{kpis?.paidTransactions ?? 0}</strong><small>Giao dịch thành công</small></article>
-        <article className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.amber}`}><LearningIcon name="activity" /></div><span>Chờ thanh toán</span><strong>{kpis?.pendingTransactions ?? 0}</strong><small>Đang chờ kết quả</small></article>
-        <article className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.purple}`}><LearningIcon name="shield" /></div><span>Cần đối soát</span><strong>{kpis?.reviewTransactions ?? 0}</strong><small>Cần kiểm tra thêm</small></article>
-        <article className={styles.kpiCard}><div className={`${styles.kpiIcon} ${styles.red}`}><LearningIcon name="close" /></div><span>Thanh toán thất bại</span><strong>{kpis?.failedTransactions ?? 0}</strong><small>Không ghi nhận doanh thu</small></article>
-      </section>
+    {analytics && <>
 
-      <section className={`${styles.panel} ${styles.trendPanel}`}><div className={styles.panelHeading}><div><h2>Xu hướng doanh thu</h2><p>Doanh thu từ giao dịch đã thanh toán · {periodDescription(filter)}</p></div><span className={styles.periodBadge}>{analytics.period === "DAY" ? "Chi tiết theo giờ trong ngày" : analytics.period === "MONTH" ? "Chi tiết theo ngày trong tháng" : analytics.period === "QUARTER" ? "Chi tiết theo tháng trong quý" : "Chi tiết theo tháng trong năm"}</span></div><RevenueTrendChart key={`${period}-${date}-${year}-${month}-${quarter}`} data={analytics.trend} /></section>
 
-      <div className={styles.insightGrid}>
-        <section className={styles.panel}><div className={styles.panelHeading}><div><h2>Doanh thu theo gói</h2><p>Sắp xếp theo doanh thu giảm dần</p></div></div><PackageRevenueChart data={analytics.packages} total={analytics.kpis.grossPaidVnd} /></section>
-        <section className={styles.panel}><div className={styles.panelHeading}><div><h2>Trạng thái giao dịch</h2><p>Phân bổ trong cùng phạm vi thời gian</p></div></div><StatusDonut data={analytics.statuses} /></section>
-      </div>
+      <div className={styles.analysisGrid} data-payment-analysis><section className={`${styles.panel} ${styles.trendPanel}`}><div className={styles.panelHeading}><div><h2>Xu hướng doanh thu</h2><p>Doanh thu từ giao dịch đã thanh toán · {periodDescription(filter)}</p></div><span className={styles.periodBadge}>{analytics.period === "DAY" ? "Chi tiết theo giờ trong ngày" : analytics.period === "MONTH" ? "Chi tiết theo ngày trong tháng" : analytics.period === "QUARTER" ? "Chi tiết theo tháng trong quý" : "Chi tiết theo tháng trong năm"}</span></div><RevenueTrendChart key={`${period}-${date}-${year}-${month}-${quarter}`} data={analytics.trend} /><dl className={styles.trendSummary}><div><dt>Kỳ có doanh thu cao nhất</dt><dd>{peak && peak.revenueVnd > 0 ? peak.label : "Chưa có doanh thu"}</dd></div><div><dt>Giá trị TB / giao dịch đã thanh toán</dt><dd>{analytics.kpis.paidTransactions ? formatVnd(Math.round(analytics.kpis.grossPaidVnd / analytics.kpis.paidTransactions)) : "—"}</dd></div><div><dt>Tỷ lệ giao dịch đã thanh toán</dt><dd>{analytics.kpis.totalTransactions ? (analytics.kpis.paidTransactions / analytics.kpis.totalTransactions * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "%" : "—"}</dd></div></dl></section>
+
+      <aside className={styles.insightGrid} data-payment-breakdowns>
+        <section data-panel className={styles.panel}><div className={styles.panelHeading}><div><h2>Doanh thu theo gói</h2><p>Sắp xếp theo doanh thu giảm dần</p></div></div><PackageRevenueChart data={analytics.packages} total={analytics.kpis.grossPaidVnd} /></section>
+        <section data-panel className={styles.panel}><div className={styles.panelHeading}><div><h2>Trạng thái giao dịch</h2><p>Phân bổ trong cùng phạm vi thời gian</p></div></div><StatusDonut data={analytics.statuses} /></section>
+      </aside></div>
 
       <section className={`${styles.panel} ${styles.transactionsPanel}`}>
         <div className={styles.panelHeading}><div><h2>Danh sách giao dịch</h2><p>{periodDescription(filter)} · Doanh thu chỉ tính giao dịch đã thanh toán</p></div><span className={styles.resultCount}>{analytics.kpis.totalTransactions} giao dịch</span></div>

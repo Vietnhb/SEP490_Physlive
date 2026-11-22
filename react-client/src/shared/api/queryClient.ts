@@ -17,6 +17,7 @@ export const apiKey = (url: string) => ["api", sessionScope(), url] as const;
 export type DataChange = { path?: string };
 export function affectedBy(read: string, write?: string) {
   if (!write) return true;
+  if (read.startsWith("/reports/customer-usage")) return /schools|plans|payments|billing|assignments|submissions|simulation|problems|evaluations/.test(write);
   const schoolId = (path: string) => /\/schools\/([0-9a-f]{8}-[0-9a-f-]{27,})(?:\/|$)/i.exec(path)?.[1]?.toLowerCase();
   const readSchool = schoolId(read), writeSchool = schoolId(write);
   if (readSchool && writeSchool && readSchool !== writeSchool) return false;

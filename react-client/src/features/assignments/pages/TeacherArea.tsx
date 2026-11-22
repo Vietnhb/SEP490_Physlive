@@ -51,6 +51,7 @@ export default function TeacherAreaLayout() {
       label: "Bài tập",
       items: [
         { to: "/lab/classes", label: "Lớp phụ trách", icon: "users" },
+        { to: "/lab/reports", label: "Báo cáo kết quả", icon: "chart" },
         { to: "/lab", label: "Tất cả bài đã giao", icon: "chart", end: true },
         { to: "/assignments/workspace", label: "Giao bài mới", icon: "plus" },
       ],

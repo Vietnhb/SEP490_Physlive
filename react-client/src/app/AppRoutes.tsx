@@ -52,7 +52,9 @@ const teacherAreaModule = () => import("../features/assignments/pages/TeacherAre
 const TeacherArea = lazy(teacherAreaModule);
 const TeacherThemed = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherThemed })));
 const TeacherComplaints = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherComplaintsPage })));
+const CustomerUsageReport = lazy(() => import("../features/management/pages/CustomerUsageReport"));
 const TeacherDashboard = lazy(() => import("../features/assignments/pages/TeacherDashboard"));
+const TeacherClassReport = lazy(() => import("../features/assignments/pages/TeacherClassReport"));
 const TeacherClasses = lazy(() => import("../features/assignments/pages/TeacherClassesPage"));
 const Lab = lazy(() => import("../features/simulation/pages/Lab"));
 const studentModule = () => import("../features/assignments/pages/StudentAssignments");
@@ -133,6 +135,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           />
           <Route path="/lab" element={workspaceElement(<TeacherArea />)}>
             <Route index element={<Lab />} />
+            <Route path="reports" element={<TeacherThemed><TeacherClassReport /></TeacherThemed>} />
             <Route path="classes" element={<TeacherThemed><TeacherClasses /></TeacherThemed>} />
             <Route path="classes/:classId" element={<TeacherThemed><TeacherClasses /></TeacherThemed>} />
             <Route path="complaints" element={<TeacherThemed><TeacherComplaints /></TeacherThemed>} />
@@ -173,6 +176,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route index element={<Admin />} />
             <Route path="users" element={<UserAccounts />} />
             <Route path="support" element={<SupportInbox />} />
+            <Route path="customer-usage" element={<CustomerUsageReport />} />
             <Route path="feedback" element={<Navigate to="/manager/support?kind=FEEDBACK" replace />} />
             <Route path="messages" element={<Navigate to="/manager/support?kind=MESSAGE" replace />} />
             <Route path="appeals" element={<Navigate to="/manager/support?kind=ACCOUNT" replace />} />
