@@ -1,3 +1,5 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
+import ReportChart from "../../../shared/ui/ReportChart";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { Badge, Button } from "@radix-ui/themes";
 import type { SimulationComplaint } from "../../support/api/supportApi";
@@ -5,7 +7,6 @@ import type { ReviewerAccess, ReviewerView } from "../model/reviewerAccess";
 import type { Version } from "../model/reviewerTypes";
 import { timeAgo } from "../model/reviewerUtils";
 import { ReviewerIcon, type ReviewerIconName } from "./ReviewerKit";
-import LearningIcon from "../../../shared/ui/LearningIcon";
 import s from "./ReviewerOverview.module.css";
 
 type PendingItem = { createdAt?: string };
@@ -32,7 +33,7 @@ function useOverview(access: ReviewerAccess) {
   return { tasks, canHandleComplaints, refreshing: active.some(item => item.refreshing), refresh: () => { void Promise.all(active.map(item => item.refresh())); } };
 }
 
-export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: ReviewerAccess; name?: string; onOpen: (view: ReviewerView) => void }>) {
+export function ReviewerOverview({ access, onOpen }: Readonly<{ access: ReviewerAccess; name?: string; onOpen: (view: ReviewerView) => void }>) {
   const { tasks, canHandleComplaints, refreshing, refresh } = useOverview(access);
   const failed = tasks.filter(task => task.error);
   const loaded = tasks.filter(task => task.count !== undefined).length;
@@ -40,26 +41,25 @@ export function ReviewerOverview({ access, name, onOpen }: Readonly<{ access: Re
   const pending = tasks.filter(task => (task.count ?? 0) > 0).sort((a, b) => (a.oldest ? Date.parse(a.oldest) : Infinity) - (b.oldest ? Date.parse(b.oldest) : Infinity) || (b.count ?? 0) - (a.count ?? 0));
   const total = tasks.reduce((sum, task) => sum + (task.count ?? 0), 0);
   const oldest = oldestDate(pending.map(task => ({ createdAt: task.oldest })));
-  const firstName = name?.trim().split(/\s+/).at(-1);
-  const message = failed.length ? "Một số nhóm công việc chưa cập nhật được. Hãy thử làm mới." : !ready ? "Đang kiểm tra các nhóm công việc của bạn…" : total > 0 ? "Hiện có " + number(total) + " việc đang chờ bạn xử lý." : "Không còn công việc đang chờ xử lý.";
   const priority = pending[0];
-  return <div className={s.dashboard} data-testid="reviewer-dashboard">
-    <header className={s.welcome}><div><span className={s.eyebrow}><LearningIcon name="shield" />Không gian kiểm duyệt</span><h1>{firstName ? "Chào " + firstName : "Việc cần làm"}</h1><p>{message}</p></div><div className={s.headerActions}><Button variant="soft" disabled={refreshing} onClick={refresh}><ReviewerIcon name="refresh" />{refreshing ? "Đang cập nhật…" : "Làm mới"}</Button>{priority && <Button onClick={() => onOpen(priority.view)}>Tiếp tục xử lý<ReviewerIcon name="arrow" /></Button>}</div></header>
+  return <div className={s.dashboard} data-testid="reviewer-dashboard" data-analytics="dashboard" data-dashboard-role="reviewer">
+
     {failed.length > 0 && <div className={s.error} role="alert"><span>Chưa cập nhật được: {failed.map(task => task.title).join(", ")}. Các nhóm còn lại vẫn có thể sử dụng.</span><Button variant="soft" onClick={refresh}>Thử lại</Button></div>}
-    <section className={s.stats} aria-label="Các nhóm công việc">{tasks.map(task => <article key={task.id} className={s.stat + " " + s[task.tone]} data-task={task.id} aria-busy={task.loading}>
+    <section data-kpis className={s.stats} aria-label="Các nhóm công việc">{tasks.map(task => <article data-kpi key={task.id} className={s.stat + " " + s[task.tone]} data-task={task.id} data-pending={(task.count ?? 0) > 0} aria-busy={task.loading}>
       <h2><ReviewerIcon name={task.icon} />{task.title}</h2><strong aria-label={task.count == null ? "Chưa có số liệu" : number(task.count) + " mục"}>{task.count == null ? "—" : number(task.count)}</strong><p title={task.count === 0 ? task.empty : undefined}>{task.error ? "Chưa cập nhật được số liệu" : task.count == null ? "Đang tải công việc…" : task.count > 0 ? "Đang chờ xử lý" : "Không có việc đang chờ"}</p><Button variant="ghost" onClick={() => onOpen(task.view)}>{task.action}<ReviewerIcon name="arrow" size={16} /></Button>
     </article>)}</section>
-    <div className={s.content}>
-      <section className={s.panel} aria-labelledby="reviewer-priority-title"><div className={s.panelHeading}><div><h2 id="reviewer-priority-title">Ưu tiên xử lý</h2><p>Nhóm có yêu cầu cũ nhất được xếp trước.</p></div><span className={s.sectionIcon}><ReviewerIcon name="queue" /></span></div>
+    <RefreshButton disabled={refreshing} onClick={refresh} />
+    <div className={s.content} data-reviewer-queue>
+      <section data-panel className={s.panel} aria-labelledby="reviewer-priority-title"><div className={s.panelHeading}><div><h2 id="reviewer-priority-title">Ưu tiên xử lý</h2><p>Nhóm có yêu cầu cũ nhất được xếp trước.</p></div>{priority && <Button variant="soft" onClick={() => onOpen(priority.view)}>Xử lý mục cũ nhất<ReviewerIcon name="arrow" /></Button>}</div>
         {pending.length > 0 ? <ul className={s.priorityList}>{pending.map(task => <li key={task.id}><span className={s.rowIcon}><ReviewerIcon name={task.icon} /></span><div className={s.taskCopy}><div><h3>{task.title}</h3><Badge color="amber">{number(task.count!)} mục</Badge></div><p>{task.detail}</p>{task.oldest && <small><ReviewerIcon name="clock" size={14} />Cũ nhất {timeAgo(task.oldest)}</small>}{task.error && <small className={s.warningText}>Đang hiển thị số liệu gần nhất.</small>}</div><Button variant="soft" onClick={() => onOpen(task.view)} aria-label={task.action + ": " + task.title}>Xử lý<ReviewerIcon name="arrow" size={16} /></Button></li>)}</ul> : <div className={s.empty}><span><ReviewerIcon name={ready ? "check" : "queue"} size={28} /></span><h3>{ready ? "Đã xử lý hết công việc" : failed.length ? "Chưa thể tổng hợp công việc" : "Đang tổng hợp công việc"}</h3><p>{ready ? "Bạn có thể xem lại các nhóm công việc hoặc cập nhật dữ liệu chuẩn." : failed.length ? "Thử làm mới để kiểm tra lại các nhóm chưa tải được." : "Số liệu sẽ xuất hiện khi tải xong."}</p></div>}
       </section>
-      <aside className={s.aside} aria-label="Tình trạng và phạm vi công việc">
+      <aside className={s.aside} aria-label="Tình trạng và phạm vi công việc"><ReportChart title="Phân bổ công việc" description="Các mục đang chờ theo từng nhóm." variant="donut" unit="mục đang chờ" items={tasks.filter(task => !task.error).map(task => ({ label: task.title, value: task.count }))} />
         <section className={s.queueSummary} aria-labelledby="reviewer-queue-title"><span className={s.summaryIcon}><ReviewerIcon name="clock" size={24} /></span><h2 id="reviewer-queue-title">Tình trạng hàng đợi</h2><dl><div><dt>Công việc đang chờ</dt><dd>{ready ? number(total) : "—"}</dd></div><div><dt>Nhóm còn công việc</dt><dd>{ready ? number(pending.length) + " / " + number(tasks.length) : loaded + " / " + tasks.length + " nhóm đã tải"}</dd></div><div><dt>Yêu cầu cũ nhất</dt><dd>{oldest ? timeAgo(oldest) : "—"}</dd></div></dl></section>
-        <section className={s.panel + " " + s.guide} aria-labelledby="reviewer-scope-title"><div className={s.panelHeading}><div><h2 id="reviewer-scope-title">Phạm vi công việc</h2><p>Các chức năng tài khoản được cấp.</p></div></div><ul>
+        <details className="reviewer-role-guide"><summary>Phạm vi công việc</summary><section data-panel className={s.panel + " " + s.guide} aria-labelledby="reviewer-scope-title"><div className={s.panelHeading}><div><h2 id="reviewer-scope-title">Phạm vi công việc</h2><p>Các chức năng tài khoản được cấp.</p></div></div><ul>
           {access.canReview && <li><span className={s.guideIcon}><ReviewerIcon name="eye" /></span><div><h3>Kiểm duyệt nội dung</h3><p>Xem, phê duyệt hoặc từ chối mô phỏng chia sẻ công khai.</p></div></li>}
           {canHandleComplaints && <li><span className={s.guideIcon}><ReviewerIcon name="message" /></span><div><h3>Hỗ trợ giáo viên</h3><p>Kiểm tra báo lỗi và phản hồi kết quả xử lý mô phỏng.</p></div></li>}
           {access.canEdit && <li><span className={s.guideIcon}><ReviewerIcon name="edit" /></span><div><h3>Biên soạn dữ liệu chuẩn</h3><p>Quản lý chủ đề, định luật và các bản nháp chờ phát hành.</p></div></li>}
-        </ul>{!access.isManager && (!access.canEdit || !access.canReview) && <p className={s.accessNote}>Liên hệ bộ phận vận hành nếu cần thêm quyền.</p>}</section>
+        </ul>{!access.isManager && (!access.canEdit || !access.canReview) && <p className={s.accessNote}>Liên hệ bộ phận vận hành nếu cần thêm quyền.</p>}</section></details>
       </aside>
     </div>
   </div>;

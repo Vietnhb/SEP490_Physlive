@@ -1,3 +1,4 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useState } from "react";
 import axios from "axios";
@@ -52,7 +53,7 @@ export function LawGapsDesk() {
     <header className="reviewer-page-head"><div>
       <Heading as="h1" className="admin-content-title" size="6">Định luật cần rà soát</Heading>
       <Text as="p" size="2" color="gray" mt="1">Các trường hợp định luật chưa kiểm được mô phỏng, gộp theo loại. Đánh dấu khi đã xử lý; gặp lại thì mục tự mở lại.</Text>
-    </div><Button variant="outline" disabled={resource.refreshing} onClick={() => void load()}>Làm mới</Button></header>
+    </div><RefreshButton disabled={resource.refreshing} onClick={() => void load()} /></header>
     <SegmentedControl.Root value={filter} onValueChange={value => setFilter(value as Filter)}>
       <SegmentedControl.Item value="OPEN">Cần xử lý</SegmentedControl.Item>
       <SegmentedControl.Item value="RESOLVED">Đã bổ sung</SegmentedControl.Item>

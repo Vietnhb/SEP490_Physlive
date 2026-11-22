@@ -1,0 +1,27 @@
+/* Financial and customer reports: compact metrics, analytical panels, detailed tables. */
+[data-report-design] { --report-surface:#fff; --report-ink:#1a2940; --report-muted:#657188; --report-line:#dfe5ed; }
+[data-report-design="usage"].page,main[data-report-design="usage"] { gap:16px!important; padding:24px 32px!important; }
+[data-report-design] [data-kpis] { gap:0; border:1px solid var(--report-line); border-radius:10px; overflow:hidden; background:var(--report-surface); margin-bottom:0; }
+[data-report-design] [data-kpi] { display:flex; justify-content:center; min-height:108px!important; padding:14px 18px!important; background:var(--report-surface)!important; color:var(--report-ink)!important; border:0; border-right:1px solid var(--report-line); border-radius:0!important; box-shadow:none; gap:4px; }
+[data-report-design] [data-kpi]:last-child { border-right:0; }[data-report-design] [data-kpi]::after { display:none; }
+[data-report-design] [data-kpi] > strong { margin:4px 0!important; font-size:26px!important; line-height:1.25; font-weight:650; }
+[data-report-design] [data-kpi] > span { font-size:12px!important; color:var(--report-muted)!important; padding-right:28px; }
+[data-report-design] [data-kpi] small { color:var(--report-muted)!important; font-size:10px; line-height:1.5; margin:0; }
+[data-report-design] [data-kpi] > div:first-child,[data-report-design] [data-kpi] > span:first-child { position:absolute; top:14px; right:14px; width:24px; height:24px; padding:0; margin:0; background:var(--gray-3); border-radius:6px; color:#516a8f!important; }
+[data-report-design] [data-kpi] svg { width:14px; height:14px; }
+[data-report-design="payments"] [data-kpi]:first-child { background:#f0edff!important; color:#5148a3!important; }
+[data-report-design="payments"] [data-kpi]:nth-child(2) > strong { color:#148166!important; }[data-report-design="payments"] [data-kpi]:nth-child(3) > strong { color:#a66c17!important; }[data-report-design="payments"] [data-kpi]:nth-child(4) > strong { color:#7350ae!important; }[data-report-design="payments"] [data-kpi]:nth-child(5) > strong { color:#bd4249!important; }
+[data-report-design="usage"] [data-kpi]:first-child { background:#edf6fb!important; }[data-report-design="usage"] [data-kpi]:nth-child(3) > strong { color:#237987!important; }
+[data-report-design="usage"] form { padding:12px 16px; gap:12px; border:1px solid var(--report-line); border-radius:10px; background:var(--report-surface); }
+[data-report-design="usage"] form label { gap:5px; }[data-report-design="usage"] form .rt-SelectTrigger,[data-report-design="usage"] form label > span:last-child { height:36px; border-radius:6px; }
+[data-report-design="usage"] form .rt-Button { min-height:34px; padding:7px 14px; border-radius:6px; font-size:12px; }
+[data-report-design] article,[data-report-design] section[data-panel] { box-shadow:none; }
+[data-report-design="usage"] [data-usage-analysis] > article { padding:16px; border-radius:10px; }
+[data-report-design="payments"] > header { margin:14px 0; }[data-report-design="payments"] > header > div { width:100%; }[data-report-design="payments"] > header > div > div { padding:3px 7px; border-radius:7px; font-size:12px; }
+[data-report-design="payments"] [data-payment-analysis] section { padding:16px; border-radius:10px; }[data-report-design="payments"] [data-payment-analysis] h2 { font-size:15px; }[data-report-design="payments"] [data-payment-analysis] p { font-size:11px; }
+.dark [data-report-design] { --report-surface:#1c2431; --report-ink:#e0e7f3; --report-muted:#abb8cd; --report-line:#354052; }
+.dark [data-report-design="payments"] [data-kpi]:first-child { background:#302b4c!important; color:#c9c0ff!important; }.dark [data-report-design="usage"] [data-kpi]:first-child { background:#22394b!important; }
+.dark [data-report-design="payments"] [data-kpi]:nth-child(2) > strong { color:#75d8b9!important; }.dark [data-report-design="payments"] [data-kpi]:nth-child(3) > strong { color:#efbd6b!important; }.dark [data-report-design="payments"] [data-kpi]:nth-child(4) > strong { color:#bfa0f2!important; }.dark [data-report-design="payments"] [data-kpi]:nth-child(5) > strong { color:#ffabb0!important; }.dark [data-report-design="usage"] [data-kpi]:nth-child(3) > strong { color:#86d6df!important; }
+@media(max-width:700px) { main[data-report-design="usage"] { padding:20px 16px!important; }[data-report-design] [data-kpis] { grid-template-columns:repeat(2,minmax(0,1fr)); }[data-report-design] [data-kpi] { padding:12px!important; min-height:104px!important; border-bottom:1px solid var(--report-line); }[data-report-design] [data-kpi] > strong { font-size:23px!important; }[data-report-design] [data-kpi] > div:first-child,[data-report-design] [data-kpi] > span:first-child { right:10px; top:10px; }[data-report-design="payments"] [data-kpi]:first-child { grid-column:1/-1; } }
+
+@media(max-width:700px) { [data-report-design="payments"] [data-payment-kpis] [data-kpi]:first-child { grid-column:1/-1!important; } }

@@ -1,3 +1,5 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
+import ReportChart from "../../../shared/ui/ReportChart";
 import { useResource } from "../../../shared/hooks/operationsData";
 import type { DataPage } from "../../../shared/api/page";
 import type { SchoolClassSummary } from "../types";
@@ -22,7 +24,7 @@ const licenseLabels: Record<SchoolReportSummary["licenseStatus"], string> = {
 type IconName = ComponentProps<typeof LearningIcon>["name"];
 
 function SummaryCard({ label, value, icon, tone, detail }: Readonly<{ label: string; value: number; icon: IconName; tone: "primary" | "success" | "secondary" | "neutral"; detail: string }>) {
-  return <article className={s.stat + " " + s[tone]}><h2><LearningIcon name={icon} />{label}</h2><strong>{number(value)}</strong><p>{detail}</p></article>;
+  return <article data-kpi className={s.stat + " " + s[tone]}><h2><LearningIcon name={icon} />{label}</h2><strong>{number(value)}</strong><p>{detail}</p></article>;
 }
 
 function QuotaUsage({ label, used, quota, detail }: Readonly<{ label: string; used: number; quota: number | null; detail: string }>) {
@@ -54,24 +56,23 @@ export default function SchoolDashboard() {
   const license = entitlement.data;
   const refreshing = report.refreshing || roster.refreshing || entitlement.refreshing;
   const load = () => Promise.all([report.refresh(), roster.refresh(), entitlement.refresh()]);
-  const schoolName = summary?.schoolName || user?.schoolName || "Không gian nhà trường";
 
-  return <div className="admin-content"><div className={s.dashboard} data-testid="school-dashboard">
-    <header className={s.welcome}>
-      <div><span className={s.eyebrow}><LearningIcon name="book" />Quản lý trường học</span><h1>{schoolName}</h1><p>Theo dõi lớp học, tài khoản và gói sử dụng của trường.</p></div>
-      <div className={s.headerActions}><Button variant="soft" disabled={refreshing} onClick={() => void load()}><LearningIcon name="refresh" />{refreshing ? "Đang cập nhật…" : "Làm mới"}</Button><Button asChild><Link to="/school/classes">Quản lý lớp học<LearningIcon name="arrow" /></Link></Button></div>
-    </header>
+  const dashboardActions = <RefreshButton disabled={refreshing} onClick={() => void load()} />;
+  return <div className="admin-content"><div className={s.dashboard} data-testid="school-dashboard" data-analytics="dashboard" data-dashboard-role="school">
+
+    {!summary && dashboardActions}
     {report.error && <div className={s.error} role="alert"><LearningIcon name="activity" /><span>{report.error}</span><Button variant="soft" color="red" onClick={() => void report.refresh()}>Thử lại</Button></div>}
     {report.loading && !summary ? <DashboardLoadingSkeleton cards={4} label="Đang tải dữ liệu trường…" /> : summary && <>
-      <section className={s.stats} aria-label="Chỉ số trường học">
+      <section data-kpis className={s.stats} aria-label="Chỉ số trường học">
         <SummaryCard label="Học sinh đang hoạt động" value={summary.students} icon="users" tone="primary" detail={number(summary.enrolledStudents) + " lượt xếp lớp"} />
         <SummaryCard label="Giáo viên" value={summary.teachers} icon="book" tone="secondary" detail="Tài khoản thuộc trường" />
         <SummaryCard label="Lớp đang hoạt động" value={summary.activeClasses} icon="activity" tone="success" detail="Các lớp đang được sử dụng" />
         <SummaryCard label="Token AI đã dùng" value={summary.usedTokens} icon="chart" tone="neutral" detail={monthLabel(summary.usageMonth)} />
       </section>
-      <motion.div className={s.content} initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .2 }}>
-        <div className={s.main}>
-          <section className={s.panel + " " + s.classes} aria-labelledby="school-recent-classes-title">
+      {dashboardActions}
+      <motion.div className={s.content} data-school-campus initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .2 }}>
+        <div className={s.main} data-school-roster>
+          <section data-panel className={s.panel + " " + s.classes} aria-labelledby="school-recent-classes-title">
             <div className={s.panelHeading}><div><h2 id="school-recent-classes-title">Lớp học gần đây</h2><p>Tối đa 5 lớp đang hoạt động của trường.</p></div><Button asChild variant="ghost"><Link to="/school/classes">Tất cả lớp học<LearningIcon name="arrow" /></Link></Button></div>
             {roster.loading ? <ClassTableLoading headers={["Lớp", "Giáo viên", "Học sinh", "Chi tiết"]} /> : roster.error ? <div className={s.error} role="alert"><span>Không thể tải danh sách lớp.</span><Button variant="soft" onClick={() => void roster.refresh()}>Thử lại</Button></div> : classes.length === 0 ? <div className={s.empty}><span className={s.emptyIcon}><LearningIcon name="book" /></span><h3>Chưa có lớp đang hoạt động</h3><p>Tạo lớp học để bắt đầu phân công giáo viên và xếp lớp học sinh.</p><Button asChild><Link to="/school/classes">Quản lý lớp học</Link></Button></div> :
               <div className={s.tableContainer}><table className={s.table}><caption className={s.srOnly}>Các lớp học gần đây</caption><colgroup><col className={s.classColumn} /><col className={s.teacherColumn} /><col className={s.studentsColumn} /><col className={s.actionColumn} /></colgroup><thead><tr><th scope="col">Lớp</th><th scope="col">Giáo viên</th><th scope="col">Học sinh</th><th scope="col"><span className={s.srOnly}>Chi tiết</span></th></tr></thead><tbody>{classes.slice(0, 5).map(item => {
@@ -80,7 +81,8 @@ export default function SchoolDashboard() {
               })}</tbody></table></div>}
             {!roster.loading && !roster.error && classes.length > 0 && <p className={s.tableFootnote}>Đang hiển thị {Math.min(5, classes.length)} / {number(roster.data?.totalElements ?? summary.activeClasses)} lớp đang hoạt động</p>}
           </section>
-          <section className={s.panel} aria-labelledby="school-shortcuts-title"><div className={s.panelHeading}><div><h2 id="school-shortcuts-title">Truy cập nhanh</h2><p>Các công việc thường dùng trong trường.</p></div></div><div className={s.shortcuts}>{shortcuts.map(item => <Link key={item.to} to={item.to} className={s.shortcut}><span className={s.shortcutIcon}><LearningIcon name={item.icon} /></span><span><strong>{item.title}</strong><small>{item.detail}</small></span><LearningIcon name="chevronRight" /></Link>)}</div></section>
+      {!roster.loading && !roster.error && <div className="analytics-chart-grid"><ReportChart title="Quy mô lớp học gần đây" description="Số học sinh của tối đa 5 lớp đang hoạt động gần đây." unit="học sinh" items={classes.map(item => ({ label: item.name, value: item.studentCount }))} /><ReportChart title="Tài khoản giảng dạy và học tập" description="Số tài khoản giáo viên và học sinh trong trường." variant="donut" unit="tài khoản" items={[{ label: "Học sinh", value: summary.students }, { label: "Giáo viên", value: summary.teachers }]} /></div>}
+          <section data-panel className={s.panel} aria-labelledby="school-shortcuts-title"><div className={s.panelHeading}><div><h2 id="school-shortcuts-title">Truy cập nhanh</h2><p>Các công việc thường dùng trong trường.</p></div></div><div className={s.shortcuts}>{shortcuts.map(item => <Link key={item.to} to={item.to} className={s.shortcut}><span className={s.shortcutIcon}><LearningIcon name={item.icon} /></span><span><strong>{item.title}</strong><small>{item.detail}</small></span><LearningIcon name="chevronRight" /></Link>)}</div></section>
         </div>
         <aside className={s.aside} aria-label="Gói sử dụng và hạn mức">
           <section className={s.license} aria-labelledby="school-license-title">
@@ -90,7 +92,7 @@ export default function SchoolDashboard() {
             <dl className={s.licenseDetails}><div><dt>Hạn sử dụng</dt><dd>{dateLabel(license?.licenseEnd ?? summary.licenseEnd)}</dd></div><div><dt>Thời gian còn lại</dt><dd>{entitlement.loading ? "Đang kiểm tra…" : entitlement.error ? "Chưa xác minh" : license && Number.isFinite(license.daysUntilExpiry) && summary.licenseStatus !== "UNLICENSED" ? license.daysUntilExpiry >= 0 ? number(license.daysUntilExpiry) + " ngày" : "Đã hết hạn" : "—"}</dd></div></dl>
             <Button asChild><Link to="/school/billing">Xem gói & thanh toán<LearningIcon name="arrow" /></Link></Button>
           </section>
-          <section className={s.panel + " " + s.usage} aria-labelledby="school-quota-title"><div className={s.panelHeading}><div><h2 id="school-quota-title">Hạn mức sử dụng</h2><p>{monthLabel(summary.usageMonth)}</p></div><LearningIcon name="chart" /></div>
+          <section data-panel className={s.panel + " " + s.usage} aria-labelledby="school-quota-title"><div className={s.panelHeading}><div><h2 id="school-quota-title">Hạn mức sử dụng</h2><p>{monthLabel(summary.usageMonth)}</p></div><LearningIcon name="chart" /></div>
             <QuotaUsage label="Học sinh đang hoạt động" used={summary.students} quota={summary.studentQuota} detail={summary.studentQuota == null ? "Không giới hạn học sinh theo gói." : "Còn " + number(Math.max(0, summary.studentQuota - summary.students)) + " chỗ trong hạn mức."} />
             <QuotaUsage label="Token AI tháng này" used={summary.usedTokens} quota={summary.tokenQuota} detail={summary.tokenQuota == null ? "Gói không giới hạn token AI." : "Còn " + number(Math.max(0, summary.tokenQuota - summary.usedTokens)) + " token trong tháng."} />
             <Button asChild variant="ghost"><Link to="/school/reports">Xem báo cáo chi tiết<LearningIcon name="arrow" /></Link></Button>

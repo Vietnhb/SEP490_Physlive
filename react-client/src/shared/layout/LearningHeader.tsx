@@ -1,3 +1,4 @@
+import PageActionsTarget from "./PageActionsTarget";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Icon from "../ui/LearningIcon";
@@ -90,7 +91,7 @@ export default function LearningHeader({
       {/* phones hide the journey links in the header; the same steps become the bottom tabs */}
       <MobileTabBar items={journey} spacer={false} />
 
-      <div className="learn-header-actions">
+      <div className="learn-header-actions"><PageActionsTarget />
         {!isSubmissions && <>
           {onNewSimulation && <button type="button" className="learn-header-action" onClick={onNewSimulation}><Icon name="plus" />Mô phỏng mới</button>}
           {onViewModeChange && <fieldset className="learn-view-switch"><legend className="learn-sr-only">Chế độ hiển thị</legend>

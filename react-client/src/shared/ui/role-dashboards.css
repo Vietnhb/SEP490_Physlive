@@ -1,0 +1,126 @@
+/* Each role has its own work surface, hierarchy and visual identity. Reports keep their separate styling. */
+[data-dashboard-role] { --role-surface:#fff; --role-bg:#f6f8fb; --role-ink:#172435; --role-muted:#667386; --role-line:#e3e8ef; --role-accent:#3868b2; color:var(--role-ink); }
+[data-dashboard-role][data-analytics="dashboard"] { gap:16px; }
+[data-dashboard-role] [data-kpis] { gap:12px; margin-bottom:0!important; }
+[data-dashboard-role] [data-kpi] { background:var(--role-surface)!important; color:var(--role-ink)!important; border:1px solid var(--role-line)!important; box-shadow:none!important; min-height:112px; padding:16px 18px!important; gap:6px!important; justify-content:center; border-radius:10px!important; }
+[data-dashboard-role] [data-kpi]::after { display:none; }
+[data-dashboard-role] [data-kpi] h2,[data-dashboard-role] [data-kpi] dt,[data-dashboard-role] [data-kpi] > span { color:inherit!important; font-size:12px; font-weight:500; }
+[data-dashboard-role] [data-kpi] strong,[data-dashboard-role] [data-kpi] dd { font-size:27px; line-height:1.2; font-weight:650; letter-spacing:-.5px; margin:2px 0; }
+[data-dashboard-role] [data-kpi] small,[data-dashboard-role] [data-kpi] p { color:var(--role-muted)!important; opacity:1; font-size:11px; font-weight:400; margin:0; }
+[data-dashboard-role] [data-panel],[data-dashboard-role] .report-chart { background:var(--role-surface)!important; color:var(--role-ink); border:1px solid var(--role-line); border-radius:12px!important; padding:18px 20px!important; box-shadow:0 2px 5px #15253b03!important; }
+[data-dashboard-role] [data-panel] h2,[data-dashboard-role] .report-chart h2 { font-size:16px!important; line-height:1.5; font-weight:600; }
+[data-dashboard-role] [data-panel] header,[data-dashboard-role] .report-chart header { margin-bottom:16px; }
+[data-dashboard-role] .analytics-chart-grid { gap:16px; margin:0; align-items:start; }
+[data-dashboard-role] .report-chart-bars { gap:14px; }.report-chart-row { min-width:0; }
+[data-dashboard-role] .report-chart-track { height:9px; }
+[data-dashboard-role] .report-chart-distribution { min-height:160px; gap:20px; }
+[data-dashboard-role] .report-chart-donut { width:136px; height:136px; }
+[data-dashboard-role] .report-chart-donut > span { width:100px; height:100px; background:var(--role-surface); }
+[data-dashboard-role] .report-chart header p { font-size:11px; }
+[data-dashboard-role] a[data-kpi]:hover { border-color:var(--role-accent)!important; transform:none; filter:none; }
+[data-dashboard-role] a:focus-visible,[data-dashboard-role] button:focus-visible { outline:2px solid var(--role-accent); outline-offset:3px; }
+/* Manager: financial overview inspired by Stripe; one highlighted total and clean supporting metrics. */
+[data-dashboard-role="manager"] { --role-accent:#635bdb; --primary:#635bdb; --blue-ink:#5a50bc; --chart-1:#635bdb; --chart-2:#12a297; --chart-3:#ebad44; --chart-4:#9293d6; padding:24px!important; }
+[data-dashboard-role="manager"] [data-kpis] { gap:0; border:1px solid var(--role-line); border-radius:12px; overflow:hidden; background:var(--role-surface); }
+[data-dashboard-role="manager"] [data-kpi] { position:relative; border:0!important; border-right:1px solid var(--role-line)!important; border-radius:0!important; min-height:126px; padding:16px 20px!important; gap:8px!important; }
+[data-dashboard-role="manager"] [data-kpi]:first-child { background:#635bdb!important; color:#fff!important; }
+[data-dashboard-role="manager"] [data-kpi]:first-child small { color:#eeecff!important; }
+[data-dashboard-role="manager"] [data-kpi] > span:first-child { position:absolute; right:16px; top:15px; width:auto; margin:0; }
+[data-dashboard-role="manager"] [data-kpi] > span:first-child > svg { display:none; }
+[data-dashboard-role="manager"] [data-kpi] > span:first-child > span { width:28px; height:28px; border-radius:8px; }
+[data-dashboard-role="manager"] [data-kpi] > span:nth-child(2) { max-width:calc(100% - 35px); color:var(--role-muted)!important; }
+[data-dashboard-role="manager"] [data-kpi]:first-child > span:nth-child(2) { color:#fff!important; }
+[data-dashboard-role="manager"] [data-role-main] { grid-template-columns:minmax(0,1.8fr) minmax(280px,1fr); gap:16px; align-items:start; }
+[data-dashboard-role="manager"] [data-role-secondary] { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+[data-dashboard-role="manager"] [data-role-main] > aside { gap:8px; }
+[data-dashboard-role="manager"] [data-role-main] > aside a { padding-top:9px; padding-bottom:9px; }
+[data-dashboard-role="manager"] [data-role-main] > aside > a { padding:14px; margin-top:12px; }
+[data-dashboard-role="manager"] [data-role-main] > aside h3 { margin:7px 0; font-size:13px; }
+[data-dashboard-role="manager"] [data-role-secondary] [data-panel] > div { gap:16px; }
+[data-dashboard-role="manager"] [data-role-secondary] [data-panel] > strong { font-size:34px; }
+/* Administrator: identity governance, restrained blue, account health before platform analytics. */
+[data-dashboard-role="admin"] { --role-accent:#286bb3; --chart-1:#347ec0; --chart-2:#19a091; --chart-3:#db9834; --chart-4:#73839e; }
+[data-dashboard-role="admin"] [data-kpi] { border-left:3px solid #347ec0!important; border-radius:6px!important; min-height:108px; }
+[data-dashboard-role="admin"] [data-kpi]:nth-child(2) { border-left-color:#19a091!important; }
+[data-dashboard-role="admin"] [data-kpi]:nth-child(3) { border-left-color:#73839e!important; }
+[data-dashboard-role="admin"] [data-kpi]:nth-child(4) { border-left-color:#db9834!important; }
+[data-dashboard-role="admin"] [data-kpi]:first-child { background:color-mix(in srgb,#347ec0 6%,var(--role-surface))!important; }
+[data-dashboard-role="admin"] [data-kpi] h2 svg { width:18px; height:18px; color:var(--role-accent)!important; }
+[data-dashboard-role="admin"] [data-admin-identity] { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:16px; align-items:start; }
+[data-dashboard-role="admin"] [data-admin-identity] ul { margin:0; }
+.admin-platform-details { border:1px solid var(--role-line); border-radius:10px; background:var(--role-surface); padding:16px 20px; }
+.admin-platform-details > summary { cursor:pointer; font-size:13px; font-weight:600; }.admin-platform-details > summary > span { float:right; font-weight:400; color:var(--role-muted); font-size:11px; }
+.admin-platform-details[open] > summary { margin-bottom:16px; }
+.admin-activity-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:12px 0 20px; }.admin-activity-summary > span { padding:14px; background:var(--role-bg); font-size:12px; border-radius:8px; }.admin-activity-summary strong { display:block; margin-top:6px; font-size:22px; }
+/* School: a campus operations console; roster, licence and quota belong together. */
+[data-dashboard-role="school"] { --role-accent:#087b70; --m3-primary:#087b70; --chart-1:#16887b; --chart-2:#599dac; --chart-3:#aebc67; --chart-4:#436f83; }
+[data-dashboard-role="school"] [data-kpi] { display:grid; grid-template-columns:1fr auto; min-height:102px; border-top:3px solid #16887b!important; }
+[data-dashboard-role="school"] [data-kpi] h2 { grid-column:1/-1; }.school-stat-label { min-width:0; }
+[data-dashboard-role="school"] [data-kpi] h2 svg { width:18px; height:18px; color:#16887b!important; }
+[data-dashboard-role="school"] [data-kpi] p { grid-column:1/-1; }
+[data-dashboard-role="school"] [data-school-campus] { grid-template-columns:minmax(0,1.9fr) minmax(270px,1fr); gap:16px; align-items:start; }
+[data-dashboard-role="school"] [data-school-roster], [data-dashboard-role="school"] [data-school-campus] > aside { gap:16px; }
+[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child { border:0; border-radius:12px; padding:20px; background:#115c55; color:#fff; }
+[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child h2,[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child p,[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child dt,[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child dd { color:inherit; }
+[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child a { background:#fff; color:#115c55; }
+[data-dashboard-role="school"] .report-chart-distribution { gap:12px; min-height:128px; }
+[data-dashboard-role="school"] .report-chart-donut { width:104px; height:104px; }[data-dashboard-role="school"] .report-chart-donut > span { width:76px; height:76px; }[data-dashboard-role="school"] .report-chart-donut strong { font-size:22px; }
+[data-dashboard-role="school"] .report-chart-distribution ul { min-width:110px; }
+[data-dashboard-role="school"] [data-school-roster] > section:last-child a { padding:12px; border-radius:8px; }
+/* Teacher: classroom cards and assignment follow-up, not an executive reporting wall. */
+[data-dashboard-role="teacher"] { --role-accent:#087f8c; --chart-1:#198e97; --chart-2:#5885b7; --chart-3:#d5a24b; --chart-4:#9984b4; }
+[data-dashboard-role="teacher"] [data-kpis] { border:1px solid var(--role-line); border-radius:10px; background:var(--role-surface); gap:0; overflow:hidden; }
+[data-dashboard-role="teacher"] [data-kpi] { border:0!important; border-right:1px solid var(--role-line)!important; border-radius:0!important; min-height:92px; display:grid; grid-template-columns:1fr auto; padding:14px 20px!important; gap:7px!important; }
+[data-dashboard-role="teacher"] [data-kpi] > svg { position:absolute; right:18px; top:18px; width:23px; height:23px; color:#198e97!important; }
+[data-dashboard-role="teacher"] [data-kpi] strong { grid-column:1; }.teacher-class-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+[data-teacher-tools] { padding:14px 18px!important; margin:16px 0!important; border-radius:12px!important; border:1px solid var(--role-line); background:var(--role-surface)!important; gap:12px!important; }
+[data-teacher-tools] > div:first-child { width:38px; height:38px; border-radius:10px; background:#e5f3f2; color:#087f8c; }
+[data-teacher-tools] h2 { font-size:16px!important; }[data-teacher-tools] p { font-size:11px!important; }
+[data-teacher-tools] a { min-height:36px!important; padding:8px 14px!important; border-radius:7px!important; font-size:12px!important; }
+[data-teacher-classroom] { grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:16px!important; align-items:start; margin-bottom:16px!important; }
+[data-dashboard-role="teacher"] .teacher-class-tile { display:flex; flex-direction:column; position:relative; min-width:0; border:1px solid var(--role-line); border-radius:10px; overflow:hidden; color:var(--role-ink); text-decoration:none; background:var(--role-surface); }
+.teacher-class-grade { display:block; padding:11px 14px; background:#e4f2f1; color:#156e68; font-size:11px; font-weight:600; }
+.teacher-class-tile:nth-child(2n) .teacher-class-grade { background:#e9eef9; color:#446694; }
+.teacher-class-tile > div { padding:14px 14px 8px; min-width:0; }.teacher-class-tile strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:16px; }.teacher-class-tile small { display:block; color:var(--role-muted); font-size:11px; margin-top:6px; }
+.teacher-class-tile > span:last-of-type { margin:0 14px 14px; color:var(--role-muted); font-size:11px; }.teacher-class-tile > svg { position:absolute; bottom:14px; right:14px; width:16px; height:16px; }
+[data-dashboard-role="teacher"] .analytics-chart-grid { margin-bottom:16px; }
+/* Student: a focused personal study desk with a warm task accent and calm green progress. */
+[data-dashboard-role="student"] { --role-accent:#287c60; --chart-1:#2a9974; --chart-2:#e5ad46; --chart-3:#97a4b3; --chart-4:#7488b7; }
+.student-workspace [data-dashboard-role="student"] .student-hero { margin-bottom:16px; }
+[data-dashboard-role="student"] [data-kpi] { min-height:100px; border:1px solid var(--role-line)!important; border-radius:14px!important; padding:14px 18px!important; }
+[data-dashboard-role="student"] [data-kpi]:first-child { background:color-mix(in srgb,#f4bc58 13%,var(--role-surface))!important; border-color:color-mix(in srgb,#e8a32c 35%,var(--role-line))!important; }
+[data-dashboard-role="student"] [data-kpi] dt { display:flex; align-items:center; gap:8px; font-size:11px; }[data-dashboard-role="student"] [data-kpi] dt > span { width:26px; height:26px; border-radius:8px; background:var(--role-bg)!important; color:var(--role-accent)!important; }
+.student-workspace [data-dashboard-role="student"] .student-dashboard-grid { grid-template-columns:minmax(0,1.9fr) minmax(280px,1fr); gap:18px; align-items:start; }
+[data-dashboard-role="student"] .student-dashboard-main,[data-dashboard-role="student"] .student-dashboard-aside { gap:16px; }
+[data-dashboard-role="student"] .student-dashboard-main > section,[data-dashboard-role="student"] .student-classes { padding:18px 20px; border-radius:14px; background:var(--role-surface); border-color:var(--role-line); }
+[data-dashboard-role="student"] .student-class-card { border-radius:10px; padding:14px; }.student-workspace [data-dashboard-role="student"] .student-class-card h3 { font-size:16px; }
+[data-dashboard-role="student"] .student-dashboard-explore { background:color-mix(in srgb,#2a9974 9%,var(--role-surface)); padding:18px 20px; border-radius:14px; }
+[data-dashboard-role="student"] .student-dashboard-explore h2 { font-size:16px; }.student-workspace [data-dashboard-role="student"] .student-dashboard-explore > p { font-size:12px; }
+[data-dashboard-role="student"] .student-dashboard-aside .report-chart-distribution { flex-direction:column; gap:16px; }
+[data-dashboard-role="student"] .student-dashboard-aside .report-chart-distribution ul { width:100%; }
+/* Reviewer: an operational queue inspired by Jira; counts are navigation and the oldest work leads. */
+[data-dashboard-role="reviewer"] { --role-accent:#4a58a5; --chart-1:#6070bf; --chart-2:#d09b45; --chart-3:#4e9f92; --chart-4:#9785bc; }
+[data-dashboard-role="reviewer"] [data-kpi] { min-height:134px; border-radius:7px!important; padding:14px 16px!important; border-bottom:3px solid var(--role-line)!important; }
+[data-dashboard-role="reviewer"] [data-kpi][data-pending=true] { border-bottom-color:#c99130!important; }
+[data-dashboard-role="reviewer"] [data-kpi] h2 { font-size:12px; max-width:85%; }[data-dashboard-role="reviewer"] [data-kpi] h2 svg { width:17px; height:17px; color:var(--role-accent)!important; }
+[data-dashboard-role="reviewer"] [data-kpi] strong { font-size:24px; }[data-dashboard-role="reviewer"] [data-kpi] .rt-Button { background:transparent; color:var(--role-accent); padding:4px 0; min-height:28px; font-size:11px; border-radius:4px; justify-content:flex-start; }
+[data-reviewer-queue] { grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:16px; align-items:start; }
+[data-reviewer-queue] > section { align-self:start; }[data-reviewer-queue] > section ul { margin:0; }[data-reviewer-queue] > section li { padding:16px 0; gap:12px; }
+[data-reviewer-queue] > section h3 { font-size:14px; }[data-reviewer-queue] > section li p { font-size:12px; line-height:1.6; margin:5px 0; }
+[data-reviewer-queue] > aside { gap:16px; }[data-reviewer-queue] > aside > section:not(.report-chart) { background:var(--role-surface); border:1px solid var(--role-line); border-radius:10px; padding:18px 20px; }
+[data-reviewer-queue] > aside .report-chart-distribution { flex-direction:column; gap:16px; }[data-reviewer-queue] > aside .report-chart-distribution ul { width:100%; }
+.reviewer-role-guide { padding:14px 16px; border:1px solid var(--role-line); border-radius:8px; background:var(--role-surface); }.reviewer-role-guide > summary { cursor:pointer; font-size:12px; font-weight:600; }.reviewer-role-guide > section { margin-top:12px; border:0!important; padding:0!important; }
+/* Dark mode retains each role's accent and avoids bright white surfaces. */
+.dark [data-dashboard-role] { --role-surface:#1b2430; --role-bg:#222d3c; --role-ink:#e5ebf4; --role-muted:#a8b6c9; --role-line:#344153; }
+.dark [data-dashboard-role="manager"] { --primary:#a79eff; --blue-ink:#b9b1ff; }
+.dark [data-dashboard-role="teacher"] .teacher-class-grade { background:#24413f; color:#a9dad4; }.dark [data-dashboard-role="teacher"] .teacher-class-tile:nth-child(2n) .teacher-class-grade { background:#29364e; color:#b5cbee; }
+.dark [data-dashboard-role="teacher"] [data-teacher-tools] > div:first-child { background:#24413f; color:#b4e6de; }
+@media(max-width:1100px) { [data-dashboard-role="manager"] [data-role-main],[data-dashboard-role="school"] [data-school-campus],[data-reviewer-queue] { grid-template-columns:minmax(0,1fr); }[data-dashboard-role="school"] [data-school-campus] > aside { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }[data-reviewer-queue] > aside { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }.reviewer-role-guide { grid-column:1/-1; } }
+@media(max-width:800px) { [data-dashboard-role="manager"] { padding:20px 16px!important; }[data-dashboard-role="manager"] [data-role-secondary],[data-dashboard-role="admin"] [data-admin-identity],[data-teacher-classroom],.student-workspace [data-dashboard-role="student"] .student-dashboard-grid { grid-template-columns:minmax(0,1fr); }[data-dashboard-role] [data-kpis] { gap:10px; }[data-dashboard-role="manager"] [data-kpis],[data-dashboard-role="teacher"] [data-kpis] { gap:0; }[data-dashboard-role] [data-kpi] { padding:14px 16px!important; min-height:100px; }[data-dashboard-role] [data-kpi] strong,[data-dashboard-role] [data-kpi] dd { font-size:25px; }[data-dashboard-role] [data-panel], [data-dashboard-role] .report-chart { padding:16px!important; }[data-dashboard-role="school"] [data-school-campus] > aside,[data-reviewer-queue] > aside { grid-template-columns:minmax(0,1fr); }[data-teacher-tools] > div:nth-child(2) { flex-basis:100%; }.admin-activity-summary { grid-template-columns:minmax(0,1fr); }.admin-platform-details > summary > span { display:none; } }
+@media(prefers-reduced-motion:reduce) { [data-dashboard-role] * { scroll-behavior:auto; } }
+
+/* Keep related teaching summaries in the same column without blank grid cells. */
+.teacher-class-column { display:grid; gap:16px; min-width:0; align-content:start; }
+[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child .rt-Badge { background:#dcf8eb; color:#13533d; }
+[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child .rt-Badge[data-accent-color="red"] { background:#ffe4e1; color:#992d2d; }
+[data-dashboard-role="school"] [data-school-campus] > aside > section:first-child .rt-Badge[data-accent-color="orange"] { background:#fff0d6; color:#854d0e; }

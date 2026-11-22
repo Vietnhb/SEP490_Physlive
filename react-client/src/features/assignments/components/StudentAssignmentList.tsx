@@ -1,3 +1,4 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
 import { compareStudentWork, studentAssignmentState, studentAssignmentSummary } from "../model/studentAssignmentState";
 import { missedDeadline } from "../model/assignmentDeadline";
 import { useState } from "react";
@@ -49,7 +50,7 @@ export function AssignmentList({ assignments, loading, error, onRefresh, onSelec
       <div className="student-assignment-search">
         <TextField.Root type="search" size="2" aria-label="Tìm bài tập" placeholder="Tìm bài tập, lớp học…" value={search} onChange={event => setSearch(event.target.value)}><TextField.Slot><LearningIcon name="search" /></TextField.Slot></TextField.Root>
         {classes.length > 1 && <Select.Root value={classFilter || "all"} onValueChange={value => setClassFilter(value === "all" ? "" : value)}><Select.Trigger aria-label="Lọc theo lớp học" /><Select.Content><Select.Item value="all">Tất cả lớp</Select.Item>{classes.map(([id, label]) => <Select.Item key={id} value={id}>{label}</Select.Item>)}</Select.Content></Select.Root>}
-        <Button type="button" variant="surface" disabled={loading} onClick={onRefresh}><LearningIcon name="refresh" />{loading ? "Đang tải…" : "Làm mới"}</Button>
+        <RefreshButton disabled={loading} onClick={onRefresh} />
       </div>
     </div>
     {error && <Callout.Root color="red" size="1" className="student-inline-alert"><Callout.Text>{error}</Callout.Text><Button type="button" variant="ghost" color="red" onClick={onRefresh}>Thử lại</Button></Callout.Root>}

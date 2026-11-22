@@ -1,9 +1,10 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import type { AccountPage } from "../../../shared/api/page";
 import { useState } from "react";
 import { Avatar, Badge, Button, Callout, Card, Dialog, Flex, Heading, IconButton, Select, Table, Text, TextField } from "@radix-ui/themes";
-import { ArrowRightIcon, CheckCircledIcon, Cross2Icon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { ArrowRightIcon, CheckCircledIcon, Cross2Icon, ExclamationTriangleIcon, LockClosedIcon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { ROLE_NAMES, getRoleLabel } from "../../../shared/auth/roles";
 import type { User, AccountStatus } from "../../../shared/auth/types";
@@ -166,9 +167,7 @@ export default function AdminDirectory() {
                   </Select.Content>
                 </Select.Root>
 
-                <IconButton className="directory-refresh" variant="soft" color="gray" size="3" onClick={() => void load()} disabled={loading} aria-label="Làm mới danh sách">
-                  <ReloadIcon />
-                </IconButton>
+                <RefreshButton onClick={() => void load()} disabled={loading} aria-label="Làm mới danh sách" />
               </div>
 
               {error ? (

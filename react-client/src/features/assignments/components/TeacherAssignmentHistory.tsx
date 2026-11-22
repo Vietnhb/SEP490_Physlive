@@ -1,5 +1,6 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
 import { useMemo, useState } from "react";
-import { Badge, Button, Heading, IconButton, Select, Text } from "@radix-ui/themes";
+import { Badge, Button, Heading, Select, Text } from "@radix-ui/themes";
 import type { Assignment, StudentOption, TeacherClassOption } from "../../../shared/types/physlive";
 import { questionPrompt } from "../model/teacherAssignmentUtils";
 import LearningIcon from "../../../shared/ui/LearningIcon";
@@ -50,7 +51,7 @@ export function TeacherAssignmentHistory({
           <Heading as="h2" size="4" weight="bold" id="assigned-work-title">Bài đã giao</Heading>
           <Text as="p" size="1" color="gray">{filteredItems.length} bài · {openCount} đang mở</Text>
         </div>
-        <IconButton variant="soft" color="gray" aria-label="Làm mới danh sách bài đã giao" onClick={onRefresh} disabled={loading}><LearningIcon name="refresh" /></IconButton>
+        <RefreshButton aria-label="Làm mới danh sách bài đã giao" onClick={onRefresh} disabled={loading} />
       </header>
       <div className="studio-history__filters">
         <Select.Root value={classFilter || ALL} onValueChange={value => { setClassFilter(value === ALL ? "" : value); setStudentFilter(""); }}>

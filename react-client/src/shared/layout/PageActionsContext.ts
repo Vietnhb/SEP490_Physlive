@@ -7,3 +7,6 @@ export const PageActionsSlot = createContext<HTMLElement | null>(null);
 export function usePageActionsInTopbar() {
   return useContext(PageActionsSlot) !== null;
 }
+
+/** Registration for headers outside the sidebar layouts (teacher and public pages). */
+export const PageActionsTargetRegistration = createContext<((node: HTMLDivElement | null) => void) | null>(null);

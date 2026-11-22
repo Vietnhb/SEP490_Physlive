@@ -153,3 +153,15 @@
  .hasCompact .fullValue { display: none; }
  .hasCompact .compactValue { display: block; }
 }
+
+.operationCardHeading { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; height:18px; }
+.operationCardHeading > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.operationCardHeading .operationDetailsButton { margin:0; padding:0; min-height:0; height:18px; flex-shrink:0; font-size:11px; line-height:18px; cursor:pointer; }
+.operationDetailsButton svg { width:12px; height:12px; }
+.operationUnavailable { display:flex; align-items:center; gap:16px; justify-content:space-between; background:var(--gray-3); border-radius:10px; padding:16px; margin-top:16px; }
+.operationUnavailable strong { font-size:14px; }.operationUnavailable p { font-size:13px; color:var(--gray-11); margin:6px 0 0; line-height:1.6; }.operationUnavailable button { flex-shrink:0; }
+@media(max-width:480px) { .operationUnavailable { align-items:flex-start; flex-direction:column; } }
+.operationDialog { max-height:calc(100dvh - 48px); overflow-y:auto; }
+.operationPeriod,.operationNote { font-size:12px; line-height:1.6; color:var(--gray-11); margin:16px 0; }
+.operationTotal { display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding:14px 16px; background:var(--accent-3); border-radius:10px; }.operationTotal strong { font-size:26px; color:var(--accent-11); }
+.operationList { margin:8px 0; }.operationList > div { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px 0; border-bottom:1px solid var(--gray-5); }.operationList dt { font-size:14px; font-weight:600; }.operationList small { display:block; font-size:12px; font-weight:400; color:var(--gray-11); margin-top:5px; }.operationList dd { margin:0; font-weight:700; font-size:20px; }.operationFooter { display:flex; justify-content:flex-end; margin-top:20px; }

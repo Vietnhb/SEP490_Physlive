@@ -62,11 +62,14 @@ export type PostBreakdown = {
   monthly: PostStats;
 };
 
+export type OperationStats = { simulationRuns: number; submissions: number; gradedSubmissions: number };
+
 export type AdminAnalytics = {
   postsThisWeek: number;
   postsThisMonth: number;
   operationsThisWeek: number;
   operationsThisMonth: number;
+  operationBreakdown?: { weekly: OperationStats; monthly: OperationStats; weekStart: string; monthStart: string; measuredAt: string };
   postBreakdown?: PostBreakdown;
   revenue: {
     totalVnd: number;

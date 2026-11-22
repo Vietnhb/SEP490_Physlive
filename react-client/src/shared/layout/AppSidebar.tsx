@@ -151,7 +151,7 @@ export default function AppSidebarLayout({ id, subtitle, home, groups, actions, 
           <span className="app-topbar__divider" aria-hidden="true" />
           <p className="app-topbar__title"><span>{subtitle}</span>{current && <><span aria-hidden="true">/</span>{childCrumb ? <Link to={current.to} className="app-topbar__crumb-link">{current.title ?? current.label}</Link> : <strong>{current.title ?? current.label}</strong>}{childCrumb && <><span aria-hidden="true">/</span><strong className="app-topbar__crumb-child" title={childCrumb}>{childCrumb}</strong></>}</>}</p>
           <div className="app-topbar__actions">
-            <div ref={setPageActions} className="app-topbar__page-actions" />
+            <div ref={setPageActions} className="app-topbar__page-actions" data-page-actions-target />
             {actions}
             {showThemeToggle && <ThemeToggle />}
             {accountPlacement === "topbar" && <AccountMenu variant="workspace" />}

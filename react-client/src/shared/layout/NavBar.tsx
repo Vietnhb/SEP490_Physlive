@@ -1,3 +1,4 @@
+import PageActionsTarget from "./PageActionsTarget";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import "./NavBar.css";
@@ -66,7 +67,7 @@ export default function NavBar() {
             </NavLink>
           ))}
         </nav>
-        <div className="site-nav__actions">
+        <div className="site-nav__actions"><PageActionsTarget />
           <ThemeToggle className="site-nav__theme" />
           {user ? (
             <AccountMenu variant="navbar" />

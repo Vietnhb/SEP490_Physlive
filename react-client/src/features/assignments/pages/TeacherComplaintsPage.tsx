@@ -1,3 +1,4 @@
+import RefreshButton from "../../../shared/ui/RefreshButton";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Button, Dialog, Flex, Select, TextField } from "@radix-ui/themes";
@@ -42,7 +43,7 @@ export default function TeacherComplaintsPage() {
   const hasFilters = Boolean(query || status !== "ALL" || from || to);
   const resetPage = () => { setPage(1); scroll.current?.scrollTo({ top: 0 }); };
   return <main className={"support-page support-page--manager " + styles.teacher}>
-    <header className="complaint-page__head"><div><h1>Khiếu nại đã gửi</h1><p>Theo dõi báo lỗi mô phỏng và phản hồi từ người kiểm duyệt.</p></div><Button variant="outline" disabled={resource.refreshing} onClick={() => void resource.refresh()}>Làm mới</Button></header>
+    <header className="complaint-page__head"><div><h1>Khiếu nại đã gửi</h1><p>Theo dõi báo lỗi mô phỏng và phản hồi từ người kiểm duyệt.</p></div><RefreshButton disabled={resource.refreshing} onClick={() => void resource.refresh()} /></header>
     {resource.error && <p role="alert" className="admin-error-banner">{resource.error}</p>}
     <section className="support-panel">
       <div className={styles.filters} role="group" aria-label="Bộ lọc khiếu nại">
