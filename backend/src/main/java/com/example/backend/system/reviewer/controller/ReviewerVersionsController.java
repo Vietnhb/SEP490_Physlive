@@ -29,6 +29,16 @@ public class ReviewerVersionsController {
         return service.schemas().stream().map(SchemaContracts.Response::from).toList();
     }
 
+    @GetMapping("/schemas/summary")
+    public List<SchemaContracts.Summary> schemaSummaries() {
+        return service.schemaSummaries();
+    }
+
+    @GetMapping("/schema-versions/{id}/history")
+    public List<SchemaContracts.Audit> schemaHistory(@PathVariable UUID id) {
+        return service.schemaHistory(id);
+    }
+
     @PutMapping("/schema-versions/{id}")
     public SchemaContracts.Response updateSchema(@PathVariable UUID id, @Valid @RequestBody SchemaContracts.Request request) {
         return SchemaContracts.Response.from(service.updateSchema(id, request));
@@ -43,5 +53,10 @@ public class ReviewerVersionsController {
     @PutMapping("/schema-versions/{id}/lifecycle")
     public SchemaContracts.Response schemaLifecycle(@PathVariable UUID id, @RequestParam LifecycleStatus status) {
         return SchemaContracts.Response.from(service.schemaLifecycle(id, status));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/schema-versions/dry-run")
+    public ReviewerVersionService.DryRunResult dryRun(@Valid @RequestBody SchemaContracts.Request request) {
+        return service.dryRun(request);
     }
 }

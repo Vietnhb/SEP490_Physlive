@@ -6,19 +6,42 @@ import com.example.backend.system.account.service.AccountAccessService;
 import com.example.backend.system.account.service.CurrentUserService;
 import com.example.backend.system.physics.dto.SchemaContracts;
 import com.example.backend.system.physics.model.entity.SchemaVersion;
+import com.example.backend.system.physics.model.entity.SchemaVersionAudit;
+import com.example.backend.system.physics.repository.SchemaVersionAuditRepository;
 import com.example.backend.system.physics.repository.SchemaVersionRepository;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class SchemaService {
     private final SchemaVersionRepository schemaRepository;
+    private final SchemaVersionAuditRepository auditRepository;
     private final SchemaDefinitionService schemaDefinitions;
     private final AccountAccessService access;
     private final CurrentUserService currentUser;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SchemaService(SchemaVersionRepository schemaRepository,
+                         SchemaVersionAuditRepository auditRepository,
+                         SchemaDefinitionService schemaDefinitions,
+                         AccountAccessService access,
+                         CurrentUserService currentUser) {
+        this.schemaRepository = schemaRepository;
+        this.auditRepository = auditRepository;
+        this.schemaDefinitions = schemaDefinitions;
+        this.access = access;
+        this.currentUser = currentUser;
+    }
+
+    public SchemaService(SchemaVersionRepository schemaRepository,
+                         SchemaDefinitionService schemaDefinitions,
+                         AccountAccessService access,
+                         CurrentUserService currentUser) {
+        this(schemaRepository, null, schemaDefinitions, access, currentUser);
+    }
 
     @Transactional(readOnly = true)
     public List<SchemaContracts.Response> listVisible(boolean enabledOnly) {
@@ -66,7 +89,9 @@ public class SchemaService {
         schema.setVersion(request.version().trim());
         schema.setDefinition(request.definition());
         schema.setLifecycleStatus(LifecycleStatus.DRAFT);
-        return schemaRepository.save(schema);
+        SchemaVersion saved = schemaRepository.save(schema);
+        recordAudit(saved, "CREATE_DRAFT", null, LifecycleStatus.DRAFT, null);
+        return saved;
     }
 
     @Transactional
@@ -114,21 +139,68 @@ public class SchemaService {
             schemaRepository.saveAll(previous);
             // Retire the old row before the new one can satisfy the unique published-family index.
             schemaRepository.flush();
+            previous.forEach(item -> recordAudit(item, "AUTO_RETIRE", LifecycleStatus.APPROVED, LifecycleStatus.RETIRED,
+                    "Tự động ngừng dùng khi phê duyệt v" + schema.getVersion()));
             schema.setDefinitionChecksum(actualChecksum);
         }
+        LifecycleStatus fromStatus = schema.getLifecycleStatus();
         schema.setLifecycleStatus(status);
+        recordAudit(schema, status == LifecycleStatus.APPROVED ? "APPROVE" : "RETIRE", fromStatus, status, null);
     }
 
     @Transactional
     public SchemaVersion updateDraft(java.util.UUID id, SchemaContracts.Request request) {
         SchemaVersion schema = schemaRepository.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy phiên bản mô hình"));
         if (schema.getLifecycleStatus() != LifecycleStatus.DRAFT) throw ApiException.conflict("Chỉ có thể chỉnh sửa bản nháp");
+        if (request.expectedRecordVersion() != null && !request.expectedRecordVersion().equals(schema.getRecordVersion()))
+            throw ApiException.conflict("Bản nháp đã được người khác chỉnh sửa. Hãy tải lại trang để xem phiên bản mới nhất trước khi lưu.");
         if (!schema.getSchemaId().equals(request.schemaId()) || !schema.getVersion().equals(request.version()))
             throw ApiException.conflict("Không thể thay đổi định danh mô hình hoặc phiên bản");
         schemaDefinitions.validateTopicPackForAuthoring(request.definition(), request.schemaId());
         schemaDefinitions.validateDefinition(request.definition(), request.schemaId(), request.version(), request.topic());
         schema.setName(request.name().trim()); schema.setTopic(request.topic().trim()); schema.setDefinition(request.definition());
-        return schemaRepository.save(schema);
+        SchemaVersion saved = schemaRepository.save(schema);
+        recordAudit(saved, "UPDATE_DRAFT", LifecycleStatus.DRAFT, LifecycleStatus.DRAFT, null);
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.Summary> listSummaries() {
+        return schemaRepository.findSummaries().stream()
+                .map(row -> new SchemaContracts.Summary(row.getId(), row.getSchemaId(), row.getName(),
+                        row.getTopic(), row.getVersion(), row.getLifecycleStatus(), row.getCreatedAt()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.Audit> history(UUID id) {
+        if (!schemaRepository.existsById(id)) {
+            throw ApiException.notFound("Không tìm thấy phiên bản mô hình");
+        }
+        return auditRepository.findTop100BySchemaVersionIdOrderByCreatedAtDesc(id).stream()
+                .map(row -> new SchemaContracts.Audit(
+                        row.getId(),
+                        row.getSchemaVersion().getId(),
+                        row.getActor() == null ? null : row.getActor().getFullName(),
+                        row.getActor() == null ? null : row.getActor().getEmail(),
+                        row.getAction(),
+                        row.getFromStatus(),
+                        row.getToStatus(),
+                        row.getNote(),
+                        row.getCreatedAt()))
+                .toList();
+    }
+
+    private void recordAudit(SchemaVersion schema, String action, LifecycleStatus fromStatus, LifecycleStatus toStatus, String note) {
+        if (auditRepository == null) return;
+        SchemaVersionAudit audit = new SchemaVersionAudit();
+        audit.setSchemaVersion(schema);
+        audit.setActor(currentUser == null ? null : currentUser.currentUserOrNull());
+        audit.setAction(action);
+        audit.setFromStatus(fromStatus);
+        audit.setToStatus(toStatus);
+        audit.setNote(note);
+        auditRepository.save(audit);
     }
 
     @Transactional

@@ -4,6 +4,7 @@ import com.example.backend.base.crud.model.entity.AuditedEntity;
 import com.example.backend.system.account.model.entity.User;
 import com.example.backend.system.support.model.enums.SupportKind;
 import com.example.backend.system.support.model.enums.SupportStatus;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,6 +16,8 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "support_items")
@@ -53,6 +56,19 @@ public class SupportItem extends AuditedEntity {
     @Column(name = "simulation_id")
     private java.util.UUID simulationId;
 
+    /** Snapshot of an unsaved generated simulation attached to a COMPLAINT so reviewers can replay it. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "simulation_snapshot", columnDefinition = "jsonb")
+    private JsonNode simulationSnapshot;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_to_id")
+    private User assignedTo;
+
     @Column(name = "reviewer_referred", nullable = false)
     private boolean reviewerReferred;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "law_gap_id")
+    private com.example.backend.system.reviewer.model.entity.LawGap lawGap;
 }

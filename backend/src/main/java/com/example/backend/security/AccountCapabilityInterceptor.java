@@ -19,7 +19,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @RequiredArgsConstructor
 public class AccountCapabilityInterceptor implements HandlerInterceptor {
     /** Routes this interceptor must be registered for. */
-    public static final List<String> PATHS = List.of("/api/reviewer/**", "/api/evaluations/**", "/api/schemas/**",
+    public static final List<String> PATHS = List.of("/api/reviewer/**", "/api/schemas/**",
         "/api/simulation/**", "/api/problems/**", "/api/specifications/**", "/api/exports/**",
         "/api/assignments", "/api/assignments/**", "/api/user/students", "/api/library", "/api/library/**");
     private static final List<String> READ_METHODS = List.of("GET", "HEAD", "OPTIONS");
@@ -34,7 +34,6 @@ public class AccountCapabilityInterceptor implements HandlerInterceptor {
         boolean read = READ_METHODS.contains(request.getMethod());
         boolean review = path.startsWith("/api/reviewer/library");
         boolean editor = path.startsWith("/api/reviewer/") && !review
-                || path.startsWith("/api/evaluations")
                 || path.startsWith("/api/schemas") && !read;
         if (review && !access.canReviewPublic(currentUser.requireCurrentUser())
                 || editor && !access.canEditContext(currentUser.requireCurrentUser())

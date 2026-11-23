@@ -11,7 +11,6 @@ const ContentModeration = lazy(() => import("../components/ContentModeration").t
 const TopicsWorkspace = lazy(() => import("../components/TopicsWorkspace").then(module => ({ default: module.TopicsWorkspace })));
 const LawGapsDesk = lazy(() => import("../components/LawGapsDesk").then(module => ({ default: module.LawGapsDesk })));
 const ComplaintsDesk = lazy(() => import("../components/ComplaintsDesk").then(module => ({ default: module.ComplaintsDesk })));
-import type { SimulationComplaint } from "../../support/api/supportApi";
 import "../styles/reviewer.css";
 import "../../support/styles/complaints.css";
 
@@ -28,13 +27,13 @@ export default function ReviewerLayout() {
   const user = useSessionStore(state => state.user);
   const [params] = useSearchParams();
   const access = reviewerAccess(user);
-  const pendingResource = useResource<unknown[]>("/reviewer/library?status=PENDING", access.canReview, 60_000);
-  const pending = pendingResource.data?.length ?? 0;
+  const pendingResource = useResource<{ PENDING?: number }>("/reviewer/library/counts", access.canReview, 60_000);
+  const pending = pendingResource.data?.PENDING ?? 0;
   const canHandleComplaints = !access.isManager && (access.canEdit || access.canReview);
-  const complaintsResource = useResource<SimulationComplaint[]>("/support/complaints/review", canHandleComplaints, 60_000);
-  const openComplaints = complaintsResource.data?.filter(item => item.status !== "RESOLVED").length ?? 0;
-  const gapsResource = useResource<unknown[]>("/reviewer/law-gaps?status=OPEN", access.canEdit, 60_000);
-  const openGaps = gapsResource.data?.length ?? 0;
+  const complaintsResource = useResource<{ open?: number; read?: number }>("/support/complaints/counts", canHandleComplaints, 60_000);
+  const openComplaints = (complaintsResource.data?.open ?? 0) + (complaintsResource.data?.read ?? 0);
+  const gapsResource = useResource<{ OPEN?: number }>("/reviewer/law-gaps/counts", access.canEdit, 60_000);
+  const openGaps = gapsResource.data?.OPEN ?? 0;
 
   const legacy = params.get("view") ?? params.get("tab");
   if (legacy !== null && legacy in LEGACY) return <Navigate to={`/reviewer${LEGACY[legacy] ? `/${LEGACY[legacy]}` : ""}`} replace />;
@@ -81,7 +80,7 @@ export function ReviewerTopicsPage() {
 export function ReviewerComplaintsPage() {
   const { access } = useReviewer();
   if (access.isManager) return <Navigate to="/manager/support?kind=COMPLAINT" replace />;
-  return access.canEdit || access.canReview ? <Suspense fallback={<p role="status">Đang tải…</p>}><ComplaintsDesk /></Suspense> : <Navigate to="/reviewer" replace />;
+  return access.canEdit || access.canReview ? <Suspense fallback={<p role="status">Đang tải…</p>}><ComplaintsDesk canEdit={access.canEdit} /></Suspense> : <Navigate to="/reviewer" replace />;
 }
 
 export function ReviewerGapsPage() {

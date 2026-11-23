@@ -47,8 +47,40 @@ public class SupportController {
     public SupportContracts.SupportView complaint(@Valid @RequestBody SupportContracts.CreateComplaintRequest request) {
         return service.createComplaint(request);
     }
+    @GetMapping("/complaints/counts")
+    public SupportContracts.ComplaintCounts complaintCounts() { return service.complaintCounts(); }
     @GetMapping("/complaints/review")
     public List<SupportContracts.SupportView> complaintsForReview() { return service.complaintsForReview(); }
+    @GetMapping("/complaints/review/page")
+    public SupportContracts.ComplaintPage complaintsForReviewPage(
+            @RequestParam(defaultValue = "TODO") String group,
+            @RequestParam(required = false) com.example.backend.system.support.model.enums.SupportStatus status,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean assignedToMe,
+            @RequestParam(defaultValue = "false") boolean unassignedOnly,
+            @RequestParam(required = false) Integer slaHours,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return service.complaintsForReviewPage(group, status, q, assignedToMe, unassignedOnly, slaHours, from, to, page, size);
+    }
+    @GetMapping("/complaints/review/{id}")
+    public SupportContracts.SupportView complaintForReview(@PathVariable UUID id) {
+        return service.complaintForReview(id);
+    }
+    @PostMapping("/complaints/review/{id}/claim")
+    public SupportContracts.SupportView claimComplaint(@PathVariable UUID id,
+                                                       @RequestParam(defaultValue = "false") boolean release,
+                                                       @RequestParam(defaultValue = "false") boolean force) {
+        return service.claimComplaint(id, release, force);
+    }
+    @PostMapping("/complaints/review/{id}/escalate-law-gap")
+    public SupportContracts.SupportView escalateComplaintToLawGap(
+            @PathVariable UUID id,
+            @Valid @RequestBody(required = false) SupportContracts.EscalateLawGapRequest request) {
+        return service.escalateComplaintToLawGap(id, request);
+    }
     @PutMapping("/complaints/review/{id}")
     public SupportContracts.SupportView resolveComplaint(@PathVariable UUID id,
                                                        @Valid @RequestBody UpdateSupportRequest request) {
@@ -59,9 +91,6 @@ public class SupportController {
 
     @GetMapping("/admin")
     public List<SupportContracts.SupportView> adminList(@RequestParam(required = false) SupportKind kind) { return service.adminList(kind); }
-
-    @PostMapping("/admin/{id}/refer-reviewer")
-    public SupportContracts.SupportView referReviewer(@PathVariable UUID id) { return service.referReviewer(id); }
 
     @PutMapping("/admin/{id}")
     public SupportContracts.SupportView update(@PathVariable UUID id,

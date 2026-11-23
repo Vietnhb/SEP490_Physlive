@@ -36,7 +36,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
         {simulation ? (
           /* Layout giữa khi có mô phỏng: Canvas card + Header + Restart */
           <div className="simulation-stage-container">
-            {complaintOpen && complaint && <SimulationComplaintDialog {...complaint} onClose={() => setComplaintOpen(false)} />}
+            {complaintOpen && complaint && <SimulationComplaintDialog {...complaint} simulationSnapshot={!complaint.simulationId ? simulation : undefined} onClose={() => setComplaintOpen(false)} />}
             {liveTimeline && presentation ? (
               <div className="simulation-scene-frame" aria-busy={recomputing}>
               <SvgPixiScene

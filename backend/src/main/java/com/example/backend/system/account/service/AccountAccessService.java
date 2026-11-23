@@ -32,6 +32,12 @@ public class AccountAccessService {
                 && user.hasPermission(PermissionCode.CONTENT_REVIEW);
     }
 
+    /** Handling teacher simulation complaints requires an active REVIEWER with at least one reviewer permission. */
+    public boolean canHandleComplaints(User user) {
+        return active(user) && hasRole(user, RoleName.REVIEWER)
+                && (user.hasPermission(PermissionCode.CONTENT_REVIEW) || user.hasPermission(PermissionCode.CONTENT_EDIT));
+    }
+
     public boolean isDepartmentHead(User user) {
         return active(user) && hasRole(user, RoleName.STAFF) && user.hasPermission(PermissionCode.DEPARTMENT_HEAD_PHYSICS);
     }

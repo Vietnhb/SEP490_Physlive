@@ -4,7 +4,7 @@ import type { Version } from "../model/reviewerTypes";
 
 /** Vietnamese names for topic codes (KINEMATICS) and quantity keys (initial_velocity),
  *  read from the topic catalogue every signed-in role may read. */
-export type ReviewerCatalog = { topicName: (code?: string | null) => string; quantityLabel: (key?: string | null) => string; humanize: (text?: string | null) => string };
+export type ReviewerCatalog = { topics: string[]; topicName: (code?: string | null) => string; quantityLabel: (key?: string | null) => string; humanize: (text?: string | null) => string };
 
 type Maps = { topics: Map<string, string>; quantities: Map<string, string> };
 
@@ -29,6 +29,7 @@ export function useReviewerCatalog(): ReviewerCatalog {
   const maps = useMemo(() => buildMaps(data ?? []), [data]);
   const quantityLabel = (key?: string | null) => !key ? "" : maps?.quantities.get(key) ?? prettyKey(key);
   return {
+    topics: Array.from(maps.topics.keys()),
     topicName: code => !code ? "" : maps?.topics.get(code) ?? code,
     quantityLabel,
     // Replace snake_case quantity keys inside AI-generated sentences, e.g. "đại lượng initial_position".

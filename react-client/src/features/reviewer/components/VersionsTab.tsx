@@ -1,15 +1,17 @@
 import PageActions from "../../../shared/layout/PageActions";
 import RowActions from "../../../shared/ui/RowActions";
 import { useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Badge, Button, Card, Heading, SegmentedControl, Table, Text } from "@radix-ui/themes";
 import api from "../../../shared/api/client";
+import { apiKey, queryClient } from "../../../shared/api/queryClient";
 import { LoadState } from "../../../shared/ui/OperationsKit";
 import { useAction, useResource } from "../../../shared/hooks/operationsData";
 import { VersionEditorModal, type VersionSaveOutcome } from "./VersionEditorModal";
 import { ReviewerDialog } from "./ReviewerDialog";
 import type { Version } from "../model/reviewerTypes";
-import { formatDate, matches } from "../model/reviewerUtils";
-import { ReviewerIcon, ReviewerRefresh, ReviewerSearch, ReviewStatus } from "./ReviewerKit";
+import { formatDate, matches, reviewerStatusLabel, timeAgo } from "../model/reviewerUtils";
+import { ReviewerIcon, ReviewerPagination, ReviewerRefresh, ReviewerSearch, ReviewStatus } from "./ReviewerKit";
 import { objectRows } from "../model/jsonRows";
 import { LawBook } from "./LawCatalogueEditor";
 
@@ -22,16 +24,37 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 export function VersionsTab() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const resource = useResource<Version[]>("/reviewer/schemas");
   const action = useAction();
   const [filter, setFilter] = useState<"ALL" | Lifecycle>("ALL");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => searchParams.get("topic") ?? "");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [selected, setSelected] = useState<Version | null>(null);
   const [editor, setEditor] = useState<{ version?: Version; clone: boolean } | null>(null);
   const [decision, setDecision] = useState<{ version: Version; status: "APPROVED" | "RETIRED" | "DELETE" } | null>(null);
   const all = useMemo(() => resource.data ?? [], [resource.data]);
+
+  const deepSchemaId = searchParams.get("schemaId");
+  const deepTarget = useMemo(() => {
+    if (!deepSchemaId || all.length === 0) return null;
+    const candidates = all.filter(item => item.schemaId.toLowerCase() === deepSchemaId.toLowerCase());
+    return candidates.find(item => item.lifecycleStatus === "APPROVED")
+      ?? candidates.find(item => item.lifecycleStatus === "DRAFT")
+      ?? candidates[0]
+      ?? null;
+  }, [deepSchemaId, all]);
+  const activeSelected = selected ?? deepTarget;
+  const clearSelection = () => {
+    setSelected(null);
+    if (searchParams.has("schemaId") || searchParams.has("topic")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("schemaId");
+      next.delete("topic");
+      setSearchParams(next, { replace: true });
+    }
+  };
   const count = (status: Lifecycle) => all.filter(version => version.lifecycleStatus === status).length;
   const rows = all.filter(version => (filter === "ALL" || version.lifecycleStatus === filter) && matches(query, version.schemaId, version.name, version.topic, version.version))
     .sort((a, b) => ORDER.indexOf(a.lifecycleStatus) - ORDER.indexOf(b.lifecycleStatus));
@@ -54,8 +77,8 @@ export function VersionsTab() {
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
   const currentPage = Math.min(page, totalPages);
   const visibleRows = pageSize > 0 ? rows.slice((currentPage - 1) * pageSize, currentPage * pageSize) : rows;
-  const rangeStart = rows.length === 0 ? 0 : pageSize > 0 ? (currentPage - 1) * pageSize + 1 : 1;
-  const rangeEnd = pageSize > 0 ? Math.min(rows.length, currentPage * pageSize) : rows.length;
+  const currentApprovedFor = (target?: Version) =>
+    target ? all.find(item => item.id !== target.id && item.schemaId.toLowerCase() === target.schemaId.toLowerCase() && item.lifecycleStatus === "APPROVED") : undefined;
 
   const changeLifecycle = async () => {
     if (!decision) return;
@@ -76,13 +99,15 @@ export function VersionsTab() {
     if (ok) {
       if (isDelete) {
         resource.setData(prev => (prev ?? []).filter(item => item.id !== targetId));
-        if (selected?.id === targetId) setSelected(null);
+        if (activeSelected?.id === targetId) clearSelection();
       } else if (updatedVersion) {
         const nextVersion = updatedVersion;
         resource.setData(prev => (prev ?? []).map(item => item.id === targetId ? nextVersion : decision.status === "APPROVED" && item.schemaId.toLowerCase() === nextVersion.schemaId.toLowerCase() && item.lifecycleStatus === "APPROVED" ? { ...item, lifecycleStatus: "RETIRED" } : item));
-        if (selected?.id === targetId) setSelected(nextVersion);
+        if (activeSelected?.id === targetId) setSelected(nextVersion);
       }
       setDecision(null);
+      void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/schemas/summary") });
+      void queryClient.invalidateQueries({ queryKey: apiKey(`/reviewer/schema-versions/${targetId}/history`) });
       void resource.refresh();
     }
   };
@@ -100,17 +125,22 @@ export function VersionsTab() {
       });
     }
     setEditor(null);
+    void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/schemas/summary") });
+    if (outcome?.saved?.id) {
+      void queryClient.invalidateQueries({ queryKey: apiKey(`/reviewer/schema-versions/${outcome.saved.id}/history`) });
+    }
     void resource.refresh();
   };
 
   // Editing takes the page; the list comes back when the reviewer saves or leaves.
   if (editor) return <VersionEditorModal initial={editor.version} clone={editor.clone} sharedCatalogue={sharedCatalogue} onClose={() => setEditor(null)} onSaved={handleEditorSaved} />;
   // Reading a topic takes the page too: its roles and laws need the width, and the actions sit beside its title.
-  if (selected) return <>
-    <VersionDetail version={selected} sharedCatalogue={sharedCatalogue} onClose={() => setSelected(null)}
-      onEdit={() => { setEditor({ version: selected, clone: selected.lifecycleStatus !== "DRAFT" }); setSelected(null); }}
-      onDelete={selected.lifecycleStatus === "DRAFT" ? () => setDecision({ version: selected, status: "DELETE" }) : undefined} />
-    {decision && <DecisionDialog decision={decision} busy={action.busy} feedback={action.feedback} onClose={() => setDecision(null)} onConfirm={() => void changeLifecycle()} />}
+  if (activeSelected) return <>
+    <VersionDetail version={activeSelected} sharedCatalogue={sharedCatalogue} onClose={clearSelection}
+      onEdit={() => { setEditor({ version: activeSelected, clone: activeSelected.lifecycleStatus !== "DRAFT" }); clearSelection(); }}
+      onApprove={activeSelected.lifecycleStatus === "DRAFT" ? () => setDecision({ version: activeSelected, status: "APPROVED" }) : undefined}
+      onDelete={activeSelected.lifecycleStatus === "DRAFT" ? () => setDecision({ version: activeSelected, status: "DELETE" }) : undefined} />
+    {decision && <DecisionDialog decision={decision} previousApproved={currentApprovedFor(decision.version)} busy={action.busy} feedback={action.feedback} onClose={() => setDecision(null)} onConfirm={() => void changeLifecycle()} />}
   </>;
 
   return <Card size="3" className="reviewer-panel">
@@ -153,48 +183,73 @@ export function VersionsTab() {
           {!resource.loading && !resource.error && rows.length === 0 && <Table.Row><Table.Cell colSpan={4} className="reviewer-table-empty">{query || filter !== "ALL" ? `Không có ${noun} phù hợp.` : `Chưa có ${noun} nào. Bấm “Thêm chủ đề” để bắt đầu.`}</Table.Cell></Table.Row>}
         </Table.Body>
       </Table.Root></div>
-      {rows.length > 5 && (
-        <div className="reviewer-pagination">
-          <Text size="2" color="gray">
-            Hiển thị <strong>{rangeStart}–{rangeEnd}</strong> trong <strong>{rows.length}</strong> chủ đề
-          </Text>
-          <div className="reviewer-pagination-controls">
-            <div className="reviewer-pagination-sizes" role="group" aria-label="Số dòng mỗi trang">
-              {[5, 10, 0].map(size => (
-                <button
-                  key={size}
-                  type="button"
-                  className={`reviewer-page-chip${pageSize === size ? " is-active" : ""}`}
-                  onClick={() => { setPageSize(size); setPage(1); }}
-                >
-                  {size === 0 ? "Tất cả" : `${size} / trang`}
-                </button>
-              ))}
-            </div>
-            {pageSize > 0 && totalPages > 1 && (
-              <div className="reviewer-pagination-pages">
-                <Button type="button" variant="soft" color="gray" size="1" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>← Trước</Button>
-                <Text size="2">Trang {currentPage} / {totalPages}</Text>
-                <Button type="button" variant="soft" color="gray" size="1" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Sau →</Button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <ReviewerPagination total={rows.length} page={currentPage} pageSize={pageSize} noun="chủ đề" onPageChange={setPage} onPageSizeChange={size => { setPageSize(size); setPage(1); }} />
     </>}
 
-    {decision && <DecisionDialog decision={decision} busy={action.busy} feedback={action.feedback} onClose={() => setDecision(null)} onConfirm={() => void changeLifecycle()} />}
+    {decision && <DecisionDialog decision={decision} previousApproved={currentApprovedFor(decision.version)} busy={action.busy} feedback={action.feedback} onClose={() => setDecision(null)} onConfirm={() => void changeLifecycle()} />}
 
   </Card>;
 }
 
-function DecisionDialog({ decision, busy, feedback, onClose, onConfirm }: Readonly<{ decision: { version: Version; status: "APPROVED" | "RETIRED" | "DELETE" }; busy: boolean; feedback: ReactNode; onClose: () => void; onConfirm: () => void }>) {
+function summarizeRecordDiff(prev: Record<string, unknown>, next: Record<string, unknown>) {
+  const prevKeys = new Set(Object.keys(prev));
+  const nextKeys = new Set(Object.keys(next));
+  const added = [...nextKeys].filter(k => !prevKeys.has(k));
+  const removed = [...prevKeys].filter(k => !nextKeys.has(k));
+  const changed = [...nextKeys].filter(k => prevKeys.has(k) && JSON.stringify(prev[k]) !== JSON.stringify(next[k]));
+  return { added, removed, changed };
+}
+
+function summarizeArrayDiff(prev: unknown, next: unknown, keyOf: (item: Record<string, unknown>) => string) {
+  const toMap = (list: unknown) => {
+    const map: Record<string, unknown> = {};
+    if (Array.isArray(list)) {
+      list.forEach((item, index) => {
+        const rec = asRecord(item);
+        const key = keyOf(rec) || String(index);
+        map[key] = item;
+      });
+    }
+    return map;
+  };
+  return summarizeRecordDiff(toMap(prev), toMap(next));
+}
+
+function VersionDiffBox({ previous, next }: Readonly<{ previous: Version; next: Version }>) {
+  const prevDef = asRecord(previous.definition);
+  const nextDef = asRecord(next.definition);
+  const prevCat = asRecord(prevDef.lawCatalogue);
+  const nextCat = asRecord(nextDef.lawCatalogue);
+  const rows: { label: string; added: number; changed: number; removed: number }[] = [
+    { label: "Định luật", ...summarizeArrayDiff(prevCat.laws, nextCat.laws, r => String(r.id ?? r.title ?? "")) },
+    { label: "Vai trò đại lượng", ...summarizeRecordDiff(asRecord(prevCat.roles), asRecord(nextCat.roles)) },
+    { label: "Vật thể gợi ý", ...summarizeArrayDiff(prevDef.objectTypes, nextDef.objectTypes, r => String(r.type ?? r.label ?? "")) },
+    { label: "Đại lượng gợi ý", ...summarizeArrayDiff(prevDef.quantityDefinitions, nextDef.quantityDefinitions, r => String(r.key ?? r.label ?? "")) },
+  ].map(item => ({ label: item.label, added: item.added.length, changed: item.changed.length, removed: item.removed.length }))
+    .filter(item => item.added > 0 || item.changed > 0 || item.removed > 0);
+  const metaChanged = previous.name !== next.name || previous.topic !== next.topic;
+  return <div className="reviewer-diff">
+    <Text as="div" size="2" weight="bold">So sánh với bản đang dùng (v{previous.version})</Text>
+    {!metaChanged && rows.length === 0
+      ? <Text as="p" size="2" color="gray" mt="1">Không phát hiện thay đổi nội dung so với v{previous.version}.</Text>
+      : <ul className="reviewer-diff-list">
+        {metaChanged && <li>Thông tin chung: {previous.name !== next.name ? `Tên "${previous.name}" → "${next.name}"` : ""}{previous.name !== next.name && previous.topic !== next.topic ? " · " : ""}{previous.topic !== next.topic ? `Nhóm "${previous.topic}" → "${next.topic}"` : ""}</li>}
+        {rows.map(row => <li key={row.label}>
+          <strong>{row.label}:</strong>{" "}
+          {[row.added > 0 && `+${row.added} thêm`, row.changed > 0 && `~${row.changed} sửa`, row.removed > 0 && `-${row.removed} xóa`].filter(Boolean).join(", ")}
+        </li>)}
+      </ul>}
+  </div>;
+}
+
+function DecisionDialog({ decision, previousApproved, busy, feedback, onClose, onConfirm }: Readonly<{ decision: { version: Version; status: "APPROVED" | "RETIRED" | "DELETE" }; previousApproved?: Version; busy: boolean; feedback: ReactNode; onClose: () => void; onConfirm: () => void }>) {
   const isDelete = decision.status === "DELETE";
   const isApprove = decision.status === "APPROVED";
   const title = isDelete ? "Xoá bản nháp?" : isApprove ? "Phê duyệt phiên bản?" : "Ngừng sử dụng phiên bản?";
   const actionLabel = busy ? (isDelete ? "Đang xoá…" : "Đang cập nhật…") : isDelete ? "Xoá bản nháp" : isApprove ? "Phê duyệt" : "Ngừng sử dụng";
   return <ReviewerDialog title={title} onClose={onClose}>
     <Text as="p" size="3"><strong>{decision.version.name || decision.version.schemaId}</strong> · v{decision.version.version}</Text>
+    {isApprove && previousApproved && <VersionDiffBox previous={previousApproved} next={decision.version} />}
     <ul className="reviewer-consequences">{isDelete ? <>
       <li>Bản nháp này sẽ bị <strong>xoá vĩnh viễn</strong> và không thể khôi phục.</li>
       <li>Các phiên bản đang dùng hoặc ngừng dùng của chủ đề không bị ảnh hưởng.</li>
@@ -211,7 +266,29 @@ function DecisionDialog({ decision, busy, feedback, onClose, onConfirm }: Readon
   </ReviewerDialog>;
 }
 
-function VersionDetail({ version, sharedCatalogue, onClose, onEdit, onDelete }: Readonly<{ version: Version; sharedCatalogue?: Record<string, unknown>; onClose: () => void; onEdit: () => void; onDelete?: () => void }>) {
+type SchemaAudit = {
+  id: string;
+  schemaVersionId: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  note?: string | null;
+  createdAt: string;
+};
+
+const SCHEMA_AUDIT_ACTION: Record<string, string> = {
+  CREATE_DRAFT: "Tạo bản nháp",
+  UPDATE_DRAFT: "Cập nhật bản nháp",
+  APPROVE: "Phê duyệt phát hành",
+  RETIRE: "Ngừng sử dụng",
+  AUTO_RETIRE: "Tự động ngừng dùng",
+};
+
+function VersionDetail({ version, sharedCatalogue, onClose, onEdit, onApprove, onDelete }: Readonly<{ version: Version; sharedCatalogue?: Record<string, unknown>; onClose: () => void; onEdit: () => void; onApprove?: () => void; onDelete?: () => void }>) {
+  const historyResource = useResource<SchemaAudit[]>(`/reviewer/schema-versions/${version.id}/history`);
+  const history = historyResource.data ?? [];
   const definition = (version.definition && typeof version.definition === "object" ? version.definition : {}) as Record<string, unknown>;
   const objects = objectRows(definition.objectTypes);
   const quantities = objectRows(definition.quantityDefinitions);
@@ -219,11 +296,12 @@ function VersionDetail({ version, sharedCatalogue, onClose, onEdit, onDelete }: 
   const catalogue = (definition.lawCatalogue && typeof definition.lawCatalogue === "object" ? definition.lawCatalogue : {}) as Record<string, unknown>;
   const limitations = Array.isArray(definition.limitations) ? definition.limitations.map(String) : [];
   return <Card size="3" className="reviewer-panel">
-    <div className="reviewer-toolbar" style={{ alignItems: "center" }}>
+    <div className="reviewer-toolbar reviewer-sticky-header" style={{ alignItems: "center" }}>
       <Button type="button" variant="soft" color="gray" size="2" onClick={onClose}>← Danh sách chủ đề</Button>
       <Heading as="h2" size="5" style={{ flex: 1, minWidth: 0 }}>{version.name || version.schemaId} · v{version.version}</Heading>
       {onDelete && <Button type="button" variant="soft" color="red" size="2" onClick={onDelete}>Xoá bản nháp</Button>}
-      <Button type="button" size="2" onClick={onEdit}>{version.lifecycleStatus === "DRAFT" ? "Sửa bản nháp" : "Tạo phiên bản mới để sửa"}</Button>
+      <Button type="button" variant={onApprove ? "soft" : "solid"} size="2" onClick={onEdit}>{version.lifecycleStatus === "DRAFT" ? "Sửa bản nháp" : "Tạo phiên bản mới để sửa"}</Button>
+      {onApprove && <Button type="button" size="2" onClick={onApprove}>Phê duyệt</Button>}
     </div>
     <div className="reviewer-detail-meta"><ReviewStatus status={version.lifecycleStatus} /><Text size="2" color="gray">Tạo ngày {formatDate(version.createdAt)}</Text></div>
     <div className="reviewer-summary">
@@ -241,6 +319,21 @@ function VersionDetail({ version, sharedCatalogue, onClose, onEdit, onDelete }: 
       </details>}
       {limitations.length > 0 && <><Heading as="h3" size="2">Giới hạn</Heading><ul className="reviewer-consequences">{limitations.map(item => <li key={item}>{item}</li>)}</ul></>}
     </div>
+    {history.length > 0 && <details className="reviewer-disclosure">
+      <summary>Lịch sử phiên bản ({history.length})</summary>
+      <table className="reviewer-mini-table">
+        <thead><tr><th>Thời điểm</th><th>Người thực hiện</th><th>Hành động</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+        <tbody>
+          {history.map(entry => <tr key={entry.id}>
+            <td title={formatDate(entry.createdAt)}>{timeAgo(entry.createdAt) || formatDate(entry.createdAt)}</td>
+            <td>{entry.actorName || entry.actorEmail || "—"}</td>
+            <td>{SCHEMA_AUDIT_ACTION[entry.action] ?? entry.action}</td>
+            <td>{entry.fromStatus ? `${reviewerStatusLabel(entry.fromStatus)} → ` : ""}{entry.toStatus ? reviewerStatusLabel(entry.toStatus) : "—"}</td>
+            <td>{entry.note || "—"}</td>
+          </tr>)}
+        </tbody>
+      </table>
+    </details>}
     <details className="reviewer-disclosure"><summary>Thông tin kỹ thuật</summary>
       <dl className="reviewer-evidence-grid"><div><dt>Mã chủ đề</dt><dd><code>{version.schemaId}</code></dd></div><div><dt>Số lần chỉnh sửa</dt><dd>{version.recordVersion ?? 0}</dd></div><div><dt>Mã kiểm tra nội dung</dt><dd><code>{version.definitionChecksum ?? "—"}</code></dd></div></dl>
       <pre className="reviewer-json">{JSON.stringify(version.definition, null, 2)}</pre>

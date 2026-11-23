@@ -1,6 +1,6 @@
 import PageActions from "../../../shared/layout/PageActions";
-import { Badge, Heading, Select, TextField } from "@radix-ui/themes";
-import type { ComponentProps, ReactNode } from "react";
+import { Badge, Button, Heading, Select, Text, TextField } from "@radix-ui/themes";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { reviewerStatusLabel } from "../model/reviewerUtils";
 import RefreshButton from "../../../shared/ui/RefreshButton";
 
@@ -59,4 +59,64 @@ export function ReviewStatus({ status }: Readonly<{ status: string }>) {
 /** Sits in the area's top bar with the page's other main actions, as on every management page. */
 export function ReviewerRefresh({ refresh, loading }: Readonly<{ refresh: () => void; loading: boolean }>) {
   return <PageActions><RefreshButton onClick={refresh} disabled={loading} /></PageActions>;
+}
+
+/** Highlights waiting items that have passed 24h / 48h SLA thresholds; refreshes every minute while open. */
+export function SlaBadge({ createdAt, active = true }: Readonly<{ createdAt?: string | null; active?: boolean }>) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active || !createdAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, [active, createdAt]);
+  if (!active || !createdAt) return null;
+  const parsed = Date.parse(createdAt);
+  if (!Number.isFinite(parsed)) return null;
+  const hours = (now - parsed) / 3_600_000;
+  if (hours < 24) return null;
+  const urgent = hours >= 48;
+  return <Badge color={urgent ? "red" : "amber"} variant="soft" size="1">{urgent ? "Quá 48 giờ" : "Chờ > 24 giờ"}</Badge>;
+}
+
+/** Shared client-side pagination bar for reviewer tables and card lists. */
+export function ReviewerPagination({ total, page, pageSize, noun, onPageChange, onPageSizeChange, sizes = [5, 10, 0] }: Readonly<{
+  total: number;
+  page: number;
+  pageSize: number;
+  noun: string;
+  onPageChange: (next: number) => void;
+  onPageSizeChange: (size: number) => void;
+  sizes?: number[];
+}>) {
+  if (total <= 5) return null;
+  const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+  const currentPage = Math.min(page, totalPages);
+  const start = total === 0 ? 0 : pageSize > 0 ? (currentPage - 1) * pageSize + 1 : 1;
+  const end = pageSize > 0 ? Math.min(total, currentPage * pageSize) : total;
+  return <div className="reviewer-pagination">
+    <Text size="2" color="gray">
+      Hiển thị <strong>{start}–{end}</strong> trong <strong>{total}</strong> {noun}
+    </Text>
+    <div className="reviewer-pagination-controls">
+      <div className="reviewer-pagination-sizes" role="group" aria-label={`Số ${noun} mỗi trang`}>
+        {sizes.map(size => (
+          <button
+            key={size}
+            type="button"
+            className={`reviewer-page-chip${pageSize === size ? " is-active" : ""}`}
+            onClick={() => onPageSizeChange(size)}
+          >
+            {size === 0 ? "Tất cả" : `${size} / trang`}
+          </button>
+        ))}
+      </div>
+      {pageSize > 0 && totalPages > 1 && (
+        <div className="reviewer-pagination-pages">
+          <Button type="button" variant="soft" color="gray" size="1" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>← Trước</Button>
+          <Text size="2">Trang {currentPage} / {totalPages}</Text>
+          <Button type="button" variant="soft" color="gray" size="1" disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)}>Sau →</Button>
+        </div>
+      )}
+    </div>
+  </div>;
 }

@@ -14,7 +14,11 @@ public final class SchemaContracts {
     private SchemaContracts() { }
     public record Request(@NotBlank @Size(max = 80) String schemaId, @NotBlank @Size(max = 120) String name,
                           @NotBlank @Size(max = 32) String topic, @NotBlank @Size(max = 16) String version,
-                          @NotNull JsonNode definition, LifecycleStatus lifecycleStatus) { }
+                          @NotNull JsonNode definition, LifecycleStatus lifecycleStatus, Long expectedRecordVersion) {
+        public Request(String schemaId, String name, String topic, String version, JsonNode definition, LifecycleStatus lifecycleStatus) {
+            this(schemaId, name, topic, version, definition, lifecycleStatus, null);
+        }
+    }
     public record Response(UUID id, String schemaId, String name, String topic, String version,
                            JsonNode definition, String definitionChecksum, LifecycleStatus lifecycleStatus,
                            long recordVersion, Instant createdAt, Instant updatedAt) {
@@ -25,6 +29,10 @@ public final class SchemaContracts {
         }
     }
     public record TopicName(String topic, String name, LifecycleStatus lifecycleStatus) {}
+    public record Summary(UUID id, String schemaId, String name, String topic, String version,
+                          LifecycleStatus lifecycleStatus, Instant createdAt) {}
+    public record Audit(UUID id, UUID schemaVersionId, String actorName, String actorEmail, String action,
+                        LifecycleStatus fromStatus, LifecycleStatus toStatus, String note, Instant createdAt) {}
     public record ModuleRelease(UUID id, String topic, String moduleName, String schemaId,
                                 String schemaVersion, LifecycleStatus lifecycleStatus) {
         public static ModuleRelease from(SchemaVersion schema) {

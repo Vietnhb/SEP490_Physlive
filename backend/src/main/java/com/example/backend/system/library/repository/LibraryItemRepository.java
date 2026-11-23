@@ -166,9 +166,47 @@ public interface LibraryItemRepository extends JpaRepository<LibraryItem, UUID> 
     @Query("select i.folder.id as folderId, count(i) as total from LibraryItem i where i.folder.id in :folderIds and i.active = true group by i.folder.id")
     List<FolderCount> countActiveByFolderIds(@Param("folderIds") java.util.Collection<UUID> folderIds);
 
+    interface ModerationStatusCount {
+        LibraryModerationStatus getStatus();
+        long getTotal();
+    }
+
+    @Query("select i.moderationStatus as status, count(i) as total from LibraryItem i where i.visibility in :visibilities and (i.active = true or i.moderationStatus = com.example.backend.system.library.model.enums.LibraryModerationStatus.REMOVED) group by i.moderationStatus")
+    List<ModerationStatusCount> countByVisibilityInGroupByModerationStatus(@Param("visibilities") java.util.Set<Visibility> visibilities);
+
     @Query("select i from LibraryItem i where i.visibility in :visibilities and i.moderationStatus = :status and (i.active = true or i.moderationStatus = com.example.backend.system.library.model.enums.LibraryModerationStatus.REMOVED) order by i.createdAt asc")
     List<LibraryItem> findByVisibilityInAndModerationStatusOrderByCreatedAtAsc(@Param("visibilities") java.util.Set<Visibility> visibilities, @Param("status") LibraryModerationStatus status);
-    @EntityGraph(attributePaths = {"specification", "owner", "owner.school"})
+    @EntityGraph(attributePaths = {"specification", "owner", "owner.school", "assignedTo"})
+    @Query("""
+            select i from LibraryItem i
+            left join i.owner owner
+            left join owner.school school
+            left join i.assignedTo assignee
+            where i.visibility in :visibilities
+              and i.moderationStatus = :status
+              and (i.active = true or i.moderationStatus = com.example.backend.system.library.model.enums.LibraryModerationStatus.REMOVED)
+              and (:assignedToId < 0 or assignee.id = :assignedToId)
+              and (:unassignedOnly = false or assignee is null)
+              and (:useSla = false or i.createdAt < :slaBefore)
+              and (:topic = '' or lower(coalesce(i.specification.topic, '')) = lower(:topic))
+              and (:pattern = ''
+                   or cast(function('vn_fold', coalesce(i.title, '')) as string) like :pattern
+                   or cast(function('vn_fold', coalesce(i.specification.topic, '')) as string) like :pattern
+                   or cast(function('vn_fold', coalesce(owner.fullName, '')) as string) like :pattern
+                   or cast(function('vn_fold', coalesce(school.name, '')) as string) like :pattern)
+            order by i.createdAt asc
+            """)
+    Page<LibraryItem> findModerationPage(@Param("visibilities") java.util.Set<Visibility> visibilities,
+                                         @Param("status") LibraryModerationStatus status,
+                                         @Param("assignedToId") int assignedToId,
+                                         @Param("unassignedOnly") boolean unassignedOnly,
+                                         @Param("useSla") boolean useSla,
+                                         @Param("slaBefore") java.time.Instant slaBefore,
+                                         @Param("topic") String topic,
+                                         @Param("pattern") String pattern,
+                                         Pageable pageable);
+
+    @EntityGraph(attributePaths = {"specification", "owner", "owner.school", "assignedTo"})
     @Query("select i from LibraryItem i where i.visibility in :visibilities and i.moderationStatus = :status and (i.active = true or i.moderationStatus = com.example.backend.system.library.model.enums.LibraryModerationStatus.REMOVED) order by i.createdAt asc")
     Page<LibraryItem> findByVisibilityInAndModerationStatusOrderByCreatedAtAsc(@Param("visibilities") java.util.Set<Visibility> visibilities,
                                                                                  @Param("status") LibraryModerationStatus status,

@@ -9,7 +9,7 @@ import { indexAtTime } from "../../simulation/model/learningModel";
 import { ReviewerIcon } from "./ReviewerKit";
 
 /** Inline player so the reviewer judges the simulation itself, not just its title. */
-export function SimulationPreviewPane({ simulationId, onLoaded }: Readonly<{ simulationId: string; onLoaded?: (ok: boolean) => void }>) {
+export function SimulationPreviewPane({ simulationId, onLoaded, onMeta, errorText }: Readonly<{ simulationId: string; onLoaded?: (ok: boolean) => void; onMeta?: (meta: { schemaId?: string; topic?: string }) => void; errorText?: string }>) {
   const [state, setState] = useState<{ id: string; simulation?: Simulation; generated?: GeneratedSimulationResult; error?: string }>({ id: "" });
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -19,15 +19,31 @@ export function SimulationPreviewPane({ simulationId, onLoaded }: Readonly<{ sim
     void openSharedGeneratedSimulation(simulationId).catch(() => null)
       .then(scene => {
         if (scene?.simulationSpec?.solverTimeline) {
-          if (active) { setState({ id: simulationId, generated: scene }); onLoaded?.(true); }
+          if (active) {
+            setState({ id: simulationId, generated: scene });
+            onMeta?.({
+              schemaId: typeof scene.simulationSpec.schemaId === "string" ? scene.simulationSpec.schemaId : undefined,
+              topic: typeof scene.simulationSpec.topic === "string" ? scene.simulationSpec.topic : undefined,
+            });
+            onLoaded?.(true);
+          }
           return null;
         }
         return getSharedSimulation(simulationId);
       })
-      .then(value => { if (value === null) return; if (active) { setState({ id: simulationId, simulation: value }); setTime(value.time[0] ?? 0); setPlaying(false); onLoaded?.(true); } })
-      .catch(() => { if (active) { setState({ id: simulationId, error: "Không mở được mô phỏng này. Có thể dữ liệu mô phỏng bị lỗi — bạn nên từ chối và ghi rõ lý do." }); onLoaded?.(false); } });
+      .then(value => {
+        if (value === null) return;
+        if (active) {
+          setState({ id: simulationId, simulation: value });
+          setTime(value.time[0] ?? 0);
+          setPlaying(false);
+          onMeta?.({ schemaId: value.schemaId });
+          onLoaded?.(true);
+        }
+      })
+      .catch(() => { if (active) { setState({ id: simulationId, error: errorText ?? "Không mở được mô phỏng này. Có thể dữ liệu mô phỏng bị lỗi — bạn nên từ chối và ghi rõ lý do." }); onLoaded?.(false); } });
     return () => { active = false; };
-  }, [simulationId, onLoaded]);
+  }, [simulationId, onLoaded, onMeta, errorText]);
   const simulation = state.id === simulationId ? state.simulation : undefined;
   const generated = state.id === simulationId ? state.generated : undefined;
   const error = state.id === simulationId ? state.error : undefined;
