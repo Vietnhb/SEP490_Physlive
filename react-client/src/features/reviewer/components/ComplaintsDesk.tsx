@@ -75,6 +75,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
   const opener = useRef<HTMLButtonElement | null>(null);
   const actionSectionRef = useRef<HTMLDivElement | null>(null);
   const [notice, setNotice] = useState("");
+  const [dialogNotice, setDialogNotice] = useState("");
   const [actionError, setActionError] = useState("");
 
   useEffect(() => {
@@ -162,20 +163,22 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
 
   const toggleClaim = async (release: boolean, force = false) => {
     if (!selected || lock.current) return;
-    lock.current = true; setBusy(true); setActionError(""); setNotice("");
+    lock.current = true; setBusy(true); setActionError(""); setNotice(""); setDialogNotice("");
     try {
       const updated = await claimComplaint(selected.id, release, force);
       syncUpdatedItem(updated);
       void queryClient.invalidateQueries({ queryKey: apiKey("/support/complaints/counts") });
       setConfirmTakeover(false);
-      setNotice(release ? "Đã bỏ nhận xử lý khiếu nại." : force ? "Đã tiếp nhận lại khiếu nại này." : "Đã nhận xử lý khiếu nại này.");
+      const message = release ? "Đã bỏ nhận xử lý khiếu nại." : force ? "Đã tiếp nhận lại khiếu nại này." : "Đã nhận xử lý khiếu nại này.";
+      setDialogNotice(message);
+      setNotice(message);
     } catch (error) { setActionError(apiMessage(error, "Không cập nhật được trạng thái nhận xử lý.")); }
     finally { lock.current = false; setBusy(false); }
   };
 
   const escalateToLawGap = async () => {
     if (!selected || lock.current) return;
-    lock.current = true; setBusy(true); setActionError(""); setNotice("");
+    lock.current = true; setBusy(true); setActionError(""); setNotice(""); setDialogNotice("");
     try {
       const updated = await escalateComplaintToLawGap(selected.id, {
         schemaId: activeMeta.schemaId,
@@ -188,7 +191,9 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps?status=OPEN") });
       setActionMode("reply");
       setEscalateNote("");
-      setNotice("Đã chuyển khiếu nại sang mục Định luật cần rà soát để bộ phận biên soạn xử lý.");
+      const message = "Đã chuyển khiếu nại sang mục Định luật cần rà soát để bộ phận biên soạn xử lý.";
+      setDialogNotice(message);
+      setNotice(message);
     } catch (error) { setActionError(apiMessage(error, "Chưa chuyển được sang rà soát định luật. Vui lòng thử lại.")); }
     finally { lock.current = false; setBusy(false); }
   };
@@ -197,15 +202,17 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
     if (!selected || lock.current) return;
     const response = (drafts[selected.id] ?? "").trim();
     if (!response && (nextStatus !== "RESOLVED" || !selected.adminResponse?.trim())) { setActionError("Hãy nhập phản hồi hoặc kết quả xử lý trước khi lưu."); return; }
-    lock.current = true; setBusy(true); setActionError(""); setNotice("");
+    lock.current = true; setBusy(true); setActionError(""); setNotice(""); setDialogNotice("");
     try {
       const updated = await resolveComplaint(selected.id, nextStatus, response || undefined, selected.status, selected.respondedAt);
       syncUpdatedItem(updated);
       void queryClient.invalidateQueries({ queryKey: apiKey("/support/complaints/counts") });
       void resource.refresh();
       setDrafts(previous => ({ ...previous, [updated.id]: "" }));
-      setNotice(nextStatus === "RESOLVED" ? "Đã giải quyết khiếu nại và gửi kết quả cho giáo viên." : "Đã gửi phản hồi. Khiếu nại tiếp tục được xem xét.");
-      if (nextStatus === "RESOLVED") setSelectedId("");
+      const message = nextStatus === "RESOLVED" ? "Đã giải quyết khiếu nại và gửi kết quả cho giáo viên." : "Đã gửi phản hồi. Khiếu nại tiếp tục được xem xét.";
+      setNotice(message);
+      if (nextStatus === "RESOLVED") { setDialogNotice(""); setSelectedId(""); }
+      else setDialogNotice(message);
     } catch (error) { setActionError(apiMessage(error, "Chưa lưu được phản hồi. Vui lòng thử lại.")); }
     finally { lock.current = false; setBusy(false); }
   };
@@ -249,13 +256,15 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
           <td><span className={styles.clamp}>{item.subject}</span><Flex gap="2" align="center" wrap="wrap"><small>{code(item.id)}</small>{(item.simulationId || item.hasSimulationSnapshot || hasSavedScene(item.simulationSnapshot)) && <Badge size="1" variant="soft" color="indigo">Có mô phỏng</Badge>}{item.lawGapId && <Badge size="1" variant="soft" color={item.lawGapStatus === "RESOLVED" ? "green" : "purple"}>{item.lawGapStatus === "RESOLVED" ? "Đã sửa định luật" : "Đã chuyển biên soạn"}</Badge>}</Flex></td>
           <td><Flex direction="column" gap="1" align="start"><Badge color={item.status === "RESOLVED" ? "green" : item.status === "READ" ? "blue" : "orange"}>{COMPLAINT_STATUS[item.status]}</Badge><SlaBadge createdAt={item.createdAt} active={item.status !== "RESOLVED"} />{item.assignedToName && item.status !== "RESOLVED" && <small>Đang xử lý: {item.assignedToName}</small>}</Flex></td>
           <td><time dateTime={item.createdAt}>{date(item.createdAt)}</time></td>
-          <td><Button size="1" variant="soft" aria-haspopup="dialog" onClick={event => { opener.current = event.currentTarget; setSelectedId(item.id); setActionMode("reply"); setEscalateNote(""); setActionError(""); }}>{item.status === "RESOLVED" ? "Xem chi tiết" : "Xử lý"}</Button></td>
+          <td><Button size="1" variant="soft" aria-haspopup="dialog" onClick={event => { opener.current = event.currentTarget; setSelectedId(item.id); setActionMode("reply"); setEscalateNote(""); setDialogNotice(""); setActionError(""); }}>{item.status === "RESOLVED" ? "Xem chi tiết" : "Xử lý"}</Button></td>
         </tr>)}</tbody></table>{!rows.length && <p className={styles.empty}>Không có khiếu nại phù hợp với bộ lọc.</p>}</div>}
       <footer className={styles.footer}><span aria-live="polite">Hiển thị {totalElements ? start + 1 : 0}–{Math.min(start + rows.length, totalElements)} / {totalElements} khiếu nại</span><div><label>Số dòng/trang<Select.Root value={String(size)} onValueChange={value => { setSize(Number(value)); setPage(1); }}><Select.Trigger aria-label="Số khiếu nại Reviewer mỗi trang" /><Select.Content>{[5, 10, 20].map(value => <Select.Item key={value} value={String(value)}>{value}</Select.Item>)}</Select.Content></Select.Root></label><Button variant="soft" size="1" disabled={current === 1} onClick={() => setPage(current - 1)}>Trước</Button><span>Trang {current}/{pages}</span><Button variant="soft" size="1" disabled={current === pages} onClick={() => setPage(current + 1)}>Sau</Button></div></footer>
     </section>
-    <Dialog.Root open={Boolean(selected)} onOpenChange={open => { if (!open && !busy) { setSelectedId(""); setConfirmTakeover(false); setActionMode("reply"); setEscalateNote(""); } }}><Dialog.Content maxWidth="840px" className={`${modal.dialog} reviewer-academic`} onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => event.preventDefault()} onCloseAutoFocus={event => { if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }); } }}>
-      <header className={styles.dialogHeader}><div><Dialog.Title mb="1">Xử lý khiếu nại mô phỏng</Dialog.Title><Dialog.Description>{selected && code(selected.id)}</Dialog.Description></div><Flex gap="2" align="center">{selected && selected.status !== "RESOLVED" && (claimedByOther ? <Button size="2" variant="soft" color="amber" disabled={busy} onClick={() => setConfirmTakeover(true)}>Tiếp nhận lại</Button> : <Button size="2" variant="soft" color={claimedByMe ? "gray" : "indigo"} disabled={busy} onClick={() => void toggleClaim(claimedByMe)}>{claimedByMe ? "Bỏ nhận xử lý" : "Nhận xử lý"}</Button>)}<Dialog.Close><Button variant="soft" color="gray" disabled={busy} aria-label="Đóng chi tiết khiếu nại">Đóng</Button></Dialog.Close></Flex></header>
+    <Dialog.Root open={Boolean(selected)} onOpenChange={open => { if (!open && !busy) { setSelectedId(""); setConfirmTakeover(false); setActionMode("reply"); setEscalateNote(""); setDialogNotice(""); setActionError(""); } }}><Dialog.Content maxWidth="840px" className={`${modal.dialog} reviewer-academic`} onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onInteractOutside={event => event.preventDefault()} onCloseAutoFocus={event => { if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }); } }}>
+      <header className={styles.dialogHeader}><div><Dialog.Title mb="1">Xử lý khiếu nại mô phỏng</Dialog.Title><Dialog.Description>{selected && code(selected.id)}</Dialog.Description></div><Flex gap="2" align="center">{selected && selected.status !== "RESOLVED" && (claimedByOther ? <Button size="2" variant="soft" color="amber" disabled={busy} onClick={() => setConfirmTakeover(true)}>Tiếp nhận lại</Button> : <Button size="2" variant="soft" color={claimedByMe ? "gray" : "indigo"} loading={busy} disabled={busy} onClick={() => void toggleClaim(claimedByMe)}>{claimedByMe ? "Bỏ nhận xử lý" : "Nhận xử lý"}</Button>)}<Dialog.Close><Button variant="soft" color="gray" disabled={busy} aria-label="Đóng chi tiết khiếu nại">Đóng</Button></Dialog.Close></Flex></header>
       <div className={modal.body}>{selected && selectedContent && <>
+        {dialogNotice && <p role="status" className={styles.success} style={{ marginBottom: 14 }}>{dialogNotice}</p>}
+        {actionError && <p role="alert" className={styles.error} style={{ margin: "0 0 14px" }}>{actionError}</p>}
         {confirmTakeover && claimedByOther && <div className="reviewer-note" role="alert" style={{ marginBottom: 14 }}>
           <strong>Khiếu nại đang được {selected.assignedToName} nhận xử lý.</strong> Bạn có chắc muốn tiếp nhận lại không?
           <Flex gap="2" mt="2">
