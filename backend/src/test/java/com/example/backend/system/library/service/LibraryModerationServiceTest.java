@@ -1,6 +1,7 @@
 package com.example.backend.system.library.service;
 
 import com.example.backend.exception.ApiException;
+import com.example.backend.system.problem.model.entity.Specification;
 import com.example.backend.system.account.model.entity.User;
 import com.example.backend.system.account.service.AccountAccessService;
 import com.example.backend.system.account.service.CurrentUserService;
@@ -37,6 +38,10 @@ class LibraryModerationServiceTest {
     private LibraryItem pendingPublicItem(UUID id, int ownerId) {
         LibraryItem item = new LibraryItem();
         item.setId(id);
+        Specification specification = new Specification();
+        specification.setId(UUID.randomUUID());
+        specification.setTopic("KINEMATICS");
+        item.setSpecification(specification);
         item.setTitle("Ném xiên THPT");
         item.setVisibility(Visibility.PUBLIC);
         item.setModerationStatus(LibraryModerationStatus.PENDING);
