@@ -37,6 +37,20 @@ function QuotaUsage({ label, used, quota, detail }: Readonly<{ label: string; us
   </div>;
 }
 
+function AiQuotaNotice({ used, quota, month }: Readonly<{ used: number; quota: number | null; month: string }>) {
+  if (quota == null || (quota > 0 && used < quota * .8)) return null;
+  const exhausted = used >= quota;
+  const percentage = quota > 0 ? Math.round(used / quota * 100) : 100;
+  return <section className={s.aiNotice + (exhausted ? " " + s.aiNoticeExhausted : "")} role={exhausted ? "alert" : "status"} aria-labelledby="ai-quota-notice-title">
+    <span className={s.aiNoticeIcon}><LearningIcon name="activity" /></span>
+    <div className={s.aiNoticeContent}>
+      <h2 id="ai-quota-notice-title">{exhausted ? "Đã hết hạn mức AI tháng này" : "Sắp hết hạn mức AI · Đã dùng " + percentage + "%"}</h2>
+      <p>{monthLabel(month)}: đã dùng {number(used)} / {number(quota)} token{exhausted ? ". Các tính năng dùng AI tạm dừng đến khi hạn mức được làm mới vào đầu tháng sau hoặc trường nâng gói." : ", còn " + number(Math.max(0, quota - used)) + " token. Hạn mức được làm mới vào đầu tháng sau; trường có thể nâng gói nếu cần sử dụng thêm."}</p>
+    </div>
+    <Button asChild variant="outline"><Link to="/school/billing">Xem gói & nâng cấp<LearningIcon name="arrow" /></Link></Button>
+  </section>;
+}
+
 const shortcuts = [
   { to: "/school/users", icon: "users", title: "Tài khoản", detail: "Giáo viên và học sinh" },
   { to: "/school/import", icon: "upload", title: "Nhập dữ liệu", detail: "Người dùng, lớp và xếp lớp" },
@@ -63,6 +77,7 @@ export default function SchoolDashboard() {
     {!summary && dashboardActions}
     {report.error && <div className={s.error} role="alert"><LearningIcon name="activity" /><span>{report.error}</span><Button variant="soft" color="red" onClick={() => void report.refresh()}>Thử lại</Button></div>}
     {report.loading && !summary ? <DashboardLoadingSkeleton cards={4} label="Đang tải dữ liệu trường…" /> : summary && <>
+      <AiQuotaNotice used={summary.usedTokens} quota={summary.tokenQuota} month={summary.usageMonth} />
       <section data-kpis className={s.stats} aria-label="Chỉ số trường học">
         <SummaryCard label="Học sinh đang hoạt động" value={summary.students} icon="users" tone="primary" detail={number(summary.enrolledStudents) + " lượt xếp lớp"} />
         <SummaryCard label="Giáo viên" value={summary.teachers} icon="book" tone="secondary" detail="Tài khoản thuộc trường" />

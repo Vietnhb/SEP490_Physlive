@@ -149,3 +149,16 @@
 @media (prefers-reduced-motion: reduce) {
  .dashboard :global(.rt-Button), .table tbody tr, .dashboard .shortcut { transition: none; }
 }
+
+.aiNotice { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border: 1px solid var(--amber-7); border-left: 4px solid var(--amber-9); border-radius: 12px; background: var(--amber-2); color: var(--amber-12); }
+.aiNoticeIcon { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; background: var(--amber-4); color: var(--amber-11); }
+.aiNoticeContent { flex: 1; min-width: 0; }
+.dashboard .aiNoticeContent h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; line-height: 22px; }
+.aiNoticeContent p { margin: 0; font-size: 13px; line-height: 21px; }
+.dashboard .aiNotice > :global(.rt-Button) { flex-shrink: 0; color: inherit; box-shadow: inset 0 0 0 1px var(--amber-8); white-space: nowrap; }
+.dashboard .aiNotice > :global(.rt-Button:hover) { background: var(--amber-4); }
+.aiNoticeExhausted { background: var(--red-2); color: var(--red-12); border-color: var(--red-7); border-left-color: var(--red-9); }
+.aiNoticeExhausted .aiNoticeIcon { background: var(--red-4); color: var(--red-11); }
+.dashboard .aiNoticeExhausted > :global(.rt-Button) { box-shadow: inset 0 0 0 1px var(--red-8); }
+.dashboard .aiNoticeExhausted > :global(.rt-Button:hover) { background: var(--red-4); }
+@media (max-width: 700px) { .aiNotice { flex-wrap: wrap; gap: 12px; padding: 16px; } .aiNoticeContent { flex-basis: calc(100% - 52px); } .dashboard .aiNotice > :global(.rt-Button) { margin-left: 52px; white-space: normal; } }
