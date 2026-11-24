@@ -1,3 +1,5 @@
+import { useCustomerEmailAlerts, threadUrl } from "../components/useCustomerEmailAlerts";
+import s from "./EmailAlerts.module.css";
 import { usePendingSupport } from "../../../shared/hooks/usePendingSupport";
 import { adminPlans } from "../../billing/api/billingApi";
 import { usePlanNames } from "../../../shared/hooks/usePlanNames";
@@ -15,6 +17,8 @@ export default function AdminLayout() {
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
   const [notificationError, setNotificationError] = useState(false);
   const pendingSupport = usePendingSupport();
+  const emailAlerts = useCustomerEmailAlerts();
+  const unreadEmails = emailAlerts.data?.unreadCount ?? 0;
   useEffect(() => {
     let active = true;
     const load = () => void paymentNotifications().then(items => { if (active) { setNotifications(items); setNotificationError(false); } }).catch(() => { if (active) setNotificationError(true); });
@@ -34,6 +38,7 @@ export default function AdminLayout() {
     ] },
     { label: "Hỗ trợ", items: [
       { to: "/manager/support", label: "Yêu cầu hỗ trợ", icon: "message", badge: pendingSupport },
+      { to: "/manager/emails", label: "Nhật ký email", icon: "message", badge: unreadEmails },
     ] },
     { label: "Nội dung", items: [
       { to: "/manager/curriculum", label: "Chương trình học", icon: "file" },
@@ -41,10 +46,13 @@ export default function AdminLayout() {
     ] },
   ];
 
-  const bell = <DropdownMenu.Root><DropdownMenu.Trigger><IconButton variant="ghost" color="gray" aria-label="Thông báo trường đăng ký gói"><LearningIcon name="bell" /></IconButton></DropdownMenu.Trigger><DropdownMenu.Content align="end" sideOffset={8}>
-    <DropdownMenu.Label>Đăng ký & thanh toán của trường</DropdownMenu.Label><DropdownMenu.Separator />
+  const bell = <DropdownMenu.Root><DropdownMenu.Trigger><IconButton variant="ghost" color="gray" className={s.bell} aria-label={"Thông báo"+(unreadEmails?" · "+unreadEmails+" email chưa đọc":"")}><LearningIcon name="bell" />{unreadEmails>0&&<span className={s.count}>{unreadEmails>99?"99+":unreadEmails}</span>}</IconButton></DropdownMenu.Trigger><DropdownMenu.Content align="end" sideOffset={8}>
+    <DropdownMenu.Label>Email phản hồi chưa đọc · {unreadEmails}</DropdownMenu.Label>
+    {emailAlerts.error?<DropdownMenu.Item onSelect={()=>void emailAlerts.refresh()}>Không tải được thông báo email. Thử lại</DropdownMenu.Item>:!emailAlerts.data?<DropdownMenu.Label>Đang tải thông báo…</DropdownMenu.Label>:!unreadEmails?<DropdownMenu.Label>Không có phản hồi chưa đọc</DropdownMenu.Label>:emailAlerts.data.items.map(item=><DropdownMenu.Item className={s.notification} key={item.id} onSelect={()=>navigate(threadUrl(item))}><strong>{item.schoolName} vừa phản hồi</strong><span>{item.subject}</span></DropdownMenu.Item>)}
+    <DropdownMenu.Item onSelect={()=>navigate("/manager/emails")}>Mở hộp thư khách hàng →</DropdownMenu.Item>
+    <DropdownMenu.Separator/><DropdownMenu.Label>Đăng ký & thanh toán của trường</DropdownMenu.Label><DropdownMenu.Separator />
     {notificationError ? <p>Không thể tải thông báo.</p> : notifications.length === 0 ? <p>Chưa có đăng ký đã thanh toán.</p> : notifications.map(item => <DropdownMenu.Item key={item.id} onSelect={() => navigate("/manager/schools")}><strong>{item.schoolName}</strong><span>{planName(item.planCode)} · {item.amountVnd.toLocaleString("vi-VN")} ₫{item.status === "REQUIRES_REVIEW" ? " · Cần đối soát" : ""}</span><small>{new Date(item.paidAt).toLocaleString("vi-VN")}</small></DropdownMenu.Item>)}
   </DropdownMenu.Content></DropdownMenu.Root>;
 
-  return <AppSidebarLayout id="manager" subtitle="Vận hành" home="/manager" groups={groups} actions={bell} contentClassName="admin-shell" />;
+  return <>{emailAlerts.notice&&<div className={s.toast} role="status"><div><strong>Trường vừa phản hồi email</strong><span>{emailAlerts.notice.schoolName}</span></div><button onClick={()=>{navigate(threadUrl(emailAlerts.notice!));emailAlerts.dismiss();}}>Xem thư</button><button aria-label="Đóng thông báo email" onClick={emailAlerts.dismiss}>×</button></div>}<AppSidebarLayout id="manager" subtitle="Vận hành" home="/manager" groups={groups} actions={bell} contentClassName="admin-shell" /></>;
 }

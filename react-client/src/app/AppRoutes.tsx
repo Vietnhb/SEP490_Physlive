@@ -52,6 +52,7 @@ const teacherAreaModule = () => import("../features/assignments/pages/TeacherAre
 const TeacherArea = lazy(teacherAreaModule);
 const TeacherThemed = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherThemed })));
 const TeacherComplaints = lazy(() => teacherAreaModule().then(module => ({ default: module.TeacherComplaintsPage })));
+const CustomerEmailInbox = lazy(() => import("../features/management/pages/CustomerEmailInbox"));
 const CustomerUsageReport = lazy(() => import("../features/management/pages/CustomerUsageReport"));
 const TeacherDashboard = lazy(() => import("../features/assignments/pages/TeacherDashboard"));
 const TeacherClassReport = lazy(() => import("../features/assignments/pages/TeacherClassReport"));
@@ -177,6 +178,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route path="users" element={<UserAccounts />} />
             <Route path="support" element={<SupportInbox />} />
             <Route path="customer-usage" element={<CustomerUsageReport />} />
+            <Route path="emails" element={<CustomerEmailInbox />} />
             <Route path="feedback" element={<Navigate to="/manager/support?kind=FEEDBACK" replace />} />
             <Route path="messages" element={<Navigate to="/manager/support?kind=MESSAGE" replace />} />
             <Route path="appeals" element={<Navigate to="/manager/support?kind=ACCOUNT" replace />} />
