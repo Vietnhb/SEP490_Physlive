@@ -1,7 +1,7 @@
 import { invalidateServerData, queryClient } from "../../shared/api/queryClient";
 import { realtimeClientId as clientId } from "../../shared/api/client";
 import { useEffect, useRef, useState } from "react";
-import { API_URL } from "../../config/api";
+import { API_HEADERS, API_URL } from "../../config/api";
 import { getToken } from "../../shared/lib/token";
 
 type ChangeEvent = { revision: number; path: string; clientId: string | null };
@@ -29,7 +29,7 @@ export function useRealtimeRevision(enabled: boolean) {
           const token = getToken();
           if (!token) return;
           const response = await fetch(`${API_URL}/realtime/events`, {
-            headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` },
+            headers: { ...API_HEADERS, Accept: "text/event-stream", Authorization: `Bearer ${token}` },
             cache: "no-store",
             signal: controller.signal,
           });
