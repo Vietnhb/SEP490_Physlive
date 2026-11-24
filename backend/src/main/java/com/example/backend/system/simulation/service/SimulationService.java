@@ -2,12 +2,15 @@ package com.example.backend.system.simulation.service;
 
 import com.example.backend.exception.ApiException;
 import com.example.backend.system.account.model.entity.User;
+import com.example.backend.system.account.model.enums.RoleName;
 import com.example.backend.system.account.service.AccountAccessService;
 import com.example.backend.system.account.service.CurrentUserService;
 import com.example.backend.system.library.model.entity.LibraryItem;
 import com.example.backend.system.library.model.enums.LibraryModerationStatus;
 import com.example.backend.system.library.model.enums.Visibility;
 import com.example.backend.system.library.repository.LibraryItemRepository;
+import com.example.backend.system.support.model.enums.SupportKind;
+import com.example.backend.system.support.repository.SupportItemRepository;
 import com.example.backend.system.simulation.dto.ResolvedEnd;
 import com.example.backend.system.simulation.dto.SimulationResponse;
 import com.example.backend.system.simulation.dto.SimulationSummaryResponse;
@@ -36,15 +39,24 @@ public class SimulationService {
     private final CurrentUserService currentUser;
     private final ObjectMapper json;
     private final AccountAccessService access;
+    private final SupportItemRepository supportItems;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public SimulationService(SimulationRepository simulations, SimulationRunRepository runs,
-            LibraryItemRepository library, CurrentUserService currentUser, ObjectMapper json, AccountAccessService access) {
+            LibraryItemRepository library, CurrentUserService currentUser, ObjectMapper json,
+            AccountAccessService access, SupportItemRepository supportItems) {
         this.simulations = simulations;
         this.runs = runs;
         this.library = library;
         this.currentUser = currentUser;
         this.json = json;
         this.access = access;
+        this.supportItems = supportItems;
+    }
+
+    public SimulationService(SimulationRepository simulations, SimulationRunRepository runs,
+            LibraryItemRepository library, CurrentUserService currentUser, ObjectMapper json, AccountAccessService access) {
+        this(simulations, runs, library, currentUser, json, access, null);
     }
 
     @Transactional(readOnly = true)
@@ -112,6 +124,10 @@ public class SimulationService {
         }
         if (reviewItem != null)
             return reviewItem.getSimulation();
+        if (access.canHandleComplaints(user)
+                && supportItems != null && supportItems.existsByKindAndSimulationId(SupportKind.COMPLAINT, id)) {
+            return simulations.findById(id).orElseThrow(() -> ApiException.notFound("Không tìm thấy mô phỏng đính kèm khiếu nại"));
+        }
         LibraryItem item = library.findVisiblePublishedSimulation(id,
                 user == null ? Set.of(Visibility.PUBLIC) : Set.of(Visibility.SHARED, Visibility.PUBLIC), Visibility.PUBLIC,
                 Set.of(LibraryModerationStatus.APPROVED, LibraryModerationStatus.FEATURED), user == null ? null : user.getInstitutionId())

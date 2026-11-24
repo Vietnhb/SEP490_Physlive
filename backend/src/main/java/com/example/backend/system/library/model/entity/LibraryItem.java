@@ -72,6 +72,10 @@ public class LibraryItem extends AuditedEntity {
     @JoinColumn(name = "moderated_by")
     private User moderatedBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_to_id")
+    private User assignedTo;
+
     @Version
     @Column(name = "record_version", nullable = false)
     private long recordVersion;

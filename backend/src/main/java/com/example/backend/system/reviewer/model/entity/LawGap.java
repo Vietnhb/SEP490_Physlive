@@ -1,9 +1,14 @@
 package com.example.backend.system.reviewer.model.entity;
 
 import com.example.backend.base.crud.model.entity.AuditedEntity;
+import com.example.backend.system.account.model.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -56,4 +61,14 @@ public class LawGap extends AuditedEntity {
 
     @Column(columnDefinition = "text")
     private String note;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "decided_by_id")
+    private User decidedBy;
+
+    @Column(name = "decided_at")
+    private Instant decidedAt;
+
+    @Column(name = "source_complaint_id")
+    private java.util.UUID sourceComplaintId;
 }

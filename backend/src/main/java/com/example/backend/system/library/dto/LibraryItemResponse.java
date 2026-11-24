@@ -22,15 +22,29 @@ public record LibraryItemResponse(
         Integer sharedById,
         String sharedByName,
         UUID schoolId,
-        String schoolName) {
+        String schoolName,
+        Integer assignedToId,
+        String assignedToName) {
+    public LibraryItemResponse(
+            UUID id, UUID simulationId, UUID folderId, UUID lessonId, UUID specificationId,
+            String title, String topic, String validationStatus, Visibility visibility,
+            Instant createdAt, LibraryModerationStatus moderationStatus, String moderationComment,
+            Integer sharedById, String sharedByName, UUID schoolId, String schoolName) {
+        this(id, simulationId, folderId, lessonId, specificationId, title, topic, validationStatus,
+                visibility, createdAt, moderationStatus, moderationComment, sharedById, sharedByName,
+                schoolId, schoolName, null, null);
+    }
+
     public static LibraryItemResponse from(LibraryItem item) {
         var owner = item.getOwner();
         var school = owner == null ? null : owner.getSchool();
+        var assignee = item.getAssignedTo();
         return new LibraryItemResponse(item.getId(), item.getSimulation() == null ? null : item.getSimulation().getId(),
                 item.getFolder() == null ? null : item.getFolder().getId(), item.getLesson() == null ? null : item.getLesson().getId(),
                 item.getSpecification().getId(), item.getTitle(), item.getSpecification().getTopic(), item.getSpecification().getValidationStatus(),
                 item.getVisibility(), item.getCreatedAt(), item.getModerationStatus(), item.getModerationComment(),
                 owner == null ? null : owner.getId(), owner == null ? null : owner.getFullName(),
-                school == null ? null : school.getId(), school == null ? null : school.getName());
+                school == null ? null : school.getId(), school == null ? null : school.getName(),
+                assignee == null ? null : assignee.getId(), assignee == null ? null : assignee.getFullName());
     }
 }

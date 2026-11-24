@@ -46,40 +46,87 @@ class SupportPermissionsTest {
         assertFalse(item.isReviewerReferred());
     }
     @Test void reviewerCanReadComplaintsButCannotUseManagerSupportDesk() {
-        actor("REVIEWER"); when(repository.findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT)).thenReturn(List.of());
+        User reviewer = actor("REVIEWER");
+        when(access.canHandleComplaints(reviewer)).thenReturn(true);
+        when(repository.findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT)).thenReturn(List.of());
         assertTrue(service.complaintsForReview().isEmpty());
         verify(repository).findTop200ByKindOrderByCreatedAtDesc(SupportKind.COMPLAINT);
         assertThrows(ApiException.class, () -> service.adminList(SupportKind.MESSAGE));
     }
-    @Test void reviewerRespondsAndCannotResolveOwnComplaint() {
+    @Test void reviewerWithoutPermissionsCannotAccessComplaints() {
+        User bareReviewer = actor("REVIEWER");
+        when(access.canHandleComplaints(bareReviewer)).thenReturn(false);
+        assertThrows(ApiException.class, service::complaintsForReview);
+        assertThrows(ApiException.class, service::complaintCounts);
+    }
+    @Test void reviewerRespondsAndCannotResolveOwnOrClaimedOrStaleComplaint() {
         User reviewer = actor("REVIEWER");
+        when(access.canHandleComplaints(reviewer)).thenReturn(true);
         User sender = new User(); sender.setId(2);
+        User otherReviewer = new User(); otherReviewer.setId(3); otherReviewer.setFullName("Reviewer B");
         UUID id = UUID.randomUUID(); SupportItem item = new SupportItem(); item.setId(id);
         item.setKind(SupportKind.COMPLAINT); item.setSender(sender); item.setStatus(SupportStatus.OPEN);
         when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(item));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
+        // Claimed by another reviewer blocks resolution until takeover.
+        item.setAssignedTo(otherReviewer);
+        assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Đã xong")));
+        item.setAssignedTo(reviewer);
+        // Stale expectedStatus blocks resolution.
+        assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Đã xong", SupportStatus.READ, null)));
         assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, " ")));
-        assertEquals(SupportStatus.RESOLVED, service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Đã kiểm tra và cập nhật")).status());
+        assertEquals(SupportStatus.RESOLVED, service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Đã kiểm tra và cập nhật", SupportStatus.OPEN, null)).status());
         assertEquals(reviewer, item.getRespondedBy());
+        assertNull(item.getAssignedTo());
         assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.READ, "Mở lại")));
         item.setStatus(SupportStatus.READ);
         item.setSender(reviewer);
         assertThrows(ApiException.class, () -> service.resolveComplaint(id, new UpdateSupportRequest(SupportStatus.RESOLVED, "Tự xử lý")));
     }
-    @Test void managerCanReferOnlyUnresolvedSimulationComplaintsAndReviewerCannotRefer() {
-        actor("MANAGER");
-        UUID id = UUID.randomUUID(); SupportItem item = new SupportItem(); item.setKind(SupportKind.MESSAGE); item.setStatus(SupportStatus.OPEN);
-        User sender = new User(); sender.setId(2); item.setSender(sender);
+    @Test void reviewerCanEscalateComplaintToLawGapOnceAndRespectsClaimLock() {
+        var lawGapService = mock(com.example.backend.system.reviewer.service.LawGapService.class);
+        SupportService withEscalation = new SupportService(repository, current, access, null, null, lawGapService);
+        User reviewer = actor("REVIEWER");
+        when(access.canHandleComplaints(reviewer)).thenReturn(true);
+        User sender = new User(); sender.setId(2);
+        User otherReviewer = new User(); otherReviewer.setId(3); otherReviewer.setFullName("Reviewer B");
+        UUID id = UUID.randomUUID();
+        SupportItem item = new SupportItem();
+        item.setId(id);
+        item.setKind(SupportKind.COMPLAINT);
+        item.setSender(sender);
+        item.setSubject("Sai tầm xa");
+        item.setContent("Tính sai tầm xa ném ngang");
+        item.setStatus(SupportStatus.OPEN);
         when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(item));
         when(repository.save(any())).thenAnswer(call -> call.getArgument(0));
-        assertThrows(ApiException.class, () -> service.referReviewer(id));
-        item.setKind(SupportKind.COMPLAINT); item.setStatus(SupportStatus.RESOLVED);
-        assertThrows(ApiException.class, () -> service.referReviewer(id));
-        item.setStatus(SupportStatus.OPEN);
-        assertThrows(ApiException.class, () -> service.referReviewer(id));
-        assertEquals(SupportStatus.OPEN, item.getStatus());
-        actor("REVIEWER");
-        assertThrows(ApiException.class, () -> service.referReviewer(id));
+
+        // Reviewer who already has CONTENT_EDIT should edit directly instead of escalating
+        when(access.canEditContext(reviewer)).thenReturn(true);
+        assertThrows(ApiException.class, () -> withEscalation.escalateComplaintToLawGap(id, new EscalateLawGapRequest("thpt_kinematics", "KINEMATICS", "Tự chuyển")));
+        when(access.canEditContext(reviewer)).thenReturn(false);
+
+        // Claimed by another reviewer blocks escalation
+        item.setAssignedTo(otherReviewer);
+        assertThrows(ApiException.class, () -> withEscalation.escalateComplaintToLawGap(id, new EscalateLawGapRequest("thpt_kinematics", "KINEMATICS", "Thiếu điều kiện")));
+
+        // Claimed by self succeeds
+        item.setAssignedTo(reviewer);
+        var createdGap = new com.example.backend.system.reviewer.model.entity.LawGap();
+        UUID gapId = UUID.randomUUID();
+        createdGap.setId(gapId);
+        createdGap.setStatus("OPEN");
+        when(lawGapService.createFromComplaint(eq(id), eq("Sai tầm xa"), any(), eq("thpt_kinematics"), eq("KINEMATICS"), eq("Thiếu điều kiện")))
+                .thenReturn(createdGap);
+
+        SupportView view = withEscalation.escalateComplaintToLawGap(id, new EscalateLawGapRequest("thpt_kinematics", "KINEMATICS", "Thiếu điều kiện"));
+        assertEquals(gapId, view.lawGapId());
+        assertEquals("OPEN", view.lawGapStatus());
+        assertEquals(SupportStatus.READ, view.status());
+        assertTrue(view.reviewerReferred());
+
+        // Duplicate escalation is rejected
+        assertThrows(ApiException.class, () -> withEscalation.escalateComplaintToLawGap(id, new EscalateLawGapRequest("thpt_kinematics", "KINEMATICS", "Lần 2")));
     }
     @Test void managerInboxIncludesAllSupportTypes() {
         actor("MANAGER");

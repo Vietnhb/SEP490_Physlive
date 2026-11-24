@@ -9,7 +9,12 @@ import java.util.UUID;
 /** Moderation contracts shared by platform and school controllers. */
 public final class LibraryModeration {
     private LibraryModeration() { }
-    public record Request(LibraryModerationStatus status, @Size(max = 4000) String comment) { }
+    public record Request(LibraryModerationStatus status, @Size(max = 4000) String comment,
+                          LibraryModerationStatus expectedStatus) {
+        public Request(LibraryModerationStatus status, String comment) {
+            this(status, comment, null);
+        }
+    }
     public record Audit(UUID id, UUID itemId, String reviewerEmail, LibraryModerationStatus fromStatus,
                         LibraryModerationStatus toStatus, String comment, Instant decidedAt) { }
     public record Page(List<LibraryItemResponse> items, int page, int size, long totalElements, int totalPages) { }

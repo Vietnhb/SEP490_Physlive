@@ -17,6 +17,8 @@ const REASONS = [
 type Props = {
   /** Saved simulation the complaint is about; undefined while the simulation is not saved yet. */
   simulationId?: string;
+  /** Snapshot of an unsaved generated simulation so reviewers can still replay it. */
+  simulationSnapshot?: unknown;
   /** Problem statement, attached so the reviewer sees what was asked. */
   description?: string;
   /** Current parameter values, attached for the same reason. */
@@ -27,7 +29,7 @@ type Props = {
 };
 
 /** Teacher side: report a wrong simulation to the reviewers and follow the answers. */
-export default function SimulationComplaintDialog({ simulationId, description, parameters, historyOnly = false, onClose }: Readonly<Props>) {
+export default function SimulationComplaintDialog({ simulationId, simulationSnapshot, description, parameters, historyOnly = false, onClose }: Readonly<Props>) {
   const [reason, setReason] = useState(REASONS[0]);
   const [detail, setDetail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,7 +59,7 @@ export default function SimulationComplaintDialog({ simulationId, description, p
     const values = Object.entries(parameters ?? {}).map(([name, value]) => `${name} = ${value}`).join("; ");
     const content = [detail.trim(), "", "— Đề bài —", description?.trim(), values && `— Thông số đang dùng —\n${values}`].filter(Boolean).join("\n");
     try {
-      const created = await submitSimulationComplaint(reason, content.slice(0, 10000), simulationId);
+      const created = await submitSimulationComplaint(reason, content.slice(0, 10000), simulationId, !simulationId ? simulationSnapshot : undefined);
       setHistory(current => [created, ...(current ?? [])]);
       setDetail("");
       setNotice("Đã gửi báo lỗi đến người kiểm duyệt. Kết quả xử lý sẽ hiển thị tại đây.");

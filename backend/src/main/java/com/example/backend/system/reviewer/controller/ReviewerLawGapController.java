@@ -20,6 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReviewerLawGapController {
     private final LawGapService service;
 
+    @GetMapping("/counts")
+    public java.util.Map<String, Long> counts() {
+        return service.counts();
+    }
+
     @GetMapping
     public List<Item> list(@RequestParam(defaultValue = "OPEN") String status) {
         return service.list(status).stream().map(Item::from).toList();
