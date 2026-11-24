@@ -33,7 +33,7 @@ class CustomerUsageReportServiceTest {
   assertThrows(ApiException.class,()->service.prepare(2026,null,"","","DROP TABLE","ALL",null));
   assertThrows(ApiException.class,()->service.prepare(2026,null,"","","aiCalls","INVALID",null));verifyNoInteractions(jdbc);
  }
- CustomerUsageReportService.Row row(int id,long calls,String attention,String name){return new CustomerUsageReportService.Row(new UUID(0,id),name,"S"+id,"STARTER",null,2,calls,1,2,100,1000,Instant.parse("2026-11-01T00:00:00Z"),attention);}
+ CustomerUsageReportService.Row row(int id,long calls,String attention,String name){return new CustomerUsageReportService.Row(new UUID(0,id),name,"S"+id,"STARTER",null,2,calls,1,2,100,1000,Instant.parse("2026-11-01T00:00:00Z"),attention,null,null,null);}
  @Test void totalsRankingAndCareUseFullFilteredSetRatherThanVisiblePage(){
   var rows=List.of(row(1,20,"NONE","A"),row(2,50,"IDLE","B"),row(3,30,"IDLE","C"));
   when(jdbc.query(anyString(),anyMap(),eq(CustomerUsageReportService.ROW))).thenReturn(rows);

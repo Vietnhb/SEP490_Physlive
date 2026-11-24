@@ -60,6 +60,8 @@ public class SecurityConfig {
                 // Public replays may report renderer failures; the service requires a valid signed plan.
                 .requestMatchers(POST, "/api/simulation/render-diagnostics").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api/auth/**", "/ws/**", "/actuator/health").permitAll()
+                .requestMatchers(POST, "/api/email/resend/webhook").permitAll()
+                .requestMatchers("/api/reports/customer-usage/**").hasRole(MANAGER)
                 .requestMatchers(GET, "/api/reports/customer-usage", "/api/reports/customer-usage/csv").hasRole(MANAGER)
                 .requestMatchers("/api/user/me", "/api/user/me/**").hasAnyRole(ADMIN, MANAGER, REVIEWER, SCHOOL, STAFF, STUDENT)
                 .requestMatchers(GET, "/api/schools/*/users/*/profile").hasRole(SCHOOL)

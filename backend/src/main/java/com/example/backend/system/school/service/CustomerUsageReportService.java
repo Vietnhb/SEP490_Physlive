@@ -22,7 +22,7 @@ public class CustomerUsageReportService {
     static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     public record Row(UUID id, String name, String code, String plan, LocalDate licenseEnd,
         long activeUsers, long aiCalls, long assignments, long submissions, long tokens, long revenue,
-        Instant lastActivity, String attention) {}
+        Instant lastActivity, String attention, Instant lastContactAt, Instant nextFollowUpAt, String lastContactOutcome) {}
     public record Point(String label, long activeUsers, long aiCalls, long assignments, long submissions, long revenue) {}
     public record Group(String key, long count) {}
     public record Summary(long schools, long activeSchools, long activeUsers, long aiCalls, long assignments,
@@ -74,13 +74,36 @@ public class CustomerUsageReportService {
             WHEN s.monthly_token_quota IS NOT NULL AND s.monthly_token_quota>0
               AND coalesce(t.month_tokens,0)>=s.monthly_token_quota*0.8 THEN 'QUOTA'
             WHEN t.last_activity<:idle THEN 'IDLE'
-            WHEN t.last_activity IS NULL THEN 'UNKNOWN' ELSE 'NONE' END AS attention
+            WHEN t.last_activity IS NULL THEN 'UNKNOWN' ELSE 'NONE' END AS attention,contact.contacted_at AS last_contact_at,contact.next_follow_up_at,contact.outcome AS last_contact_outcome
         FROM school_scope s LEFT JOIN totals t ON t.school_id=s.id
+        LEFT JOIN LATERAL (
+          SELECT history.contacted_at,history.next_follow_up_at,history.outcome
+          FROM (
+            SELECT cc.contacted_at,cc.next_follow_up_at,cc.outcome,cc.created_at,cc.id
+            FROM school_customer_contacts cc WHERE cc.school_id=s.id
+            UNION ALL
+            SELECT greatest(em.sent_at,reply.received_at) AS contacted_at,NULL::timestamptz AS next_follow_up_at,
+              CASE WHEN reply.received_at IS NOT NULL THEN 'EMAIL_REPLIED'
+                WHEN em.status='DELIVERED' THEN 'EMAIL_DELIVERED'
+                WHEN em.status='DELAYED' THEN 'EMAIL_DELAYED'
+                WHEN em.status='BOUNCED' THEN 'EMAIL_BOUNCED'
+                WHEN em.status='COMPLAINED' THEN 'EMAIL_COMPLAINED'
+                WHEN em.status='FAILED' THEN 'EMAIL_FAILED'
+                ELSE 'EMAIL_SENT' END AS outcome,em.created_at,em.id
+            FROM school_customer_emails em
+            LEFT JOIN LATERAL (
+              SELECT r.received_at FROM school_customer_email_replies r
+              WHERE r.email_id=em.id ORDER BY r.received_at DESC,r.id DESC LIMIT 1
+            ) reply ON true
+            WHERE em.school_id=s.id AND em.sent_at IS NOT NULL
+          ) history
+          ORDER BY history.contacted_at DESC,history.created_at DESC,history.id DESC LIMIT 1
+        ) contact ON true
         """;
     static final RowMapper<Row> ROW = (rs,i) -> new Row(rs.getObject("id",UUID.class),rs.getString("name"),
         rs.getString("code"),rs.getString("plan_code"),rs.getObject("license_end",LocalDate.class),
         rs.getLong("active_users"),rs.getLong("ai_calls"),rs.getLong("assignments"),rs.getLong("submissions"),
-        rs.getLong("tokens"),rs.getLong("revenue"),rs.getTimestamp("last_activity")==null?null:rs.getTimestamp("last_activity").toInstant(),rs.getString("attention"));
+        rs.getLong("tokens"),rs.getLong("revenue"),rs.getTimestamp("last_activity")==null?null:rs.getTimestamp("last_activity").toInstant(),rs.getString("attention"),rs.getTimestamp("last_contact_at")==null?null:rs.getTimestamp("last_contact_at").toInstant(),rs.getTimestamp("next_follow_up_at")==null?null:rs.getTimestamp("next_follow_up_at").toInstant(),rs.getString("last_contact_outcome"));
 
     Context prepare(int year,Integer month,String query,String plan,String sort,String attention,UUID schoolId) {
         var user=current.requireCurrentUser();

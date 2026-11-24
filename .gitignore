@@ -69,3 +69,7 @@ backend/logs/
 # Physics catalogue sources live in the database; the files stay local
 backend/src/main/resources/schemas/
 backend/src/main/resources/curriculum/
+
+# Supabase CLI local metadata
+supabase/.temp/
+supabase/.branches/

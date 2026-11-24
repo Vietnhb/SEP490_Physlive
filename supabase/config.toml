@@ -1,0 +1,3 @@
+# Server-to-server only: the function verifies its dedicated shared secret itself.
+[functions.customer-mail]
+verify_jwt = false
