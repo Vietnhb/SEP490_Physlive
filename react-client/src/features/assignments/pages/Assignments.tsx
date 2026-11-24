@@ -17,6 +17,8 @@ import "../styles/assignment-flow.css";
 
 type Props = {
   workspaceLayout?: boolean;
+  /** Inside the teacher area: picker and form only; the given assignments have their own page there. */
+  embedded?: boolean;
 };
 
 
@@ -24,6 +26,7 @@ type Props = {
 
 export default function Assignments({
   workspaceLayout = false,
+  embedded = false,
 }: Readonly<Props>) {
   const user = useSessionStore((state) => state.user);
   const [confirm, confirmDialog] = useConfirm();
@@ -37,7 +40,7 @@ export default function Assignments({
 
   // STAFF ASSIGNMENT STUDIO & SUBMISSIONS MANAGEMENT
   // Only validated simulations can be assigned; the list comes from the shared library store (one request).
-  const saved = useMemo(() => libraryItems.filter(item => item.validationStatus === "PASSED"), [libraryItems]);
+  const saved = useMemo(() => libraryItems.filter(item => item.validationStatus === "PASSED" || item.validationStatus === "FLAGGED"), [libraryItems]);
   const [view, setView] = useState<"create" | "history">(() => workspaceLayout ? "create" : "history");
   const [formVersion, setFormVersion] = useState(0);
   const navigate = useNavigate();
@@ -247,7 +250,7 @@ export default function Assignments({
   };
 
   // Grading lives on the "Bài nộp" page; open it on this assignment.
-  const handleOpenSubmissions = (assignment: Assignment) => navigate(assignment.classId ? `/lab/classes/${assignment.classId}?tab=assignments&assignment=${encodeURIComponent(assignment.id)}` : `/lab?assignment=${encodeURIComponent(assignment.id)}`);
+  const handleOpenSubmissions = (assignment: Assignment) => navigate(assignment.classId ? `/workspace/classes/${assignment.classId}?tab=assignments&assignment=${encodeURIComponent(assignment.id)}` : `/workspace/assignments?assignment=${encodeURIComponent(assignment.id)}`);
 
   const handleToggleOpen = async (assignment: Assignment) => {
     const closing = assignment.status === "ACTIVE";
@@ -279,7 +282,7 @@ export default function Assignments({
   return (
     <div
       className={
-        workspaceLayout ? "learn-workspace assignment-workspace-main" : "main"
+        workspaceLayout ? "learn-workspace assignment-workspace-main" + (embedded ? " assignment-workspace-main--embedded" : "") : "main"
       }
     >
       {workspaceLayout && <TeacherLibraryPane
@@ -301,7 +304,7 @@ export default function Assignments({
         }
       >
         <div className={workspaceLayout ? "assignment-workspace-content" : "assignment-workspace-content-standard"}>
-        {queryClassId && classes.some(item => item.id === queryClassId) && <p><Link to={"/lab/classes/" + encodeURIComponent(queryClassId)}>← Quay lại lớp {classes.find(item => item.id === queryClassId)?.name}</Link></p>}
+        {queryClassId && classes.some(item => item.id === queryClassId) && <p><Link to={"/workspace/classes/" + encodeURIComponent(queryClassId)}>← Quay lại lớp {classes.find(item => item.id === queryClassId)?.name}</Link></p>}
         {notice && (
           <div
             className="status-pill pass assignment-banner" role="status"
@@ -392,7 +395,7 @@ export default function Assignments({
 
         </div>
       </div>
-      {workspaceLayout && <aside className="assignment-history-rail" aria-label="Danh sách bài đã giao">
+      {workspaceLayout && !embedded && <aside className="assignment-history-rail" aria-label="Danh sách bài đã giao">
         <TeacherAssignmentHistory
           key={queryClassId}
           initialClassId={queryClassId}

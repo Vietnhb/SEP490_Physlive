@@ -8,6 +8,7 @@ import { useSessionStore } from "../shared/auth/sessionStore";
 import { useEffectiveTheme } from "../shared/theme/themeStore";
 import academic from "../shared/layout/AcademicChrome.module.css";
 import { inAndroidApp } from "../shared/lib/appShell";
+import { canTeach, isAccountSuspended } from "../shared/auth/permissions";
 
 export default function AppShell({ children }: PropsWithChildren) {
   const { pathname } = useLocation();
@@ -21,16 +22,16 @@ export default function AppShell({ children }: PropsWithChildren) {
     && ["/admin", "/manager", "/school", "/reviewer", "/student", "/assignments", "/community", "/library", "/curriculum", "/profile"].some(
       prefix => pathname === prefix || pathname.startsWith(prefix + "/"),
     );
-  const fullPage =
+  const teacherFramedPage = canTeach(user) && !isAccountSuspended(user)
+    && ["/profile", "/support", "/community"].includes(pathname.replace(/\/+$/, ""));
+  const fullPage = teacherFramedPage ||
     [
       "/teacher",
       "/player",
-      "/workspace",
       "/assignments/workspace",
       "/models",
-      "/lab",
     ].includes(pathname) ||
-    ["/signup", "/admin", "/manager", "/school", "/reviewer", "/student", "/lab"].some(
+    ["/signup", "/admin", "/manager", "/school", "/reviewer", "/student", "/workspace", "/lab"].some(
       (prefix) => pathname === prefix || pathname.startsWith(prefix + "/"),
     );
   const shellClassName = `${fullPage ? "full-shell" : "shell"} ${academicPage ? academic.chrome : ""}`;

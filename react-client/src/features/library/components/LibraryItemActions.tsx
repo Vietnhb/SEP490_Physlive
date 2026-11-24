@@ -107,7 +107,7 @@ export default function LibraryItemActions({ item, folders }: Readonly<{ item: L
           <div><dt>Chủ đề</dt><dd>{topicName(item.topic) || "Chưa xác định"}</dd></div>
           <div><dt>Thư mục</dt><dd>{folders.find(folder => folder.id === item.folderId)?.name ?? "Chưa phân loại"}</dd></div>
           <div><dt>Ngày lưu</dt><dd>{new Date(item.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</dd></div>
-          <div><dt>Kiểm tra kết quả</dt><dd>{item.validationStatus === "PASSED" ? "Đã đạt, giao bài được" : "Chưa đạt, chưa giao bài được"}</dd></div>
+          <div><dt>Kiểm tra kết quả</dt><dd>{item.validationStatus === "PASSED" ? "Đã đạt" : item.validationStatus === "FLAGGED" ? "Cần kiểm tra lại: có kết quả chưa khớp định luật (vẫn dùng và giao bài được)" : "Chưa có kết quả kiểm tra"}</dd></div>
           <div><dt>Chia sẻ</dt><dd>{item.visibility === "PERSONAL" ? "Chỉ mình tôi" : `${item.visibility === "PUBLIC" ? "Kho cộng đồng" : "Trong trường"} · ${shareStatus(item).toLocaleLowerCase("vi")}`}</dd></div>
           {item.visibility !== "PERSONAL" && item.moderationComment && <div><dt>Ghi chú của người duyệt</dt><dd>{item.moderationComment}</dd></div>}
         </dl>

@@ -110,3 +110,17 @@
 .studio-late-policy { padding: 16px; border: 1px solid var(--gray-6); background: var(--gray-2); border-radius: 10px; margin: 16px 0 20px; }
 .studio-late-policy > label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; }
 .studio-late-policy > p { margin: 8px 0 0 26px; line-height: 1.6; }
+
+/* "Giao bài mới" inside the teacher area: the section rail is already on the left, so the studio is picker + form
+   and fills the content area instead of the whole window. */
+.assignment-theme--embedded { height: 100%; }
+.teacher-area__content:has(> .assignment-theme--embedded) { overflow: hidden; }
+.assignment-workspace-main.assignment-workspace-main--embedded {
+  grid-template-columns: 280px minmax(0, 1fr);
+  height: 100%;
+  padding: 0;
+}
+@media (max-width: 900px) {
+  .teacher-area__content:has(> .assignment-theme--embedded) { overflow: auto; }
+  .assignment-workspace-main.assignment-workspace-main--embedded { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 32vh) auto; height: auto; overflow: visible; }
+}

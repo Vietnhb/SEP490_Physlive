@@ -26,7 +26,8 @@ const timestamp = (value: string) => new Date(value).toLocaleString("vi-VN", { d
 const reference = (prefix: string, id: string) => `${prefix}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
 const PAGE_SIZE = 5;
 
-export default function MySupport() {
+/** `embedded`: inside an app frame that already links to the profile and home, so those links are left out here. */
+export default function MySupport({ embedded = false }: Readonly<{ embedded?: boolean }>) {
   const navigate = useNavigate();
   const user = useSessionStore(state => state.user);
   const logout = () => {
@@ -100,15 +101,15 @@ export default function MySupport() {
   };
   return <main className={s.page}>
     <aside className={s.sidebar} aria-label="Thông tin và danh mục yêu cầu">
-      <div className={s.identity}><span className={s.avatar}>{user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user?.fullName?.trim().charAt(0).toLocaleUpperCase("vi") || "U"}</span><strong>{user?.fullName}</strong><span>{getRoleLabel(user?.role ?? "")}</span><small>{user?.email}</small></div>
+      {!embedded && <div className={s.identity}><span className={s.avatar}>{user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : user?.fullName?.trim().charAt(0).toLocaleUpperCase("vi") || "U"}</span><strong>{user?.fullName}</strong><span>{getRoleLabel(user?.role ?? "")}</span><small>{user?.email}</small></div>}
       <div className={s.stats} aria-label="Thống kê yêu cầu"><div><strong className={s.completed}>{loading ? "—" : completed}</strong><span>Đã hoàn tất</span></div><div><strong className={s.pending}>{loading ? "—" : cases.length - completed}</strong><span>Chưa hoàn tất</span></div></div>
       <nav className={s.navigation}>
-        {!suspended && <Link to="/profile"><LearningIcon name="users" />Thông tin tài khoản<LearningIcon name="chevronRight" /></Link>}
+        {!suspended && !embedded && <Link to="/profile"><LearningIcon name="users" />Thông tin tài khoản<LearningIcon name="chevronRight" /></Link>}
         <button type="button" aria-current={category === "ALL" ? "page" : undefined} onClick={() => changeCategory("ALL")}><LearningIcon name="file" />Tất cả yêu cầu<span>{loading ? "—" : cases.length}</span></button>
         <button type="button" aria-current={category === "ACCOUNT" ? "page" : undefined} onClick={() => changeCategory("ACCOUNT")}><LearningIcon name="shield" />Khiếu nại tài khoản<span>{loading ? "—" : appeals.length}</span></button>
         <button type="button" aria-current={category === "SUPPORT" ? "page" : undefined} onClick={() => changeCategory("SUPPORT")}><LearningIcon name="message" />Hỗ trợ & góp ý<span>{loading ? "—" : items.length}</span></button>
-        {!suspended && <Link to={userHome(user)} className={s.backLink}><LearningIcon name="back" />Quay lại trang chính</Link>}
-        <button type="button" className={s.logout} onClick={logout}><ExitIcon />Đăng xuất</button>
+        {!suspended && !embedded && <Link to={userHome(user)} className={s.backLink}><LearningIcon name="back" />Quay lại trang chính</Link>}
+        {!embedded && <button type="button" className={s.logout} onClick={logout}><ExitIcon />Đăng xuất</button>}
       </nav>
     </aside>
     <div className={s.main}>

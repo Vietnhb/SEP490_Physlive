@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import Icon from "../../../shared/ui/LearningIcon";
 import type { AssignmentRecord } from "../model/teacherSubmissionTypes";
 import { formatShortDate } from "../model/teacherSubmissionUtils";
@@ -8,22 +8,30 @@ export function TeacherAssignmentList({
   selectedId,
   onSelect,
   loadedIds,
+  failedIds,
 }: Readonly<{
   records: AssignmentRecord[];
   selectedId: string;
   onSelect: (id: string) => void;
-  /** Assignments whose submissions have arrived; the rest still show a loading note. */
   loadedIds: ReadonlySet<string>;
+  failedIds: ReadonlySet<string>;
 }>) {
+  const [query, setQuery] = useState("");
+  const search = query.trim().toLocaleLowerCase("vi-VN");
+  const visible = records.filter(({ assignment }) =>
+    [assignment.title, assignment.className].some(value => value?.toLocaleLowerCase("vi-VN").includes(search)));
+
   return (
     <aside className="lab-assignment-list" aria-label="Danh sách bài đã giao">
       <div className="lab-list-heading">
-        <div>
-          <h2>Bài đã giao</h2>
-          <p>Chọn một bài để xem tiến độ.</p>
-        </div>
+        <h2>Danh sách bài tập</h2>
         <span className="lab-list-count">{records.length}</span>
       </div>
+
+      <label className="lab-search lab-assignment-search">
+        <Icon name="search" />
+        <input type="search" aria-label="Tìm bài tập" placeholder="Tìm bài hoặc lớp" value={query} onChange={event => setQuery(event.target.value)} />
+      </label>
 
       <label className="lab-mobile-selector">
         <span>Bài đang xem</span>
@@ -41,7 +49,7 @@ export function TeacherAssignmentList({
       </label>
 
       <nav className="lab-assignment-items" aria-label="Bài tập đã giao">
-        {records.map(({ assignment, submissions }) => (
+        {visible.map(({ assignment, submissions }) => (
           <button
             type="button"
             key={assignment.id}
@@ -49,23 +57,19 @@ export function TeacherAssignmentList({
             aria-pressed={selectedId === assignment.id}
             onClick={() => onSelect(assignment.id)}
           >
-            <span className="lab-assignment-item-title">
+            <span className="lab-assignment-item-title" title={assignment.title}>
               {assignment.title}
             </span>
             <span className="lab-assignment-item-meta">
-              {!loadedIds.has(assignment.id)
-                ? "Đang tải bài nộp…"
-                : `${submissions.filter(item => item.completedAt).length}/${assignment.studentIds.length} đã nộp`} · Hạn{" "}
-              {formatShortDate(assignment.dueAt)}
+              <span>{loadedIds.has(assignment.id)
+                ? `${submissions.filter(item => item.completedAt).length}/${assignment.studentIds.length} đã nộp`
+                : failedIds.has(assignment.id) ? "Lỗi tải bài nộp" : "Đang tải…"}</span>
+              <span>{assignment.dueAt ? formatShortDate(assignment.dueAt) : "Chưa đặt hạn"}</span>
             </span>
           </button>
         ))}
+        {visible.length === 0 && <p className="lab-assignment-empty" role="status">Không tìm thấy bài tập phù hợp.</p>}
       </nav>
-
-      <Link className="lab-create-link" to="/assignments/workspace">
-        <Icon name="plus" />
-        Tạo bài giao mới
-      </Link>
     </aside>
   );
 }

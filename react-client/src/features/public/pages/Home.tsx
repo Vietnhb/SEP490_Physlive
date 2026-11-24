@@ -112,7 +112,7 @@ export default function Home() {
                     : <Link className={s.primary} to="/signup">Đăng ký cho trường <span aria-hidden="true">→</span></Link>}
                 </span>
               </Magnetic>
-              <Link className={s.ghost} to="/workspace">Thử mô phỏng</Link>
+              <Link className={s.ghost} to="/workspace/simulation">Thử mô phỏng</Link>
             </motion.div>
           </div>
           <motion.div
@@ -126,7 +126,7 @@ export default function Home() {
             <div className="glow-frame" style={{ padding: 32 }}>
               <h2>Mô phỏng từ đề bài của bạn</h2>
               <p>Nhập tình huống, xem mô hình và khám phá kết quả tính toán.</p>
-              <Link className={s.primary} to="/workspace">Mở không gian mô phỏng</Link>
+              <Link className={s.primary} to="/workspace/simulation">Mở không gian mô phỏng</Link>
             </div>
           </motion.div>
           <Marquee items={topics} className={s.marquee} />

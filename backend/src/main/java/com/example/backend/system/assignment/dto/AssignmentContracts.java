@@ -73,6 +73,9 @@ public final class AssignmentContracts {
             String previousStatus, String newStatus, Integer previousGraderId, String previousGraderName,
             Instant previousGradedAt, String reason) { }
 
+    /** How far one assignment has got: who handed in, how many wait for the teacher, how many grades are confirmed. */
+    public record AssignmentProgress(UUID assignmentId, int recipients, int submitted, int awaitingGrade, int confirmed) { }
+
     public record AssignmentResponse(
             UUID id,
             UUID libraryItemId,

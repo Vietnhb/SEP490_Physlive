@@ -270,8 +270,10 @@
 .learn-journey > span {
   color: var(--subtle);
 }
-/* The active tab is drawn by the sliding pill (base.css), so the link itself keeps
-   the same padding and fully rounded shape as the other tabs. */
+.learn-journey-label { display: flex; align-items: center; gap: 6px; }
+.learn-journey-label .learn-icon { width: 15px; height: 15px; color: var(--learn-muted); }
+.learn-journey a.active .learn-icon, .learn-journey a:hover .learn-icon { color: var(--learn-blue); }
+/* The active pill shares the link's padding and rounded shape. */
 .learn-journey strong,
 .learn-journey a.active {
   font-weight: 600;
@@ -280,6 +282,7 @@
 .learn-back:hover {
   color: var(--learn-blue);
 }
+@media (max-width: 900px) { .learn-journey { display: none; } }
 .learn-back {
   display: inline-flex;
   align-items: center;
@@ -628,7 +631,8 @@
   display: -webkit-box;
   width: 100%;
   min-width: 0;
-  max-height: 26px;
+  /* two whole lines at any zoom; a fixed pixel cap cut the second line in half */
+  max-height: calc(2 * 1.3em);
   overflow: hidden;
   color: inherit;
   font-size: 12px;

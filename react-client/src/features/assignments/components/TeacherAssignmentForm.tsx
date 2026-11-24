@@ -115,7 +115,7 @@ export function TeacherAssignmentForm({
           <LearningIcon name="atom" />
           <Text as="p" size="3" weight="medium">Chưa có mô phỏng nào để giao</Text>
           <Text as="p" size="2" color="gray">Hãy dựng một mô phỏng rồi chọn “Lưu vào thư viện”. Chỉ mô phỏng đã kiểm định mới giao được cho học sinh.</Text>
-          <Button asChild><Link to="/workspace">Tạo mô phỏng</Link></Button>
+          <Button asChild><Link to="/workspace/simulation">Tạo mô phỏng</Link></Button>
         </div>
       ) : (
         <form noValidate onSubmit={event => { if (step < 2) { event.preventDefault(); goTo(step + 1); } else if (contentValid && recipientsValid) onSubmit(event); else { event.preventDefault(); setStep(contentValid ? 1 : 0); } }}>
@@ -204,7 +204,7 @@ export function TeacherAssignmentForm({
                 <TextField.Root id="assignment-max-score" size="3" type="number" min="1" step="0.5" value={maxScore} onChange={event => onMaxScoreChange(event.target.value)} />
               </Field>
               <div className="studio-field"><Text size="2" weight="medium">Cách chấm</Text>
-                <Text as="p" size="2" className="studio-readonly">{activityType === "MEASUREMENT" ? "Hệ thống chấm phần kết quả đo, thầy cô xem lại" : "Thầy cô chấm theo bài làm"}</Text></div>
+                <Text as="p" size="2" className="studio-readonly">{activityType === "MEASUREMENT" ? "Thầy cô chấm; giá trị đúng từ mô phỏng hiện bên cạnh để đối chiếu" : "Thầy cô chấm theo bài làm"}</Text></div>
             </div>
           </fieldset>
 

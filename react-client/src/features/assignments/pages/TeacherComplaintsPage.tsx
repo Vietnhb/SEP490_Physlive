@@ -64,7 +64,7 @@ export default function TeacherComplaintsPage() {
           <td><time dateTime={item.createdAt}>{date(item.createdAt)}</time></td>
           <td><Button variant="ghost" size="1" aria-haspopup="dialog" onClick={event => { opener.current = event.currentTarget; setSelectedId(item.id); }}>Xem chi tiết</Button></td>
         </tr>)}</tbody>
-      </table>{filtered.length === 0 && <p className="admin-empty-table">{items.length === 0 && !hasFilters ? <>Bạn chưa gửi khiếu nại nào. <Link to="/workspace">Mở mô phỏng để báo lỗi</Link>.</> : "Không có khiếu nại phù hợp bộ lọc."}</p>}</div>}
+      </table>{filtered.length === 0 && <p className="admin-empty-table">{items.length === 0 && !hasFilters ? <>Bạn chưa gửi khiếu nại nào. <Link to="/workspace/simulation">Mở mô phỏng để báo lỗi</Link>.</> : "Không có khiếu nại phù hợp bộ lọc."}</p>}</div>}
       <footer className={styles.footer}><span aria-live="polite">Hiển thị {filtered.length ? start + 1 : 0}–{Math.min(start + size, filtered.length)} / {filtered.length} khiếu nại</span><div>
         <label>Số dòng/trang<Select.Root value={String(size)} onValueChange={value => { setSize(Number(value)); resetPage(); }}><Select.Trigger aria-label="Số khiếu nại mỗi trang" /><Select.Content>{[10, 25, 50].map(value => <Select.Item key={value} value={String(value)}>{value}</Select.Item>)}</Select.Content></Select.Root></label>
         <Button variant="soft" size="1" disabled={current <= 1} onClick={() => { setPage(current - 1); scroll.current?.scrollTo({ top: 0 }); }}>Trước</Button><span>Trang {current}/{pages}</span><Button variant="soft" size="1" disabled={current >= pages} onClick={() => { setPage(current + 1); scroll.current?.scrollTo({ top: 0 }); }}>Sau</Button>

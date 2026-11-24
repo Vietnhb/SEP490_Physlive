@@ -34,6 +34,9 @@ const LibraryItem = memo(function LibraryItem({
       <button
         type="button"
         className={item.simulationId === currentSimulationId ? "active" : ""}
+        // the full name on hover: the list shows at most two lines of it
+        title={`${item.title}
+${topicName(item.topic) || "Vật lý"}${badge ? " · " + badge.label : ""}`}
         disabled={opening}
         onClick={() => void onOpen(item)}
       >

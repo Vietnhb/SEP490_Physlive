@@ -34,6 +34,11 @@ export function TeacherSubmissionTable({ record, students, filter, query, onGrad
   const canManage = record.assignment.canManage !== false;
   const selected = record.submissions.find(item => item.id === gradingId);
   const selectedName = selected?.studentName?.trim() || (selected && students.get(selected.studentId)?.fullName?.trim()) || "Học sinh";
+  // a measurement keeps the simulation's own value as the teacher's reference (no automatic score)
+  const criteria = record.assignment.gradingCriteria as { expectedValue?: number; tolerance?: number; unit?: string } | null | undefined;
+  const reference = typeof criteria?.expectedValue === "number"
+    ? `${Number(criteria.expectedValue.toPrecision(6))}${criteria.unit ? " " + criteria.unit : ""}${criteria.tolerance ? ` (sai số cho phép ±${criteria.tolerance})` : ""}`
+    : "";
   const selectedDetails = predictionDetails(selected?.predictions);
 
   const rows = useMemo(() => {
@@ -95,11 +100,13 @@ export function TeacherSubmissionTable({ record, students, filter, query, onGrad
           const preview = text.length > 160 ? text.slice(0, 160) + "…" : text;
           const completed = Boolean(submission?.completedAt);
           const missed = submission?.gradingStatus === "MISSED_DEADLINE";
+          const tone = !submission ? "waiting" : missed ? "pending" : !completed ? "progress"
+            : submission.gradingStatus === "TEACHER_CONFIRMED" ? "submitted" : "pending";
           return <tr key={studentId}>
             <td data-label="Học sinh"><button type="button" className={"lab-student-cell " + profileStyles.profileButton} disabled={!record.assignment.classId} aria-label={"Xem hồ sơ " + studentName} onClick={()=>setProfileId(studentId)}><StudentAvatar src={submission?.studentAvatarUrl || students.get(studentId)?.avatarUrl} /><span><strong title={studentName}>{studentName}</strong></span></button></td>
             <td data-label="Kết luận" className={submission ? "" : "lab-muted-cell"}>{missed ? "Không nộp trước hạn" : submission ? <div className="lab-answer-preview"><small>{details.conclusion ? "Kết luận" : "Dự đoán"}</small><p>{preview}</p></div> : "Chưa bắt đầu"}</td>
             <td data-label="Nộp lúc">{submission?.completedAt ? <><time dateTime={submission.completedAt}>{formatDateTime(submission.completedAt)}</time>{record.assignment.dueAt && new Date(submission.completedAt).getTime() > new Date(record.assignment.dueAt).getTime() && <small className="lab-late-badge">Nộp muộn</small>}</> : "—"}</td>
-            <td data-label="Trạng thái"><div className="lab-grade-status"><span className={`lab-status ${missed ? "pending" : completed ? "submitted" : submission ? "progress" : "pending"}`}><span className="lab-status-dot" aria-hidden="true" />{submission ? gradingLabel(submission) : "Chưa bắt đầu"}</span>{(completed || missed) && submission?.score != null && <strong>{submission.score}/{submission.maxScore ?? maxScore}</strong>}</div></td>
+            <td data-label="Trạng thái"><div className="lab-grade-status"><span className={`lab-status ${tone}`}><span className="lab-status-dot" aria-hidden="true" />{submission ? gradingLabel(submission) : "Chưa bắt đầu"}</span>{(completed || missed) && submission?.score != null && <strong>{submission.score}/{submission.maxScore ?? maxScore}</strong>}</div></td>
             <td data-label="Thao tác" className="lab-grade-action">{submission && !missed ? <div className="lab-row-actions">
               <button type="button" className="lab-grade-button" aria-haspopup="dialog" onClick={() => openGrading(submission)}>{canManage && completed ? submission.gradingStatus === "TEACHER_CONFIRMED" ? "Sửa điểm" : "Chấm bài" : "Xem bài"}</button>
               <button type="button" className="lab-history-button" aria-label="Lịch sử điểm" aria-haspopup="dialog" onClick={() => openGrading(submission, "history")}>Lịch sử</button>
@@ -120,6 +127,7 @@ export function TeacherSubmissionTable({ record, students, filter, query, onGrad
                 <h3>Nội dung bài làm</h3><p className="lab-review-submission-meta">{gradingLabel(selected)}{selected.completedAt ? " · Nộp lúc " + formatDateTime(selected.completedAt) : " · Học sinh chưa nộp bài"}</p>
                 <dl><div><dt>Dự đoán / câu trả lời ban đầu</dt><dd>{selectedDetails.answer}</dd></div>
                   {selectedDetails.estimatedValue !== undefined && <div><dt>Giá trị đo</dt><dd>{selectedDetails.estimatedValue}</dd></div>}
+                  {reference && <div><dt>Giá trị đúng từ mô phỏng</dt><dd>{reference}</dd></div>}
                   <div><dt>Lập luận</dt><dd>{selectedDetails.reasoning || "Chưa có lập luận."}</dd></div><div><dt>Kết luận</dt><dd>{selectedDetails.conclusion || "Chưa có kết luận."}</dd></div></dl>
               </section>
                 {canManage && selected.completedAt ? <form className="lab-grading-form" onSubmit={event => void submitGrade(event)}>

@@ -39,6 +39,11 @@ public class AssignmentController {
         return assignmentService.forTeacher();
     }
 
+    @GetMapping("/mine/teacher/progress")
+    public List<AssignmentContracts.AssignmentProgress> teacherProgress() {
+        return assignmentService.progressForTeacher();
+    }
+
     @GetMapping("/mine/teacher/classes")
     public List<AssignmentContracts.TeacherClassOption> teacherClasses() {
         return assignmentService.classesForTeacher();

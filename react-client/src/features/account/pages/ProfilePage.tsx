@@ -9,7 +9,7 @@ import { shrinkAvatar } from "../../../shared/lib/avatarImage";
 import "../styles/profile.css";
 import { getRoleLabel } from "../../../shared/auth/roles";
 
-function ProfileContent({ user }: Readonly<{ user: User }>) {
+function ProfileContent({ user, embedded }: Readonly<{ user: User; embedded: boolean }>) {
   const setUser = useSessionStore((state) => state.setUser);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState(user.fullName);
@@ -56,9 +56,9 @@ function ProfileContent({ user }: Readonly<{ user: User }>) {
     })();
   };
 
-  return <div className="profile-page">
+  return <div className={embedded ? "profile-page profile-page--embedded" : "profile-page"}>
     <div className="profile-container">
-      <div className="profile-back"><Link to="/"><LearningIcon name="back" />Quay lại PhysLive</Link> · <Link to="/support">Hỗ trợ & khiếu nại của tôi</Link></div>
+      {!embedded && <div className="profile-back"><Link to="/"><LearningIcon name="back" />Quay lại PhysLive</Link> · <Link to="/support">Hỗ trợ & khiếu nại của tôi</Link></div>}
       <div className="profile-grid">
         <aside className="profile-sidebar">
           <section className="profile-card profile-identity-card">
@@ -90,10 +90,11 @@ function ProfileContent({ user }: Readonly<{ user: User }>) {
   </div>;
 }
 
-export default function ProfilePage() {
+/** `embedded`: shown inside an app frame that already has the navigation, so the page drops its own way back. */
+export default function ProfilePage({ embedded = false }: Readonly<{ embedded?: boolean }>) {
   const navigate = useNavigate();
   const user = useSessionStore((state) => state.user);
   useEffect(() => { if (!user) navigate("/login", { replace: true }); }, [user, navigate]);
   if (!user) return <div className="profile-loading">Đang tải hồ sơ…</div>;
-  return <ProfileContent key={user.id} user={user} />;
+  return <ProfileContent key={user.id} user={user} embedded={embedded} />;
 }

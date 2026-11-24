@@ -23,8 +23,8 @@ const submissionsQueue = createRequestLimiter(4);
 
 export default function Lab() {
   // "Xem và chấm bài nộp" on the assignment page links here with ?assignment=<id>.
-  const [searchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState(() => searchParams.get("assignment") ?? "");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [openedAt] = useState(Date.now);
   const [submissionFilter, setSubmissionFilter] =
     useState<SubmissionFilter>("all");
   const [studentQuery, setStudentQuery] = useState("");
@@ -45,7 +45,13 @@ export default function Lab() {
   const loadedIds = new Set(assignments.filter((_, index) => readable[index] !== undefined).map(item => item.id));
   const failedIds = new Set(assignments.filter((_, index) => submissions[index]?.isError && readable[index] === undefined).map(item => item.id));
   const wanted = searchParams.get("assignment");
-  const currentId = assignments.some(item => item.id === selectedId) ? selectedId : assignments.find(item => item.id === wanted)?.id ?? assignments[0]?.id ?? "";
+  const currentId = assignments.find(item => item.id === wanted)?.id ?? assignments[0]?.id ?? "";
+  const selectAssignment = (id: string) => {
+    if (id === currentId) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("assignment", id);
+    setSearchParams(next);
+  };
   const retrySubmissions = () => { const index = assignments.findIndex(item => item.id === currentId); if (index >= 0) void submissions[index].refetch(); };
 
   const submissionsLoading = records.some(item => !loadedIds.has(item.assignment.id) && !failedIds.has(item.assignment.id));
@@ -62,15 +68,20 @@ export default function Lab() {
       (total, item) => total + item.submissions.filter(submission => submission.completedAt).length,
       0,
     );
-    return { assigned, submitted, pending: Math.max(assigned - submitted, 0) };
+    return { submitted, pending: Math.max(assigned - submitted, 0) };
   })();
 
   const selectedTotal = selected?.assignment.studentIds.length ?? 0;
   const selectedSubmitted = selected?.submissions.filter(submission => submission.completedAt).length ?? 0;
-  const selectedProgress =
-    selectedTotal === 0
-      ? 0
-      : Math.round((selectedSubmitted / selectedTotal) * 100);
+  const selectedOpen = selected?.assignment.status === "ACTIVE";
+  const dueAt = selected?.assignment.dueAt;
+  const overdue = selectedOpen && Date.parse(dueAt ?? "") < openedAt;
+  const totalsAvailable = !loading && !assignmentsResource.error && !submissionsLoading && failedIds.size === 0;
+  const filters: { value: SubmissionFilter; label: string; count: number }[] = [
+    { value: "all", label: "Tất cả", count: selectedTotal },
+    { value: "submitted", label: "Đã nộp", count: selectedSubmitted },
+    { value: "pending", label: "Chưa nộp", count: Math.max(selectedTotal - selectedSubmitted, 0) },
+  ];
 
   const updateSubmission = useCallback((assignmentId: string, updated: AssignmentSubmission) => {
     if (scope !== sessionScope()) return;
@@ -92,166 +103,105 @@ export default function Lab() {
   };
 
   return (
-    <>
-      <main className="lab-main">
-        <div className="lab-container">
-          <section className="lab-summary-strip" aria-label="Tổng quan bài nộp">
-            <span className="lab-summary-label">Tổng quan</span>
-            <div className="lab-summary-items">
-              <div className="lab-summary-item">
-                <strong>{loading && records.length === 0 ? "—" : records.length}</strong>
-                <span>Bài đã giao</span>
-              </div>
-              <div className="lab-summary-item">
-                <strong className="lab-summary-success">
-                  {submissionsLoading || (loading && records.length === 0) ? "—" : totals.submitted}
-                </strong>
-                <span>Đã nộp</span>
-              </div>
-              <div className="lab-summary-item">
-                <strong className="lab-summary-warning">
-                  {submissionsLoading || (loading && records.length === 0) ? "—" : totals.pending}
-                </strong>
-                <span>Chưa nộp</span>
-              </div>
-            </div>
-          </section>
+    <main className="lab-main">
+      <div className="lab-container lab-assigned-page">
+        <header className="lab-page-head">
+          <h1>Bài tập đã giao</h1>
+          <Link className="lab-new-assignment" to="/workspace/assignments/new"><Icon name="plus" />Giao bài mới</Link>
+        </header>
 
-          {error && (
-            <div className="lab-error" role="alert">
-              {error}
-            </div>
-          )}
-          {loading && records.length === 0 && <CardLoadingSkeleton cards={3} label="Đang tải bài giao và bài nộp…" />}
-          {!loading && !error && records.length === 0 && (
-            <div className="lab-empty-card">
-              <Icon name="message" />
-              <h2>Chưa có bài giao để theo dõi</h2>
-              <p>
-                Hãy giao một bài tập trước. Bài nộp của học sinh sẽ xuất hiện
-                tại đây.
-              </p>
-              <Link to="/assignments/workspace">
-                Đi tới khu giao bài <Icon name="arrow" />
-              </Link>
-            </div>
-          )}
+        <dl className="lab-stat-row" aria-label="Tổng quan bài nộp">
+          <div className="lab-stat">
+            <dt><span className="lab-stat-icon"><Icon name="book" /></span>Bài đã giao</dt>
+            <dd>{assignmentsResource.data ? records.length : "—"}</dd>
+          </div>
+          <div className="lab-stat lab-stat--success">
+            <dt><span className="lab-stat-icon"><Icon name="check" /></span>Lượt đã nộp</dt>
+            <dd>{totalsAvailable ? totals.submitted : "—"}</dd>
+          </div>
+          <div className="lab-stat lab-stat--warning">
+            <dt><span className="lab-stat-icon"><Icon name="activity" /></span>Lượt chưa nộp</dt>
+            <dd>{totalsAvailable ? totals.pending : "—"}</dd>
+          </div>
+        </dl>
 
-          {records.length > 0 && (
-            <div className="lab-content-grid">
-              <TeacherAssignmentList
-                records={records}
-                selectedId={currentId}
-                onSelect={setSelectedId}
-                loadedIds={loadedIds}
-              />
-              <section
-                className="lab-submission-card"
-                aria-label="Chi tiết bài nộp"
-              >
-                {selected ? (
-                  <>
-                    <div className="lab-detail-header">
-                      <div>
-                        <h2>{selected.assignment.title}</h2>
-                        <p className="lab-detail-meta">
-                          Hạn nộp: {formatDate(selected.assignment.dueAt)}
-                        </p>
-                      </div>
-                      <div className="lab-progress-summary">
-                        <strong>
-                          {selectedLoaded
-                            ? `${selectedSubmitted} / ${selectedTotal}`
-                            : "—"}
-                        </strong>
-                        <span>đã nộp</span>
-                      </div>
-                    </div>
-                    <div
-                      className="lab-progress-track"
-                      role="progressbar"
-                      aria-label="Tiến độ nộp bài"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={selectedProgress}
-                    >
-                      <span style={{ width: `${selectedProgress}%` }} />
-                    </div>
+        {error && <div className="lab-error" role="alert">{error}</div>}
+        {failedIds.size > 0 && <p className="lab-totals-note" role="status">Một số bài nộp chưa tải được. Tổng lượt nộp sẽ hiển thị khi đủ dữ liệu.</p>}
+        {loading && <CardLoadingSkeleton cards={3} label="Đang tải bài giao và bài nộp…" />}
+        {!loading && !error && records.length === 0 && (
+          <div className="lab-empty-card">
+            <Icon name="message" />
+            <h2>Chưa có bài giao để theo dõi</h2>
+            <p>Bài nộp của học sinh sẽ xuất hiện tại đây sau khi giao bài.</p>
+          </div>
+        )}
 
-                    <div className="lab-table-toolbar">
-                      <div
-                        className="lab-filter-group"
-                        role="group"
-                        aria-label="Lọc bài nộp"
-                      >
-                        <button
-                          type="button"
-                          className={submissionFilter === "all" ? "active" : ""}
-                          aria-pressed={submissionFilter === "all"}
-                          onClick={() => setSubmissionFilter("all")}
-                        >
-                          Tất cả
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            submissionFilter === "submitted" ? "active" : ""
-                          }
-                          aria-pressed={submissionFilter === "submitted"}
-                          onClick={() => setSubmissionFilter("submitted")}
-                        >
-                          Đã nộp
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            submissionFilter === "pending" ? "active" : ""
-                          }
-                          aria-pressed={submissionFilter === "pending"}
-                          onClick={() => setSubmissionFilter("pending")}
-                        >
-                          Chưa nộp
-                        </button>
-                      </div>
-                      <label className="lab-search">
-                        <span>Tìm học sinh</span>
-                        <input
-                          value={studentQuery}
-                          onChange={(event) =>
-                            setStudentQuery(event.target.value)
-                          }
-                          placeholder="Nhập tên học sinh"
-                        />
-                      </label>
-                    </div>
-                    {selectedFailed ? (
-                      <div className="lab-empty-state" role="alert">
-                        <strong>Chưa tải được bài nộp của bài này</strong>
-                        <button type="button" className="lab-grade-button" onClick={retrySubmissions}>Thử lại</button>
-                      </div>
-                    ) : !selectedLoaded ? (
-                      <TeacherSubmissionTableLoading />
-                    ) : (
-                      <TeacherSubmissionTable
-                        record={selected}
-                        students={students}
-                        filter={submissionFilter}
-                        query={studentQuery}
-                        onGrade={handleGrade}
-                        onReopen={handleReopen}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <div className="lab-empty-state">
-                    Chọn một bài tập để xem bài nộp.
+        {selected && (
+          <div className="lab-content-grid">
+            <TeacherAssignmentList records={records} selectedId={currentId} onSelect={selectAssignment} loadedIds={loadedIds} failedIds={failedIds} />
+            <section className="lab-submission-card" aria-label="Chi tiết bài nộp">
+              <header className="lab-detail-header">
+                <div className="lab-detail-heading">
+                  <div className="lab-detail-meta">
+                    <span className={`lab-state${overdue ? " lab-state--overdue" : selectedOpen ? " lab-state--open" : ""}`}>
+                      {overdue ? "Quá hạn" : selectedOpen ? "Đang mở" : "Đã đóng"}
+                    </span>
+                    <span>{selected.assignment.className ?? "Nhóm học sinh riêng"}</span>
+                    <span className="lab-detail-due"><Icon name="bell" />{dueAt ? `Hạn nộp ${formatDate(dueAt)}` : "Chưa đặt hạn"}</span>
                   </div>
-                )}
-              </section>
-            </div>
-          )}
-        </div>
-      </main>
-    </>
+                  <h2>{selected.assignment.title}</h2>
+                </div>
+                <div className="lab-progress-summary">
+                  <p><strong>{selectedLoaded ? `${selectedSubmitted}/${selectedTotal}` : "—"}</strong><span>đã nộp</span></p>
+                  {!selectedFailed && <progress
+                    className="lab-progress-track"
+                    aria-label="Tiến độ nộp bài"
+                    max={selectedTotal || 1}
+                    value={selectedLoaded ? selectedSubmitted : undefined}
+                  />}
+                </div>
+              </header>
+
+              <div className="lab-table-controls">
+                <h3>Bài nộp của học sinh</h3>
+                <div className="lab-table-toolbar">
+                  <div className="lab-filter-group" role="group" aria-label="Lọc bài nộp">
+                    {filters.map(({ value, label, count }) => (
+                      <button type="button" key={value} aria-pressed={submissionFilter === value} onClick={() => setSubmissionFilter(value)}>
+                        {label}
+                        {(selectedLoaded || value === "all") && <span aria-hidden="true">{count}</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="lab-search">
+                    <Icon name="search" />
+                    <input type="search" aria-label="Tìm học sinh" value={studentQuery} onChange={event => setStudentQuery(event.target.value)} placeholder="Tìm học sinh" />
+                  </label>
+                </div>
+              </div>
+
+              {selectedFailed ? (
+                <div className="lab-empty-state" role="alert">
+                  <strong>Chưa tải được bài nộp của bài này</strong>
+                  <button type="button" className="lab-grade-button" onClick={retrySubmissions}>Thử lại</button>
+                </div>
+              ) : !selectedLoaded ? (
+                <TeacherSubmissionTableLoading />
+              ) : (
+                <TeacherSubmissionTable
+                  key={currentId}
+                  record={selected}
+                  students={students}
+                  filter={submissionFilter}
+                  query={studentQuery}
+                  onGrade={handleGrade}
+                  onReopen={handleReopen}
+                />
+              )}
+            </section>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

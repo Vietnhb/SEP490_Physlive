@@ -54,7 +54,7 @@ function LibraryRows({
               <td className="table-stack-title">
                 <strong>
                   {assignable ? (
-                    <Link to={`/workspace?simulationId=${item.simulationId}`}>
+                    <Link to={`/workspace/simulation?simulationId=${item.simulationId}`}>
                       {item.title}
                     </Link>
                   ) : (
@@ -77,7 +77,7 @@ function LibraryRows({
                 <td className="table-stack-action">
                   <Link
                     className="table-action"
-                    to={`/assignments/workspace?libraryItemId=${item.id}`}
+                    to={`/workspace/assignments/new?libraryItemId=${item.id}`}
                   >
                     Giao bài
                   </Link>
@@ -121,7 +121,7 @@ function LibraryCatalog({ canManage }: Readonly<{ canManage: boolean }>) {
           <p className="muted">Mô phỏng bạn đã lưu và mô phỏng được chia sẻ với bạn. Chọn Giao bài để dùng cho lớp.</p>
         </div>
         {canManage && (
-          <Link to="/workspace" className="primary page-action">
+          <Link to="/workspace/simulation" className="primary page-action">
             Tạo mô phỏng
           </Link>
         )}

@@ -1,5 +1,5 @@
 import SimulationThumb from "./SimulationThumb";
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Dialog, IconButton, SegmentedControl, Select, Spinner, TextField, Theme } from "@radix-ui/themes";
 import { ChevronRightIcon, Cross2Icon, MagnifyingGlassIcon, PauseIcon, PlayIcon, ReaderIcon, ResetIcon, StarFilledIcon } from "@radix-ui/react-icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -31,6 +31,7 @@ type Props = {
   headingLevel?: "h1" | "h2";
   /** The area's breadcrumb already names the page: the heading stays for screen readers only. */
   titleHidden?: boolean;
+  catalogSidebar?: boolean;
 };
 
 type Accent = "indigo" | "cyan" | "amber";
@@ -118,11 +119,14 @@ function CatalogNav({ catalog, selection, total, counts, onSelect }: Readonly<Ca
   </nav>;
 }
 
-export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = false, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
+export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = false, catalogSidebar = false, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
   const [selection, setSelection] = useState<CatalogSelection>({});
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<LibraryScope>("ALL");
   const [sort, setSort] = useState<"latest" | "featured" | "title">("latest");
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const catalogId = useId();
+  const catalogToggle = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLButtonElement | null>(null);
   const reducedMotion = useReducedMotion();
   const transition = { duration: reducedMotion ? 0 : .18 };
@@ -152,15 +156,31 @@ export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = fa
   const savedScene = generated ?? (hasSavedScene(simulation?.result) ? simulation.result : null);
   const filtered = Boolean(query.trim() || selection.subjectId || (allowSchoolScope && scope !== "ALL"));
   const resetFilters = () => { setQuery(""); setSelection({}); setScope("ALL"); };
+  const selectFromSidebar = (next: CatalogSelection) => {
+    setSelection(next);
+    if ((next.lessonId || !next.subjectId) && catalogToggle.current?.getClientRects().length) {
+      setCatalogOpen(false);
+      catalogToggle.current.focus();
+    }
+  };
 
   return <Theme asChild accentColor="indigo" grayColor="slate" radius="large" scaling="100%" hasBackground={false}><motion.section className={styles.discovery} aria-label="Kho cộng đồng" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={transition}>
     <header className={titleHidden ? "sr-only" : styles.pageHeading}><div>{headingLevel === "h1" ? <h1>Kho cộng đồng</h1> : <h2>Kho cộng đồng</h2>}<p>Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay.</p></div>{!titleHidden && !loading && !error && <Badge size="2" variant="soft">{scopedItems.length} mô phỏng</Badge>}</header>
-    <div className={`${styles.layout} ${curriculum ? "" : styles.withoutCatalog}`}>
+    <div className={`${styles.layout}${catalogSidebar ? ` ${styles.sidebarLayout}` : ""}`}>
+      {catalogSidebar && <div className={styles.catalogSidebar}>
+        <button type="button" ref={catalogToggle} className={styles.catalogToggle} aria-controls={catalogId} aria-expanded={catalogOpen} onClick={() => setCatalogOpen(open => !open)}>
+          <ReaderIcon />Mục lục <ChevronRightIcon />
+        </button>
+        <div id={catalogId} className={styles.catalog} data-mobile-open={catalogOpen || undefined}>
+          {loading && !curriculum ? <p className={styles.catalogEmpty} role="status">Đang tải mục lục…</p>
+            : <CatalogNav catalog={catalog} selection={selection} total={scopedItems.length} counts={counts} onSelect={selectFromSidebar} />}
+        </div>
+      </div>}
       <div className={styles.results}>
         <div className={styles.toolbar}>
           <TextField.Root className={styles.search} size="3" type="search" aria-label="Tìm tài nguyên" value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm mô phỏng, bài học, giáo viên…"><TextField.Slot><MagnifyingGlassIcon width="18" height="18" /></TextField.Slot></TextField.Root>
           <div className={styles.filterRow}>
-          {curriculum && <details className={styles.catalogFilter}><summary><ReaderIcon />{breadcrumb.length ? breadcrumb.join(" › ") : "Lọc theo khối, chương, bài"}<ChevronRightIcon /></summary><div className={styles.catalog}><CatalogNav catalog={catalog} selection={selection} total={scopedItems.length} counts={counts} onSelect={setSelection} /></div></details>}
+          {!catalogSidebar && curriculum && <details className={styles.catalogFilter}><summary><ReaderIcon />{breadcrumb.length ? breadcrumb.join(" › ") : "Lọc theo khối, chương, bài"}<ChevronRightIcon /></summary><div className={styles.catalog}><CatalogNav catalog={catalog} selection={selection} total={scopedItems.length} counts={counts} onSelect={setSelection} /></div></details>}
           {allowSchoolScope && <SegmentedControl.Root size="2" value={scope} onValueChange={value => { if (value) setScope(value as LibraryScope); }} aria-label="Phạm vi chia sẻ"><SegmentedControl.Item value="ALL">Tất cả</SegmentedControl.Item><SegmentedControl.Item value="PUBLIC">Toàn hệ thống</SegmentedControl.Item><SegmentedControl.Item value="SHARED">Trong trường</SegmentedControl.Item></SegmentedControl.Root>}
           <Select.Root size="3" value={sort} onValueChange={value => setSort(value as typeof sort)}><Select.Trigger aria-label="Sắp xếp tài nguyên" className={styles.sort} variant="surface" /><Select.Content><Select.Item value="latest">Mới nhất</Select.Item><Select.Item value="featured">Nổi bật</Select.Item><Select.Item value="title">Tên A–Z</Select.Item></Select.Content></Select.Root>
           </div>

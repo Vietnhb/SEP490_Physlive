@@ -4,24 +4,24 @@
 .pageHeading h1, .pageHeading h2 { margin:0 0 8px; font-size:26px; line-height:1.3; letter-spacing:-.02em; }
 .pageHeading p { margin:0; max-width:640px; color:var(--muted); }
 .pageHeading > :global(.rt-Badge) { flex-shrink:0; margin-top:6px; }
-.layout.withoutCatalog { grid-template-columns: minmax(0, 1fr); }
 
 /* ---- Table of contents ---- */
 .catalog { position: sticky; top: calc(var(--header-h) + 24px); min-width: 0; max-height: calc(100vh - var(--header-h) - 48px); overflow-y: auto; padding-right: 6px; scrollbar-width: thin; }
-.nav { display: grid; gap: 4px; }
+.nav { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .navHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; padding: 0 10px 8px; }
 .navHead h2 { margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .nav button.navReset, .resultHead button.navReset { display: inline-flex; align-items: center; gap: 4px; min-height: 0; padding: 2px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer; }
 .nav button.navReset:hover:not(:disabled), .resultHead button.navReset:hover:not(:disabled) { background: var(--accent-soft); }
-.navSubject { display: grid; gap: 4px; margin-top: 10px; }
+.navSubject { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin-top: 10px; }
 .navSubject h3 { margin: 6px 10px 2px; color: var(--ink-2); font-size: 13px; font-weight: 600; }
 
-.gradeTabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin-bottom: 8px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
-.nav button.gradeTab, .nav button.gradeTab:hover:not(:disabled) { position: relative; isolation: isolate; min-height: 32px; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.gradeTabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); gap: 4px; margin-bottom: 8px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.nav button.gradeTab, .nav button.gradeTab:hover:not(:disabled) { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 34px; padding: 5px 6px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; line-height: 1.3; text-align: center; white-space: normal; cursor: pointer; }
+.gradeTab > span:not(.gradePill) { min-width: 0; overflow-wrap: anywhere; }
 .nav button.gradeTab[aria-selected="true"] { color: var(--ink); font-weight: 600; }
 .gradePill { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--surface); box-shadow: var(--shadow-xs), 0 0 0 1px var(--line); }
 
-.modules, .lessons { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.modules, .lessons { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 0; padding: 0; list-style: none; }
 .lessons { overflow: hidden; margin: 2px 0 6px 18px; padding-left: 8px; border-left: 1px solid var(--line); }
 .nav button.navRow, .nav button.navRow:hover:not(:disabled) { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 14px; font-weight: 500; line-height: 1.4; text-align: left; cursor: pointer; transition: color .15s ease; }
 .nav button.navRow:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
@@ -53,7 +53,8 @@
 .catalogFilter > .catalog { position:absolute; z-index:20; top:calc(100% + 8px); left:0; width:min(340px, calc(100vw - 64px)); max-height: min(480px, 65vh); overflow-y:auto; box-shadow:var(--shadow-md); }
 .sort { min-width: 140px; }
 .resultHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; margin: 18px 0 14px; }
-.resultHead p { margin: 0; color: var(--muted); font-size: 14px; }
+.resultHead p { min-width: 0; margin: 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.resultHead button.navReset { flex-shrink: 0; white-space: nowrap; }
 .resultHead strong { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
 .crumbs { color: var(--ink-2); font-weight: 500; }
 
@@ -128,8 +129,58 @@
 .catalog::-webkit-scrollbar { display: none; }
 .navCount[data-has] { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--surface-3); color: var(--ink-2); font-size: 11.5px; font-weight: 600; text-align: center; }
 .nav button.navRow[aria-pressed="true"] .navCount[data-has] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-.nav button.gradeTab small { margin-left: 5px; color: var(--accent); font-size: 11px; font-weight: 700; }
+.nav button.gradeTab small { flex: 0 0 auto; color: var(--accent); font-size: 11px; font-weight: 700; }
 .nav button.navMore, .nav button.navMore:hover:not(:disabled) { width: 100%; min-height: 32px; margin-top: 6px; padding: 0 10px; border: 1px dashed var(--line-strong); border-radius: 8px; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 500; justify-content: center; cursor: pointer; }
 .nav button.navMore:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cover { overflow: hidden; }
 .cover { height:auto; aspect-ratio:16 / 9; }
+
+.sidebarLayout {
+  grid-template-columns: clamp(285px, 32%, 400px) minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.catalogSidebar {
+  position: sticky;
+  top: 12px;
+  min-width: 0;
+}
+
+.catalogSidebar > .catalog {
+  position: static;
+  max-height: calc(100dvh - 88px);
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.catalogSidebar > .catalog::-webkit-scrollbar { display: initial; width: 6px; }
+.catalogToggle { display: none; }
+
+@media (max-width: 900px) {
+  .sidebarLayout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .catalogSidebar { position: static; }
+  .catalogSidebar > .catalog { max-height: min(54dvh, 400px); margin-top: 8px; }
+  .catalogSidebar > .catalog:not([data-mobile-open]) { display: none; }
+  .catalogSidebar .navHead { justify-content: flex-end; }
+  .catalogSidebar .navHead h2,
+  .catalogSidebar .navHead:not(:has(button)) { display: none; }
+  .catalogSidebar .catalogToggle,
+  .catalogSidebar .catalogToggle:hover:not(:disabled) {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .catalogToggle > svg:last-child { margin-inline-start: auto; transform: rotate(90deg); }
+  .catalogToggle[aria-expanded="true"] > svg:last-child { transform: rotate(-90deg); }
+}

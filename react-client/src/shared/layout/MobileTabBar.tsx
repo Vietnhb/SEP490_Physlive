@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 import LearningIcon from "../ui/LearningIcon";
 import "./MobileTabBar.css";
 
@@ -16,10 +16,10 @@ export default function MobileTabBar({ items, more, spacer = true }: Readonly<{ 
   return <>
     {spacer && <div className="mobile-tabbar-spacer" aria-hidden="true" />}
     <nav className="mobile-tabbar" aria-label="Điều hướng chính">
-      {items.map(item => <NavLink key={item.to} to={item.to} className="mobile-tabbar__item" data-active={item.active || undefined} aria-current={item.active ? "page" : undefined}>
+      {items.map(item => <Link key={item.to} to={item.to} className="mobile-tabbar__item" data-active={item.active || undefined} aria-current={item.active ? "page" : undefined}>
         <span className="mobile-tabbar__icon"><LearningIcon name={item.icon} />{count(item.badge) && <span className="mobile-tabbar__badge">{count(item.badge)}</span>}</span>
         <span className="mobile-tabbar__label">{item.label}</span>
-      </NavLink>)}
+      </Link>)}
       {more && <button type="button" className="mobile-tabbar__item" onClick={more.onOpen}>
         <span className="mobile-tabbar__icon"><LearningIcon name={more.accountOnly ? "users" : "menu"} />{count(more.badge) && <span className="mobile-tabbar__badge">{count(more.badge)}</span>}</span>
         <span className="mobile-tabbar__label">{more.accountOnly ? "Tài khoản" : "Thêm"}</span>

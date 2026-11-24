@@ -21,19 +21,21 @@ export default function CommunityLibrary({ inApp = false }: Readonly<{ inApp?: b
     { label: "bài học có mô phỏng", value: new Set(library.items.map(item => item.lessonId).filter(Boolean)).size },
   ], [library.items]);
   return (
-    <PageContainer className={`community-library-page ${styles.page}`}>
-      {!inApp && <header className={styles.hero}>
+    <PageContainer className={`community-library-page ${styles.page}${inApp ? ` ${styles.workspacePage}` : ""}`}>
+      <header className={inApp ? `${styles.hero} ${styles.workspaceHero}` : styles.hero}>
         <DotField gap={22} radius={120} activeColor="var(--accent)" />
         <div className={styles.heroCopy}>
-          <h1><SplitWords text="Kho cộng đồng" stagger={0.06} /></h1>
-          <p>Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay.</p>
+          <h1>{inApp ? "Kho cộng đồng" : <SplitWords text="Kho cộng đồng" stagger={0.06} />}</h1>
+          <p>{inApp ? "Tìm mô phỏng theo bài học, xem thử và lưu về thư viện của bạn." : "Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay."}</p>
         </div>
         {(library.loading || library.items.length > 0) && <dl className={styles.stats}>
-          {stats.map(stat => <div key={stat.label}><dd>{library.loading ? "—" : <CountUp to={stat.value} duration={1.2} />}</dd><dt>{stat.label}</dt></div>)}
+          {stats.map(stat => <div key={stat.label}><dt>{stat.label}</dt><dd>{library.loading ? "—" : inApp ? stat.value : <CountUp to={stat.value} duration={1.2} />}</dd></div>)}
         </dl>}
-      </header>}
+      </header>
       <ResourceDiscovery
-        headingLevel={inApp ? "h1" : "h2"}
+        headingLevel="h2"
+        titleHidden={inApp}
+        catalogSidebar={inApp}
         {...library}
         allowSchoolScope={Boolean(user)}
         canClone={canTeach(user)}

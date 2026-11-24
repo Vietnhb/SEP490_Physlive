@@ -26,7 +26,7 @@ function itemsFor(user: User | null): NavItem[] {
   const items: NavItem[] = [];
   if (isStudentRole(user.role)) items.push({ to: "/student", label: "Học tập" });
   if (canTeach(user) && !canViewUsers(user.role)) {
-    items.push({ to: "/workspace", label: "Workspace" }, { to: "/assignments/workspace", label: "Giao bài" });
+    items.push({ to: "/workspace", label: "Workspace" }, { to: "/workspace/assignments/new", label: "Giao bài" });
   }
   if (isDepartmentHead(user)) items.push({ to: "/department", label: "Quản lý chuyên môn" });
   if (user.role === ROLE_NAMES.SCHOOL) items.push({ to: "/school", label: "Quản lý trường" });

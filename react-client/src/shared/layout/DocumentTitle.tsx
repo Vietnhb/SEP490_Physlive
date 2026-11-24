@@ -21,6 +21,13 @@ export default function DocumentTitle() {
     const update = () => {
       frame = 0;
       // the page name in the area's breadcrumb when there is one (a dashboard's heading is a greeting), else its heading
+      // a page can name itself; an empty name means a home page, whose tab is simply the product name
+      const named = document.querySelector("[data-page-title]")?.getAttribute("data-page-title");
+      if (named != null) {
+        const titled = named.trim() ? `${named.trim()} · PhysLive` : "PhysLive";
+        if (document.title !== titled) document.title = titled;
+        return;
+      }
       const crumbs = document.querySelectorAll(".app-topbar__title strong");
       const heading = pathname === "/" ? null : crumbs[crumbs.length - 1] ?? document.querySelector("main h1, h1");
       const name = heading ? readableText(heading) : "";
