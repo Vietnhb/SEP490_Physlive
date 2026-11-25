@@ -148,7 +148,7 @@ public class ExportService {
         Simulation simulation = simulationRepository.findByOwnerIdOrderByCreatedAtDesc(user.getId()).stream()
                 .filter(item -> item.getSpecification().getId().equals(specificationId))
                 .findFirst().orElseThrow(() -> ApiException.notFound("Không tìm thấy lượt chạy mô phỏng"));
-        if (!"PASSED".equals(specification.getValidationStatus())) {
+        if (!java.util.Set.of("PASSED", "FLAGGED").contains(specification.getValidationStatus())) {
             throw ApiException.conflict("Chỉ có thể xuất bản phát lại ngoại tuyến cho mô phỏng đã kiểm định");
         }
         SimulationResponse response = simulationService.get(simulation.getId());
@@ -185,7 +185,7 @@ public class ExportService {
         User user = currentUserService.requireCurrentUser();
         Specification specification = specificationRepository.findByIdAndSubmissionOwner(specificationId, user)
                 .orElseThrow(() -> ApiException.notFound(SPECIFICATION_NOT_FOUND));
-        if (!"PASSED".equals(specification.getValidationStatus())) {
+        if (!java.util.Set.of("PASSED", "FLAGGED").contains(specification.getValidationStatus())) {
             throw ApiException.conflict("Chỉ có thể xuất bản trình chiếu cho mô phỏng đã kiểm định");
         }
         Simulation simulation = findSimulation(specificationId, user);

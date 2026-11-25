@@ -37,7 +37,7 @@ export default function Assignments({
 
   // STAFF ASSIGNMENT STUDIO & SUBMISSIONS MANAGEMENT
   // Only validated simulations can be assigned; the list comes from the shared library store (one request).
-  const saved = useMemo(() => libraryItems.filter(item => item.validationStatus === "PASSED"), [libraryItems]);
+  const saved = useMemo(() => libraryItems.filter(item => item.validationStatus === "PASSED" || item.validationStatus === "FLAGGED"), [libraryItems]);
   const [view, setView] = useState<"create" | "history">(() => workspaceLayout ? "create" : "history");
   const [formVersion, setFormVersion] = useState(0);
   const navigate = useNavigate();

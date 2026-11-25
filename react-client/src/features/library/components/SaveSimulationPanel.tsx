@@ -64,8 +64,30 @@ export default function SaveSimulationPanel({ simulation, parameters, folders, o
   const topic = catalog?.topics.map(item => topicLabel(item.name)).join(", ") ?? "";
   const topics = catalog?.topics.filter(item => item.enabled) ?? [];
   const lessons = topics.flatMap(t => t.modules.flatMap(m => m.levels.flatMap(l => l.lessons.map(lesson => ({
-    id: lesson.id, label: `${m.name} / ${l.name} / ${lesson.name}`,
+    id: lesson.id, label: `${m.name} / ${l.name} / ${lesson.name}`, name: lesson.name, path: `${m.name} · ${l.name}`,
   })))));
+  // never make the teacher hunt for a lesson: preselect the one whose name shares most words with the description
+  const suggestedLesson = (() => {
+    if (!lessons.length) return "";
+    const words = new Set(simulation.description.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2));
+    let best = lessons[0], bestScore = -1;
+    for (const lesson of lessons) {
+      const name = lesson.name.toLowerCase();
+      // the lesson named word for word in the description wins; otherwise the share of its words found there
+      const parts = name.split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 2);
+      const score = (simulation.description.toLowerCase().includes(name) ? 10 : 0)
+        + (parts.length ? parts.filter(w => words.has(w)).length / parts.length : 0);
+      if (score > bestScore) { best = lesson; bestScore = score; }
+    }
+    return best.id;
+  })();
+  if (!lessonId && suggestedLesson) setLessonId(suggestedLesson);
+  const status = simulation.validation?.status ?? "";
+  const warning = status === "FLAGGED"
+    ? { tone: "warn", text: "Một số kết quả chưa khớp định luật. Bạn vẫn lưu và dùng được; mô phỏng sẽ mang nhãn “Cần kiểm tra lại” để bạn xem lại sau." }
+    : status === "VERIFIED_PARTLY" || status === "ILLUSTRATIVE" || status === "VISUAL_ONLY_UNVERIFIED"
+      ? { tone: "info", text: "Một vài đại lượng chưa có định luật đối chiếu. Mô phỏng vẫn lưu bình thường và mang nhãn tương ứng." }
+      : null;
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -89,33 +111,35 @@ export default function SaveSimulationPanel({ simulation, parameters, folders, o
     } finally { setBusy(false); onBusyChange(false); }
   };
   return <form className="simulation-save-panel" onSubmit={save} aria-label="Lưu mô phỏng vào thư viện">
-    <h3>Lưu mô phỏng</h3>
-    <p>Lưu cảnh minh họa và các tham số hiện tại vào thư viện cá nhân để mở lại.</p>
-    <fieldset disabled={busy}>
-      <label>Tên bài<input required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></label>
-      <label>Thư mục<select value={folderId} onChange={e => setFolderId(e.target.value)}>
+    <header className="save-head">
+      <h3>Lưu mô phỏng</h3>
+      <p>Cảnh minh họa và các thông số hiện tại được lưu vào thư viện của bạn để mở lại hoặc giao bài.</p>
+    </header>
+    {warning && <p className={`save-note save-note-${warning.tone}`} role="status">{warning.text}</p>}
+    <fieldset className="save-fields" disabled={busy}>
+      <label className="save-field"><span>Tên bài</span><input required maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></label>
+      <label className="save-field"><span>Thư mục</span><select value={folderId} onChange={e => setFolderId(e.target.value)}>
         <option value="">Tạo thư mục mới…</option>
         {folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
       </select></label>
-      {!folderId && <label>Tên thư mục mới<input required maxLength={120} value={folderName} onChange={e => setFolderName(e.target.value)} /></label>}
+      {!folderId && <label className="save-field"><span>Tên thư mục mới</span><input required maxLength={120} value={folderName} placeholder="Ví dụ: Điện xoay chiều" onChange={e => setFolderName(e.target.value)} /></label>}
       <fieldset className="simulation-lesson-picker" disabled={loading}>
-        <legend>Phân loại bài học</legend>
-        {topic && <small>Chủ đề: {topic}</small>}
-        {loading ? <p role="status">Đang tải bài học…</p> : <div className="simulation-lesson-options">
+        <legend>Bài học {topic && <small>· {topic}</small>}</legend>
+        {loading ? <p className="save-muted" role="status">Đang tải bài học…</p> : <div className="simulation-lesson-options" role="radiogroup">
           {lessons.map(lesson => <label key={lesson.id} className="simulation-lesson-option">
             <input type="radio" name="simulation-lesson" required value={lesson.id}
               checked={lessonId === lesson.id} onChange={() => setLessonId(lesson.id)} />
-            <span>{lesson.label}</span>
+            <span><b>{lesson.name}</b><small>{lesson.path}</small></span>
           </label>)}
         </div>}
+        {!loading && catalog && !lessons.length && <p className="save-muted" role="status">Chưa có bài học đang hoạt động cho chủ đề này.</p>}
+        {!loading && (!catalog || !lessons.length) && <button type="button" className="save-link" onClick={() => { setLoading(true); setCatalog(null); setLessonId(""); setError(""); setReload(n => n + 1); }}>Tải lại bài học</button>}
       </fieldset>
-      {!loading && catalog && !lessons.length && <p role="status">Chưa có bài học đang hoạt động cho mô phỏng này. Hãy tải lại; nếu vẫn trống, quản trị viên cần cập nhật chương trình bài học.</p>}
-      {error && <p role="alert">{error}</p>}
-      {!loading && (!catalog || !lessons.length) && <button type="button" onClick={() => { setLoading(true); setCatalog(null); setLessonId(""); setError(""); setReload(n => n + 1); }}>Tải lại bài học</button>}
-      <div className="simulation-actions">
-        <button type="button" onClick={onClose}>Hủy</button>
-        <button type="submit" disabled={loading || !title.trim() || !lessonId || (!folderId && !folderName.trim())}>{busy ? "Đang lưu…" : "Lưu vào thư viện"}</button>
-      </div>
+      {error && <p className="save-note save-note-error" role="alert">{error}</p>}
     </fieldset>
+    <div className="simulation-actions save-actions">
+      <button type="button" onClick={onClose} disabled={busy}>Hủy</button>
+      <button type="submit" className="simulation-primary-button" disabled={busy || loading}>{busy ? "Đang lưu…" : "Lưu vào thư viện"}</button>
+    </div>
   </form>;
 }

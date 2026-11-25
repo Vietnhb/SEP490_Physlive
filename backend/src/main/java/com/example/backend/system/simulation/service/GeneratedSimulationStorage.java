@@ -48,6 +48,18 @@ public class GeneratedSimulationStorage {
     private final SimulationRunRepository runs;
     private final LibraryService library;
 
+    /**
+     * Verified by laws, partly verified, an illustration no approved law covers, or a run the checks flagged. A flagged
+     * run is the teacher's own work all the same: it is kept and used like any other (status FLAGGED), and the
+     * "needs review" warning travels with its validation result wherever it is shown.
+     */
+    static boolean isSaveable(String status) {
+        return status.startsWith("VERIFIED") || "ILLUSTRATIVE".equals(status) || "VISUAL_ONLY_UNVERIFIED".equals(status)
+                || FLAGGED.equals(status);
+    }
+
+    static final String FLAGGED = "FLAGGED";
+
     @Transactional
     public LibraryItemResponse save(SimulationRequests.Save request, SchemaVersion schema, ObjectNode computed) {
         var user = currentUser.requireCurrentUser();
@@ -66,8 +78,11 @@ public class GeneratedSimulationStorage {
         String status = computed.path(VALIDATION).path("status").asText();
         // A run that breaks a law or that the solver could not settle is not kept; a run no law covers is kept as
         // what it is — an illustration — and carries that status wherever it is shown.
-        if (!status.startsWith("VERIFIED") && !status.equals("ILLUSTRATIVE"))
-            throw ApiException.conflict("Mô phỏng này vi phạm định luật hoặc chưa tính ổn định nên chưa lưu được. Hãy sửa mô tả rồi phân tích lại");
+        // The topic-equation runtime reports a run whose description is only partly covered by approved equations
+        // as VISUAL_ONLY_UNVERIFIED; the workspace shows it as "Minh hoạ", so it is kept exactly like ILLUSTRATIVE.
+        if (!isSaveable(status))
+            throw ApiException.conflict("Mô phỏng chưa có kết quả tính hợp lệ nên chưa lưu được. Hãy phân tích lại mô tả");
+        boolean flagged = FLAGGED.equals(status);
         ObjectNode snapshot = request.simulation().deepCopy();
         ObjectNode spec = (ObjectNode) snapshot.path(SIMULATION_SPEC);
         spec.put("topic", schema.getTopic());
@@ -106,7 +121,7 @@ public class GeneratedSimulationStorage {
         specification.setRelations(snapshot.arrayNode());
         specification.setAmbiguity(snapshot.arrayNode());
         specification.setConfirmationState(ConfirmationState.CONFIRMED);
-        specification.setValidationStatus("PASSED");
+        specification.setValidationStatus(flagged ? FLAGGED : "PASSED");
         specification.setValidationResult(computed.path(VALIDATION).deepCopy());
         entities.persist(specification);
         submission.setCurrentSpecification(specification);
@@ -122,7 +137,7 @@ public class GeneratedSimulationStorage {
         run.setRunType("GENERATED");
         run.setSchemaId(schema.getSchemaId());
         run.setSchemaVersion(schema.getVersion());
-        run.setValidationPassed(true);
+        run.setValidationPassed(!flagged);
         run.setValidationCheckpoints(computed.path(VALIDATION).deepCopy());
         run.setDurationSeconds(computed.path(SOLVER_TIMELINE).path("durationSeconds").asDouble(spec.path("durationSeconds").asDouble()));
         run.setResult(snapshot);

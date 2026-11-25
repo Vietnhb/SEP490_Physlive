@@ -121,7 +121,7 @@ public class AssignmentService {
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy mục trong thư viện cá nhân"));
         Specification specification = libraryItem.getSpecification();
         if (libraryItem.getSimulation() == null || libraryItem.getSimulation().getStatus() != SimulationStatus.READY
-                || !"PASSED".equals(specification.getValidationStatus()))
+                || !java.util.Set.of("PASSED", "FLAGGED").contains(specification.getValidationStatus()))
             throw ApiException.conflict("Chỉ có thể giao mô phỏng đã lưu và đã kiểm định");
         for (Integer studentId : request.studentIds()) {
             User student = userRepository.findById(studentId)
@@ -205,6 +205,26 @@ public class AssignmentService {
                 .anyMatch(enrollment -> classTeacherAssignments.existsBySchoolClassIdAndTeacherIdAndIsActiveTrue(
                         enrollment.getSchoolClass().getId(), teacher.getId()));
         if (!assigned) throw ApiException.forbidden("Giáo viên chưa được phân công vào lớp của học sinh");
+    }
+
+    /** Hand-in and grading counts for every assignment the teacher can see, read with one query for the dashboard. */
+    @Transactional(readOnly = true)
+    public List<com.example.backend.system.assignment.dto.AssignmentContracts.AssignmentProgress> progressForTeacher() {
+        List<AssignmentResponse> visible = forTeacher();
+        if (visible.isEmpty()) return List.of();
+        java.util.Map<UUID, List<AssignmentSubmission>> byAssignment = submissionRepository
+                .findByAssignmentIdIn(visible.stream().map(AssignmentResponse::id).toList()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(item -> item.getAssignment().getId()));
+        return visible.stream().map(item -> {
+            List<AssignmentSubmission> rows = byAssignment.getOrDefault(item.id(), List.of()).stream()
+                    .filter(row -> item.studentIds().contains(row.getStudent().getId())).toList();
+            int submitted = (int) rows.stream().filter(row -> row.getCompletedAt() != null).count();
+            int awaiting = (int) rows.stream().filter(row -> row.getCompletedAt() != null && !row.isRetryAllowed()
+                    && row.getGradingStatus() != GradingStatus.TEACHER_CONFIRMED && row.getGradingStatus() != GradingStatus.MISSED_DEADLINE).count();
+            int confirmed = (int) rows.stream().filter(row -> row.getGradingStatus() == GradingStatus.TEACHER_CONFIRMED).count();
+            return new com.example.backend.system.assignment.dto.AssignmentContracts.AssignmentProgress(
+                    item.id(), item.studentIds().size(), submitted, awaiting, confirmed);
+        }).toList();
     }
 
     @Transactional(readOnly = true)

@@ -44,7 +44,8 @@ public class LibraryService {
         Simulation simulation = simulationRepository.findByIdAndOwnerId(request.simulationId(), user.getId())
                 .orElseThrow(() -> ApiException.notFound("Không tìm thấy mô phỏng"));
         Specification specification = simulation.getSpecification();
-        if (simulation.getStatus() != SimulationStatus.READY || !"PASSED".equals(specification.getValidationStatus())) {
+        // a run the law checks flagged is kept and used like any other; its "needs review" warning travels with it
+        if (simulation.getStatus() != SimulationStatus.READY || !java.util.Set.of("PASSED", "FLAGGED").contains(specification.getValidationStatus())) {
             throw ApiException.conflict("Chỉ có thể lưu mô phỏng đã kiểm định");
         }
         LibraryFolder folder = folderRepository.findByIdAndOwnerIdAndActiveTrue(request.folderId(), user.getId())
@@ -188,7 +189,7 @@ public class LibraryService {
             Simulation simulation = item.getSimulation();
             if (simulation == null || simulation.getOwner() == null || !user.getId().equals(simulation.getOwner().getId()))
                 throw ApiException.forbidden("Chỉ chia sẻ được mô phỏng do chính bạn tạo, không chia sẻ được bản sao lấy từ người khác.");
-            if (simulation.getStatus() != SimulationStatus.READY || !"PASSED".equals(item.getSpecification().getValidationStatus()))
+            if (simulation.getStatus() != SimulationStatus.READY || !java.util.Set.of("PASSED", "FLAGGED").contains(item.getSpecification().getValidationStatus()))
                 throw ApiException.conflict("Chỉ chia sẻ được mô phỏng đã kiểm định.");
             if (visibility == Visibility.SHARED && (user.getInstitutionId() == null || user.getInstitutionId().isBlank()))
                 throw ApiException.badRequest("Chia sẻ cấp trường cần tài khoản thuộc một trường.");

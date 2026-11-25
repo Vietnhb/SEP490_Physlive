@@ -100,7 +100,7 @@ public class SecurityConfig {
                 .requestMatchers(GET, "/api/assignments/mine/teacher/classes/*/grades", "/api/assignments/mine/teacher/classes/*/grades/page").hasRole(STAFF)
                 .requestMatchers(GET, "/api/assignments/*/grades.csv").hasRole(STAFF)
                 .requestMatchers(GET, "/api/assignments/*/submissions/*/grade-history").hasAnyRole(SCHOOL, STAFF, MANAGER)
-                .requestMatchers("/api/assignments/mine/teacher", "/api/assignments/mine/teacher/classes",
+                .requestMatchers("/api/assignments/mine/teacher", "/api/assignments/mine/teacher/classes", "/api/assignments/mine/teacher/progress",
                     "/api/assignments/*/submissions", "/api/assignments/*/report",
                     "/api/assignments/*/submissions/*/grade", "/api/assignments/*/submissions/*/reopen").hasAnyRole(STAFF, MANAGER)
                 .requestMatchers("/api/assignments/mine/student", "/api/assignments/*/predictions",

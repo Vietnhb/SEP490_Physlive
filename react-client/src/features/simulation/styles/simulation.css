@@ -745,18 +745,36 @@
 }
 .sim-analysis__tabs button[aria-selected="true"] { background: var(--sim-accent-soft); color: var(--sim-accent); }
 .sim-analysis__hint { margin: 2px 0 0; font-size: 12px; color: var(--sim-muted); }
-.simulation-save-panel { padding: 18px; margin: 12px 0; border: 1px solid var(--sim-border, var(--line-strong)); border-radius: 12px; background: var(--simulation-surface); }
-.simulation-save-panel h3 { margin: 0 0 8px; }
-.simulation-save-panel fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
-.simulation-save-panel label { display: grid; gap: 6px; font-weight: 600; }
-.simulation-save-panel input, .simulation-save-panel select { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid var(--sim-border, var(--line-strong)); border-radius: 8px; font: inherit; color: inherit; background: var(--simulation-surface); }
-.simulation-save-panel small, .simulation-save-panel p { font-weight: 400; font-size: 13px; }
-.simulation-save-panel .simulation-lesson-picker legend { padding: 0; margin-bottom: 6px; font-weight: 600; }
-.simulation-lesson-options { max-height: 240px; overflow-y: auto; min-width: 0; display: grid; gap: 6px; }
-.simulation-save-panel .simulation-lesson-option { display: flex; align-items: flex-start; gap: 8px; padding: 9px; border: 1px solid var(--sim-border, var(--line-strong)); border-radius: 8px; font-size: 13px; font-weight: 400; cursor: pointer; }
-.simulation-save-panel .simulation-lesson-option input { width: 16px; height: 16px; flex: 0 0 16px; margin: 2px 0 0; padding: 0; }
-.simulation-lesson-option span { min-width: 0; overflow-wrap: anywhere; }
-.simulation-lesson-option:has(input:checked) { background: var(--sim-accent-soft); border-color: var(--sim-accent); }
+/* Save panel: one column, clear hierarchy, actions pinned at the bottom of the card */
+.simulation-save-panel { --sp-ink: var(--tw-ink, var(--ink, #1a1c20)); --sp-muted: var(--tw-muted, var(--muted, #5b6170)); --sp-line: var(--tw-outline, var(--sim-border, var(--line-strong))); --sp-accent: var(--tw-primary, var(--sim-accent, var(--accent))); --sp-soft: var(--tw-primary-container, var(--sim-accent-soft)); --sp-surface: var(--tw-surface, var(--simulation-surface));
+  display: flex; flex-direction: column; gap: 16px; margin: 12px 0; padding: 20px; border: 1px solid var(--sp-line); border-radius: 16px; background: var(--sp-surface); color: var(--sp-ink); }
+.simulation-save-panel .save-head { display: grid; gap: 4px; }
+.simulation-save-panel .save-head h3 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; }
+.simulation-save-panel .save-head p { margin: 0; font-size: 13px; line-height: 20px; color: var(--sp-muted); }
+.simulation-save-panel fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.simulation-save-panel .save-fields { display: grid; gap: 16px; }
+.simulation-save-panel .save-field { display: grid; gap: 6px; }
+.simulation-save-panel .save-field > span, .simulation-save-panel .simulation-lesson-picker legend { font-size: 13px; line-height: 20px; font-weight: 600; color: var(--sp-ink); }
+.simulation-save-panel .simulation-lesson-picker legend { display: flex; gap: 4px; align-items: baseline; padding: 0; margin: 0 0 6px; }
+.simulation-save-panel .simulation-lesson-picker legend small { font-weight: 400; color: var(--sp-muted); }
+.simulation-save-panel input:not([type="radio"]), .simulation-save-panel select { box-sizing: border-box; width: 100%; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--sp-line); border-radius: 10px; background: var(--sp-surface); color: var(--sp-ink); font: inherit; font-size: 14px; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.simulation-save-panel input:not([type="radio"]):hover, .simulation-save-panel select:hover { border-color: color-mix(in srgb, var(--sp-line), var(--sp-ink) 25%); }
+.simulation-save-panel input:not([type="radio"]):focus, .simulation-save-panel select:focus { outline: none; border-color: var(--sp-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 22%, transparent); }
+.simulation-lesson-options { display: grid; gap: 8px; max-height: 248px; overflow-y: auto; min-width: 0; }
+.simulation-save-panel .simulation-lesson-option { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--sp-line); border-radius: 12px; cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease; }
+.simulation-save-panel .simulation-lesson-option:hover { background: color-mix(in srgb, var(--sp-soft) 45%, transparent); }
+.simulation-save-panel .simulation-lesson-option input { width: 18px; height: 18px; margin: 0; accent-color: var(--sp-accent); }
+.simulation-lesson-option span { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.simulation-lesson-option b { font-size: 14px; line-height: 20px; font-weight: 500; }
+.simulation-lesson-option small { font-size: 12px; line-height: 16px; color: var(--sp-muted); }
+.simulation-save-panel .save-note { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 20px; }
+.simulation-save-panel .save-note-info { background: var(--sp-soft); color: var(--tw-on-primary-container, var(--sp-ink)); }
+.simulation-save-panel .save-note-warn { background: #fff4e0; color: #7a4a00; }
+.simulation-save-panel .save-note-error { background: #fdecec; color: #a11818; }
+.simulation-save-panel .save-muted { margin: 0; font-size: 13px; color: var(--sp-muted); }
+.simulation-save-panel .save-link { justify-self: start; margin-top: 8px; padding: 0; border: 0; background: none; color: var(--sp-accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.simulation-save-panel .save-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 0; padding-top: 16px; border-top: 1px solid var(--sp-line); }
+.simulation-save-panel .simulation-lesson-option:has(input:checked) { background: var(--sp-soft); border-color: var(--sp-accent); }
 .sim-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 2px 2px; font-size: 13px; }
 .sim-legend__item { display: inline-flex; align-items: center; gap: 6px; }
 .sim-legend__item i { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }

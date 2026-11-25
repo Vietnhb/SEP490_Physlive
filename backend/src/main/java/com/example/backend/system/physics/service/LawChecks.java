@@ -145,6 +145,16 @@ public final class LawChecks {
                 java.util.Optional<Map<String, List<Symbol>>> binding = bind(law, scope, where, symbols, evolving);
                 if (binding.isEmpty()) continue;
                 Map<String, List<Symbol>> bound = binding.get();
+                // One object, several parts of it told apart by "kind" (the primary and the secondary coil of a
+                // transformer): a law that does not name the kind holds for each part on its own, with the kind-less
+                // quantities (the angular frequency) shared. Check it per part instead of calling it ambiguous.
+                if (bound.containsKey(AMBIGUOUS) && !scope.contains("kind") && splitByKind(law, scope, where, symbols, evolving, time, results)) continue;
+                // Bound without doubt but across parts (the secondary's rms voltage with the primary's amplitude): a law
+                // that does not name the kind never relates two parts, so check it per part, or not at all.
+                if (!bound.containsKey(AMBIGUOUS) && !scope.contains("kind") && !namesKinds(law) && mixesKinds(law, bound)) {
+                    splitByKind(law, scope, where, symbols, evolving, time, results);
+                    continue;
+                }
                 if (bound.containsKey(AMBIGUOUS)) {
                     ObjectNode note = results.addObject().put("law", law.path("id").asText()).put(TITLE, law.path(TITLE).asText()).put(STATUS, "AMBIGUOUS");
                     where.forEach(note.putObject(SCOPE)::put);
@@ -156,6 +166,50 @@ public final class LawChecks {
             }
         }
         return results;
+    }
+
+    /**
+     * Binds an ambiguous law once per "kind" found among its candidates, each time with only the quantities of that
+     * kind and those of no kind. Done only when every part then binds without doubt; otherwise nothing is added.
+     */
+    private boolean splitByKind(JsonNode law, List<String> scope, Map<String, String> where, List<Symbol> symbols,
+                                Set<String> evolving, double[] time, ArrayNode results) {
+        Set<String> kinds = new LinkedHashSet<>();
+        for (Symbol symbol : symbols)
+            if (symbol.get("kind") != null && (where.get("of") == null || where.get("of").equals(symbol.get("of")))) kinds.add(symbol.get("kind"));
+        if (kinds.size() < 2) return false;
+        List<ObjectNode> checked = new ArrayList<>();
+        for (String kind : kinds) {
+            List<Symbol> part = symbols.stream().filter(s -> s.get("kind") == null || kind.equals(s.get("kind"))).toList();
+            java.util.Optional<Map<String, List<Symbol>>> binding = bind(law, scope, where, part, evolving);
+            if (binding.isEmpty()) continue;
+            if (binding.get().containsKey(AMBIGUOUS)) return false;
+            // a part that only shares kind-less quantities says nothing of its own
+            if (binding.get().values().stream().flatMap(List::stream).noneMatch(s -> kind.equals(s.get("kind")))) continue;
+            Map<String, String> partWhere = new LinkedHashMap<>(where);
+            partWhere.put("kind", kind);
+            ObjectNode result = evaluate(law, partWhere, binding.get(), time);
+            if (result != null) checked.add(result);
+        }
+        if (checked.isEmpty()) return false;
+        checked.forEach(results::add);
+        return true;
+    }
+
+    /** Whether the law itself says which part each quantity belongs to (the transformer's U1 primary, U2 secondary). */
+    private static boolean namesKinds(JsonNode law) {
+        for (JsonNode variable : law.path("bind")) if (variable.path("where").has("kind")) return true;
+        return false;
+    }
+
+    /**
+     * Whether the single quantities bound to one law come from more than one part (kind) of an object. Variables that
+     * gather many quantities (the forces Newton's law adds up, each of its own kind) are meant to span kinds.
+     */
+    private static boolean mixesKinds(JsonNode law, Map<String, List<Symbol>> bound) {
+        return bound.entrySet().stream().filter(entry -> !law.path("bind").path(entry.getKey()).path("many").asBoolean())
+                .flatMap(entry -> entry.getValue().stream()).map(symbol -> symbol.get("kind"))
+                .filter(java.util.Objects::nonNull).distinct().count() > 1;
     }
 
     private static Set<Map<String, String>> scopes(List<String> scope, List<Symbol> symbols) {
