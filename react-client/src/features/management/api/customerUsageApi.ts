@@ -4,7 +4,7 @@ export type UsageSchool = {
   lastActivity: string | null; attention: string; lastContactAt?: string | null; nextFollowUpAt?: string | null; lastContactOutcome?: string | null;
 };
 export type UsageMetric = "aiCalls" | "activeUsers" | "assignments" | "submissions" | "tokens" | "revenue";
-export type UsagePoint = { label: string; activeUsers: number; aiCalls: number; assignments: number; submissions: number; revenue: number };
+export type UsagePoint = { label: string; activeUsers: number; aiCalls: number; assignments: number; submissions: number; tokens?: number; revenue: number };
 export type CustomerUsageReport = {
   year: number; month: number | null;
   summary: { schools: number; activeSchools: number; activeUsers: number; aiCalls: number; assignments: number; submissions: number; tokens: number; revenue: number };

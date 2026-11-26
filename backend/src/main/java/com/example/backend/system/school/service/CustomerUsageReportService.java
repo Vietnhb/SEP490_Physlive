@@ -23,7 +23,7 @@ public class CustomerUsageReportService {
     public record Row(UUID id, String name, String code, String plan, LocalDate licenseEnd,
         long activeUsers, long aiCalls, long assignments, long submissions, long tokens, long revenue,
         Instant lastActivity, String attention, Instant lastContactAt, Instant nextFollowUpAt, String lastContactOutcome) {}
-    public record Point(String label, long activeUsers, long aiCalls, long assignments, long submissions, long revenue) {}
+    public record Point(String label, long activeUsers, long aiCalls, long assignments, long submissions, long tokens, long revenue) {}
     public record Group(String key, long count) {}
     public record Summary(long schools, long activeSchools, long activeUsers, long aiCalls, long assignments,
         long submissions, long tokens, long revenue) {}
@@ -145,11 +145,11 @@ public class CustomerUsageReportService {
             var meta=jdbc.queryForMap(SOURCES+"SELECT count(DISTINCT actor) FILTER(WHERE at>=:from AND at<:until) AS users,min(at) AS first FROM events WHERE school_id IN (:ids)",ctx.params());
             users=((Number)meta.get("users")).longValue();if(meta.get("first") instanceof Timestamp time)first=time.toInstant();
             String bucket=month==null?"YYYY-MM":"YYYY-MM-DD";
-            var points=jdbc.queryForList(SOURCES+"SELECT to_char(at AT TIME ZONE 'Asia/Ho_Chi_Minh','"+bucket+"') AS label,count(DISTINCT actor) AS users,count(*) FILTER(WHERE kind='AI') AS calls,count(*) FILTER(WHERE kind='ASSIGNED') AS assigned,count(*) FILTER(WHERE kind='SUBMITTED') AS submitted,coalesce(sum(revenue),0) AS revenue FROM events WHERE school_id IN (:ids) AND at>=:from AND at<:until GROUP BY label ORDER BY label",ctx.params());
-            for(var p:points)trend.add(new Point((String)p.get("label"),num(p,"users"),num(p,"calls"),num(p,"assigned"),num(p,"submitted"),num(p,"revenue")));
+            var points=jdbc.queryForList(SOURCES+"SELECT to_char(at AT TIME ZONE 'Asia/Ho_Chi_Minh','"+bucket+"') AS label,count(DISTINCT actor) AS users,count(*) FILTER(WHERE kind='AI') AS calls,count(*) FILTER(WHERE kind='ASSIGNED') AS assigned,count(*) FILTER(WHERE kind='SUBMITTED') AS submitted,coalesce(sum(tokens),0) AS tokens,coalesce(sum(revenue),0) AS revenue FROM events WHERE school_id IN (:ids) AND at>=:from AND at<:until GROUP BY label ORDER BY label",ctx.params());
+            for(var p:points)trend.add(new Point((String)p.get("label"),num(p,"users"),num(p,"calls"),num(p,"assigned"),num(p,"submitted"),num(p,"tokens"),num(p,"revenue")));
         }
         int count=month==null?12:YearMonth.of(year,month).lengthOfMonth();Map<String,Point> points=new HashMap<>();trend.forEach(point->points.put(point.label(),point));trend.clear();
-        for(int i=1;i<=count;i++){String key=month==null?String.format(Locale.ROOT,"%04d-%02d",year,i):String.format(Locale.ROOT,"%04d-%02d-%02d",year,month,i);trend.add(points.getOrDefault(key,new Point(key,0,0,0,0,0)));}
+        for(int i=1;i<=count;i++){String key=month==null?String.format(Locale.ROOT,"%04d-%02d",year,i):String.format(Locale.ROOT,"%04d-%02d-%02d",year,month,i);trend.add(points.getOrDefault(key,new Point(key,0,0,0,0,0,0)));}
         Summary summary=new Summary(filtered.size(),filtered.stream().filter(r->r.activeUsers()>0).count(),users,
             filtered.stream().mapToLong(Row::aiCalls).sum(),filtered.stream().mapToLong(Row::assignments).sum(),filtered.stream().mapToLong(Row::submissions).sum(),
             filtered.stream().mapToLong(Row::tokens).sum(),filtered.stream().mapToLong(Row::revenue).sum());
@@ -159,7 +159,7 @@ public class CustomerUsageReportService {
         return new Report(year,month,summary,trend,filtered.stream().filter(r->metric(r,sort)>0).limit(5).toList(),groups,
             filtered.subList(page*size,Math.min(filtered.size(),(page+1)*size)),filtered.size(),page,size,pages,plans,first,ctx.now());
     }
-    private static long num(Map<String,Object> row,String key){return ((Number)row.get(key)).longValue();}
+    private static long num(Map<String,Object> row,String key){var value=row.get(key);return value instanceof Number n?n.longValue():0L;}
     private static long metric(Row row,String sort){return switch(sort){case "activeUsers"->row.activeUsers();case "assignments"->row.assignments();case "submissions"->row.submissions();case "tokens"->row.tokens();case "revenue"->row.revenue();default->row.aiCalls();};}
     public byte[] csv(int year,Integer month,String query,String plan,String sort,String attention){
         Context ctx=prepare(year,month,query,plan,sort,attention,null);
