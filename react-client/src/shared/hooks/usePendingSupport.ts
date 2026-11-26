@@ -17,7 +17,7 @@ export function usePendingSupport(enabled = true) {
     // Never invalidate the pending-count query itself, or this would create a refetch loop.
     void queryClient.invalidateQueries({ predicate: query => {
       const path = String(query.queryKey[2]).split("?")[0];
-      return query.queryKey[0] === "api" && (path === "/support/inbox" || path === "/admin/appeals");
+      return query.queryKey[0] === "api" && (path === "/support/inbox" || path === "/support/inbox/school-statistics" || path === "/admin/appeals");
     } });
   }, [enabled, count, revision]);
   return result.data?.count ?? 0;

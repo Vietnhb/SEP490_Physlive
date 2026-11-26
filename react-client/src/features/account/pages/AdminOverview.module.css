@@ -165,3 +165,14 @@
 .operationPeriod,.operationNote { font-size:12px; line-height:1.6; color:var(--gray-11); margin:16px 0; }
 .operationTotal { display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding:14px 16px; background:var(--accent-3); border-radius:10px; }.operationTotal strong { font-size:26px; color:var(--accent-11); }
 .operationList { margin:8px 0; }.operationList > div { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px 0; border-bottom:1px solid var(--gray-5); }.operationList dt { font-size:14px; font-weight:600; }.operationList small { display:block; font-size:12px; font-weight:400; color:var(--gray-11); margin-top:5px; }.operationList dd { margin:0; font-weight:700; font-size:20px; }.operationFooter { display:flex; justify-content:flex-end; margin-top:20px; }
+
+/* Compact weekly revenue columns, matching the supplied dashboard. */
+.revenuePanel .chart { padding:12px 0 0; background:transparent; }
+.revenuePanel .chartColumns { gap:10px; }
+.revenuePanel .chartColumn { grid-template-rows:24px 148px auto; gap:6px; }
+.revenuePanel .chartBar { width:100%; max-width:none; border-radius:6px 6px 0 0; background:#6b8ece; }
+.revenuePanel .chartColumn:last-child .chartBar { background:#23919a; }
+.revenuePanel .chartBar[data-empty] { background:var(--m3-outline); }
+.revenuePanel .chartValue { color:var(--m3-on-surface); font-size:11px; }
+.revenuePanel .barTrack { border:0; }
+.revenuePanel .chartLabel { font-size:11px; }
