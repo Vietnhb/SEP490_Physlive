@@ -235,6 +235,7 @@ export function UsersView({ schoolId }: Readonly<{ schoolId?: string }> = {}) {
       { value: "SCHOOL", label: "Quản lý trường", count: counts.SCHOOL ?? 0, dotClass: styles.roleSchool },
       { value: "MANAGER", label: "Vận hành", count: counts.MANAGER ?? 0, dotClass: styles.roleManager },
       { value: "REVIEWER", label: "Kiểm duyệt vật lý", count: counts.REVIEWER ?? 0, dotClass: styles.roleReviewer },
+      { value: "ADMIN", label: "Quản trị hệ thống", count: counts.ADMIN ?? 0, dotClass: styles.roleAdmin },
     ];
 
   const schoolNameFor = (item: User) => {
@@ -270,9 +271,9 @@ export function UsersView({ schoolId }: Readonly<{ schoolId?: string }> = {}) {
     <section className={styles.stats} aria-label="Số liệu tài khoản">
       <button type="button" className={`${styles.stat} ${styles.indigo}`} aria-pressed={selectedRole === "ALL"} onClick={() => selectRole("ALL")}>
         <span className={styles.statIcon}><LearningIcon name="users" /></span>
-        <span className={styles.statLabel}>Tổng tài khoản</span>
-        <strong className={styles.statValue}>{known ? (counts.total ?? 0).toLocaleString("vi-VN") : "—"}</strong>
-        <span className={styles.statHint}>{schoolScoped ? "Tài khoản thuộc trường" : "Toàn bộ tài khoản trên nền tảng"}</span>
+        <span className={styles.statLabel}>{schoolScoped ? "Giáo viên & Học sinh" : "Tổng tài khoản"}</span>
+        <strong className={styles.statValue}>{known ? (schoolScoped ? (counts.STAFF ?? 0) + (counts.STUDENT ?? 0) : (counts.total ?? 0)).toLocaleString("vi-VN") : "—"}</strong>
+        <span className={styles.statHint}>{schoolScoped ? (schoolCount > 0 ? `Ngoài ra có ${schoolCount.toLocaleString("vi-VN")} quản lý trường (chỉ xem)` : "Tài khoản giảng dạy & học tập") : "Toàn bộ tài khoản trên nền tảng"}</span>
         <svg className={styles.spark} viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden="true">
           <path className={styles.sparkArea} d="M0 26 C18 26 32 25 48 22 C64 18 76 6 92 14 C104 20 112 24 120 24 L120 32 L0 32 Z" />
           <path className={styles.sparkLine} d="M0 26 C18 26 32 25 48 22 C64 18 76 6 92 14 C104 20 112 24 120 24" />
