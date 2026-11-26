@@ -71,3 +71,37 @@
   .actions { align-items: stretch; flex-direction: column-reverse; }
   .actions > button { width: 100%; }
 }
+
+.pageWorkflow .stepper { gap: 8px; }
+.pageWorkflow .stepper li { display: block; padding-top: 10px; border-top: 3px solid var(--gray-5); font-size: 12px; }
+.pageWorkflow .stepper li.activeStep { border-color: var(--teal-9); color: var(--teal-11) !important; }
+.pageWorkflow .stepper li.completedStep { border-color: var(--green-8); }
+.pageWorkflow .stepper li::after, .pageWorkflow .stepper li > span, .pageWorkflow .stepper small { display: none; }
+.pageWorkflow .stepper strong { font-weight: 500; font-size: 12px; white-space: normal; }
+.pageWorkflow .stepContent { border: 1px solid var(--gray-6); border-radius: 16px; padding: 20px; background: var(--color-panel-solid); box-shadow: 0 1px 2px var(--black-a2); }
+.pageWorkflow .sectionHeading { align-items: center; }
+.pageWorkflow .sectionHeading h2 { font-size: 15px; }
+.pageWorkflow .sectionHeading p { display: none; }
+.pageWorkflow .sectionHeading button { font-size: 12px; border-radius: 8px; }
+.pageWorkflow .dropzone { min-height: 180px; box-sizing: border-box; padding: 22px; border-radius: 14px; border-color: var(--gray-7); background: var(--gray-2); gap: 8px; }
+.pageWorkflow .dropzoneActive { background: var(--teal-2); border-color: var(--teal-9); }
+.pageWorkflow .uploadIcon { width: 36px; height: 36px; background: transparent; color: var(--gray-11); }
+.pageWorkflow .uploadIcon svg { width: 23px; height: 23px; }
+.pageWorkflow .dropzone strong { font-size: 13px; }
+.pageWorkflow .dropzone button { border-radius: 8px; }
+.pageWorkflow .guide { border: 0; padding: 0; background: transparent; }
+.pageWorkflow .guide p { font-size: 12px; }
+.pageWorkflow .actions { border-top: 1px solid var(--gray-5); padding-top: 16px; }
+.templateExample { min-width: 0; }
+.templateExample h3 { font-size: 13px; font-weight: 500; margin: 0 0 5px; }
+.templateExample > p { font-size: 12px; color: var(--gray-11); margin: 0 0 12px; }
+.sampleScroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--gray-6); border-radius: 10px; }
+.sampleScroll table { width: 100%; border-spacing: 0; text-align: left; font-size: 12px; }
+.sampleScroll th, .sampleScroll td { padding: 13px 12px; white-space: nowrap; border-bottom: 1px solid var(--gray-5); }
+.sampleScroll th { background: var(--gray-2); font-weight: 500; }
+.sampleScroll th small { display: block; font-weight: 400; color: var(--gray-11); margin-top: 4px; font-family: ui-monospace, monospace; font-size: 10px; }
+.sampleScroll tr:last-child td { border-bottom: 0; }
+.sampleMuted { color: var(--gray-10); }
+@media(max-width: 640px) { .pageWorkflow .stepContent { padding: 16px; } .pageWorkflow .sectionHeading { align-items: stretch; } }
+
+.sampleScroll table td, .sampleScroll table th { font-size: 12px; }

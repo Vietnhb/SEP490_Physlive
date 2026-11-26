@@ -6,7 +6,7 @@
   font-size: 15px;
   line-height: 1.6;
 }
-.main.student-main.student-workspace > .modern-container { width: 100%; max-width: var(--page-max); padding: 0; }
+.main.student-main.student-workspace > .modern-container { width: 100%; max-width: none; margin-inline: 0; padding: 0; }
 .student-workspace .rt-Card { border-radius: 12px; background: var(--surface); }
 .student-workspace .rt-Button .learn-icon, .student-workspace .rt-IconButton .learn-icon, .student-workspace .rt-TextFieldSlot .learn-icon, .student-workspace .rt-CalloutIcon .learn-icon { width: 17px; height: 17px; }
 

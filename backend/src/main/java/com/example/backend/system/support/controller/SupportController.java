@@ -29,6 +29,11 @@ public class SupportController {
         return inbox.page(page, size, kind, handler, status, query, from, to);
     }
 
+    @GetMapping("/inbox/school-statistics")
+    public com.example.backend.system.support.service.SupportInboxService.SchoolAppealStatistics schoolStatistics() {
+        return inbox.schoolStatistics();
+    }
+
     @GetMapping("/inbox/pending-count")
     public java.util.Map<String, Long> pendingCount() {
         long revision = realtime.currentSupportRevision();

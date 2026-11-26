@@ -1,0 +1,3 @@
+export default function ManagerSchoolsArt() {
+return <svg width="154" height="100" viewBox="0 0 180 112" fill="none" aria-hidden="true"><ellipse cx="91" cy="67" rx="72" ry="35" fill="#e2f1f2"/><ellipse cx="89" cy="32" rx="68" ry="17" stroke="#9ac5cf" strokeDasharray="2 4" transform="rotate(-8 89 32)"/><g stroke="#527d9f" strokeWidth="1.2" strokeLinejoin="round"><path d="M20 99h143M36 95V54h110v41M29 54l62-30 63 30H29Z" fill="#f5fafb"/><path d="M49 58v37m17-37v37m17-37v37m18-37v37m18-37v37m15-37v37M84 95V76h16v19M91 24V10l11 4-11 5M41 51h101M35 96h113"/></g><circle cx="91" cy="43" r="4" fill="#23919a"/><circle cx="157" cy="28" r="3" fill="#23919a"/><circle cx="27" cy="48" r="2" fill="#9ac5cf"/></svg>;
+}

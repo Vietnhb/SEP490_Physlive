@@ -4,7 +4,7 @@ import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import type { DataPage } from "../../../shared/api/page";
 import { useRef, useState, type FormEvent } from "react";
 import { AlertDialog, Badge, Button, Callout, Card, Dialog, Flex, Select, Table, TextField } from "@radix-ui/themes";
-import { MagnifyingGlassIcon, PlusIcon } from "@radix-ui/react-icons";
+import { MagnifyingGlassIcon, PlusIcon, DashboardIcon, ExclamationTriangleIcon, PersonIcon, CheckCircledIcon } from "@radix-ui/react-icons";
 import { motion, useReducedMotion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { archiveSchoolClass, createSchoolClass, restoreSchoolClass } from "../api/schoolApi";
@@ -12,9 +12,18 @@ import type { SchoolClassRequest, SchoolClassSummary } from "../types";
 import { apiMessage } from "../../../shared/lib/apiError";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import s from "./SchoolClasses.module.css";
+import ClassManagementArt from "./ClassManagementArt";
 import { ClassTableLoading } from "./SchoolLoading";
-import { FormField, PageHeader } from "../../../shared/ui/ManagementUI";
+import { FormField } from "../../../shared/ui/ManagementUI";
 import modal from "../../../shared/ui/ModalScroll.module.css";
+
+type ClassStatistics = {
+  activeClasses: number; unassignedClasses: number; averageSize: number; minimumSize: number; maximumSize: number;
+  enrolledStudents: number; multiClassStudents: number;
+  grades: { gradeLevel: number; classCount: number; averageSize: number }[];
+  needsAttention: { id: string; name: string; gradeLevel: number; studentCount: number }[];
+};
+const number = (value: number) => value.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 
 const blankClass = (): SchoolClassRequest => {
   const today = new Date();
@@ -32,6 +41,7 @@ export default function SchoolClasses() {
   const [schoolYear, setSchoolYear] = useState("ALL");
   const [status, setStatus] = useState("ACTIVE");
   const [classPage, setClassPage] = useState(1);
+  const [classPageSize, setClassPageSize] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [statusTarget, setStatusTarget] = useState<SchoolClassSummary | null>(null);
@@ -59,14 +69,15 @@ export default function SchoolClasses() {
   };
 
   const search = useDebouncedValue(query);
-  const params = new URLSearchParams({ page: String(classPage - 1), size: "10", query: search, year: schoolYear, status });
+  const params = new URLSearchParams({ page: String(classPage - 1), size: String(classPageSize), query: search, year: schoolYear, status });
   if (grade !== "ALL") params.set("grade", grade);
   const resource = useResource<DataPage<SchoolClassSummary> & { years: string[] }>(`/schools/${schoolId}/classes/page?${params}`, Boolean(schoolId));
   const total = resource.data?.totalElements ?? 0;
   const years = resource.data?.years ?? [];
   const loading = resource.loading;
-  const load = resource.refresh;
-  const classPageSize = 10;
+  const statistics = useResource<ClassStatistics>(`/schools/${schoolId}/classes/statistics`, Boolean(schoolId));
+  const stats = statistics.data;
+  const load = () => { void resource.refresh(); void statistics.refresh(); };
   const classPageCount = Math.max(1, resource.data?.totalPages ?? 1);
   const currentClassPage = resource.data ? resource.data.page + 1 : classPage;
   const classPageStart = (currentClassPage - 1) * classPageSize;
@@ -102,14 +113,35 @@ export default function SchoolClasses() {
 
   if (!schoolId) return null;
 
-  return <div className="admin-content">
-    <PageHeader title="Lớp học" description={loading ? "Đang tải dữ liệu lớp học…" : `${total.toLocaleString("vi-VN")} lớp ${status === "ACTIVE" ? "đang hoạt động" : status === "INACTIVE" ? "đã xóa" : "phù hợp"}`}
-      action={actorRole === "SCHOOL" ? <Button disabled={busy || loading} onClick={() => { setForm(blankClass()); setFormError(""); setNotice(""); setShowCreate(true); }}><PlusIcon />Tạo lớp</Button> : undefined} />
+  return <div className={`admin-content ${s.managementPage}`}>
+    <header className={s.feature}>
+      <div className={s.featureCopy}>
+        <span className={s.eyebrow}>KHÔNG GIAN LỚP HỌC</span>
+        <h1>Quản lý lớp học</h1>
+        <p>Sắp xếp lớp, phân công giáo viên và theo dõi học sinh trong trường.</p>
+        <div className={s.featureActions}>
+          {actorRole === "SCHOOL" && <Button disabled={busy || loading} onClick={() => { setForm(blankClass()); setFormError(""); setNotice(""); setShowCreate(true); }}><PlusIcon />Tạo lớp học</Button>}
+          <span>{loading ? "Đang tải danh sách…" : `${total.toLocaleString("vi-VN")} lớp ${status === "ACTIVE" ? "đang hoạt động" : status === "INACTIVE" ? "đã xóa" : "phù hợp bộ lọc"}`}</span>
+        </div>
+      </div>
+      <ClassManagementArt className={s.featureArt} />
+    </header>
     {notice && <Callout.Root color="green" role="status" mb="4"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
-    {(error || resource.error) && <div className="admin-error-banner" role="alert">{error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
+    {(error || resource.error) && <div className="admin-error-banner" role="alert">{error || resource.error}<Button variant="soft" color="red" onClick={() => void load()}>Tải lại</Button></div>}
 
+    <section className={s.statistics} aria-label="Thống kê lớp đang hoạt động" aria-busy={statistics.loading}>
+      {[
+        { title: "Lớp đang hoạt động", value: stats?.activeClasses, detail: stats?.grades.map(item => `Khối ${item.gradeLevel}: ${item.classCount} lớp`).join(" · ") || "Chưa có lớp hoạt động", icon: <DashboardIcon /> },
+        { title: "Chưa phân công giáo viên", value: stats?.unassignedClasses, detail: stats?.unassignedClasses ? "Cần phân công giáo viên phụ trách" : "Đã phân công đầy đủ", icon: <ExclamationTriangleIcon /> },
+        { title: "Sĩ số trung bình", value: stats?.averageSize, detail: stats?.activeClasses ? `Từ ${stats.minimumSize} đến ${stats.maximumSize} học sinh/lớp` : "Chưa có dữ liệu sĩ số", icon: <PersonIcon /> },
+        { title: "Học sinh đã xếp lớp", value: stats?.enrolledStudents, detail: stats?.multiClassStudents ? `${number(stats.multiClassStudents)} em đang học nhiều lớp` : "Học sinh riêng biệt trong các lớp", icon: <PersonIcon /> },
+      ].map(item => <article key={item.title} className={s.statCard}><span className={s.statIcon}>{item.icon}</span><span>{item.title}</span><strong>{item.value === undefined ? "—" : number(item.value)}</strong><small>{item.value === undefined ? "Đang tải số liệu…" : item.detail}</small></article>)}
+    </section>
+    {statistics.error && <div role="alert" className="admin-error-banner">Không thể tải thống kê lớp học.<Button variant="soft" onClick={() => void statistics.refresh()}>Thử lại</Button></div>}
+    <div className={s.directoryLayout}>
     <motion.div className="school-classes-grid" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0 : .18 }}>
-      <Card asChild size="3"><section className="admin-panel">
+      <Card asChild size="3"><section className={`admin-panel ${s.listPanel}`}>
+        <div className={s.listHeading}><h2>Danh sách lớp học</h2><span>Chọn lớp để xem thành viên và bảng điểm</span></div>
 
         <div className={`${s.filters} ${s.classFilters}`}>
           <TextField.Root type="search" value={query} onChange={event => updateQuery(event.target.value)} placeholder="Tìm theo tên lớp hoặc môn học…" aria-label="Tìm lớp học">
@@ -130,7 +162,7 @@ export default function SchoolClasses() {
         </div>
 
         {loading ? <ClassTableLoading headers={["Lớp", "Khối", "Năm học", "Môn học", "Giáo viên", "Học sinh", "Trạng thái", "Thao tác"]} /> : <>
-          <div className="admin-table-scroll"><Table.Root size="2" variant="surface">
+          <div className={`admin-table-scroll ${s.classTable}`}><Table.Root size="2" variant="surface">
             <Table.Header><Table.Row>
               <Table.ColumnHeaderCell>Lớp</Table.ColumnHeaderCell>
               <Table.ColumnHeaderCell>Khối</Table.ColumnHeaderCell>
@@ -143,7 +175,7 @@ export default function SchoolClasses() {
             </Table.Row></Table.Header>
             <Table.Body>
               {visibleClasses.length === 0 ? <Table.Row><Table.Cell colSpan={8}><div className={s.empty}>Không tìm thấy lớp phù hợp với bộ lọc.</div></Table.Cell></Table.Row> : visibleClasses.map(item => <Table.Row key={item.id}>
-                <Table.RowHeaderCell>{item.name}</Table.RowHeaderCell>
+                <Table.RowHeaderCell><div className={s.classIdentity}><span className={s.classSymbol} aria-hidden="true">{item.gradeLevel}</span><span>{item.name}</span></div></Table.RowHeaderCell>
                 <Table.Cell><Badge color="indigo" variant="soft">{item.gradeLevel}</Badge></Table.Cell>
                 <Table.Cell>{item.schoolYear}</Table.Cell>
                 <Table.Cell>{item.subject || "—"}</Table.Cell>
@@ -158,11 +190,20 @@ export default function SchoolClasses() {
               </Table.Row>)}
             </Table.Body>
           </Table.Root></div>
-          {total > 0 && <Pagination start={classPageStart} pageSize={classPageSize} total={total} page={currentClassPage} pageCount={classPageCount} onPageChange={setClassPage} />}
+          {total > 0 && <Pagination start={classPageStart} pageSize={classPageSize} total={total} page={currentClassPage} pageCount={classPageCount} onPageChange={setClassPage} onPageSizeChange={value => { setClassPageSize(value); setClassPage(1); }} />}
         </>}
       </section></Card>
 
     </motion.div>
+    <aside className={s.insights} aria-label="Phân tích lớp đang hoạt động">
+      <section className={s.insightCard}><h2>Sĩ số trung bình theo khối</h2><p>Học sinh / lớp · toàn trường</p>
+        {stats?.grades.length ? stats.grades.map(item => <div key={item.gradeLevel} className={s.gradeSize}><div><span>Khối {item.gradeLevel}</span><strong>{number(item.averageSize)}</strong></div><div className={s.barTrack}><span style={{ width: `${Math.max(0, item.averageSize / Math.max(...stats.grades.map(grade => grade.averageSize), 1) * 100)}%` }} /></div></div>) : <p className={s.insightEmpty}>{statistics.loading ? "Đang tải số liệu…" : statistics.error ? "Chưa tải được số liệu." : "Chưa có lớp đang hoạt động."}</p>}
+      </section>
+      <section className={s.insightCard}><h2>Cần chú ý</h2>
+        {stats?.needsAttention.length ? <>{stats.needsAttention.map(item => <div key={item.id} className={s.attentionItem}><span className={s.gradeTag}>{item.gradeLevel}</span><div><strong>{item.name}</strong><span>Chưa có giáo viên</span><small>{number(item.studentCount)} học sinh</small></div><Button size="1" variant="outline" color="orange" onClick={() => navigate(`/school/classes/${item.id}?mode=edit`)}>Phân công</Button></div>)}{stats.unassignedClasses > stats.needsAttention.length && <p>Còn {stats.unassignedClasses - stats.needsAttention.length} lớp chưa phân công khác.</p>}</> : <div className={s.insightEmpty}><CheckCircledIcon /><span>{statistics.loading ? "Đang kiểm tra…" : statistics.error ? "Chưa tải được số liệu." : stats?.activeClasses ? "Các lớp đang hoạt động đã có giáo viên phụ trách." : "Chưa có lớp cần phân công."}</span></div>}
+      </section>
+    </aside>
+    </div>
 
     <Dialog.Root open={showCreate} onOpenChange={open => { if (!createLock.current) setShowCreate(open); }}>
       <Dialog.Content className={modal.dialog} maxWidth="620px" onEscapeKeyDown={event => { if (createLock.current) event.preventDefault(); }} onInteractOutside={event => { if (createLock.current) event.preventDefault(); }}>
@@ -185,9 +226,9 @@ export default function SchoolClasses() {
   </div>;
 }
 
-function Pagination({ start, pageSize, total, page, pageCount, onPageChange, compact = false }: Readonly<{ start: number; pageSize: number; total: number; page: number; pageCount: number; onPageChange: (page: number) => void; compact?: boolean }>) {
+function Pagination({ start, pageSize, total, page, pageCount, onPageChange, onPageSizeChange, compact = false }: Readonly<{ start: number; pageSize: number; total: number; page: number; pageCount: number; onPageChange: (page: number) => void; onPageSizeChange?: (size: number) => void; compact?: boolean }>) {
   return <div className={`${s.pagination} ${compact ? s.compactPagination : ""}`}>
     <span>Hiển thị {start + 1}–{Math.min(start + pageSize, total)} / {total}</span>
-    <div><Button type="button" size="1" variant="soft" color="gray" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>Trước</Button><span>Trang {page}/{pageCount}</span><Button type="button" size="1" variant="soft" color="gray" disabled={page >= pageCount} onClick={() => onPageChange(Math.min(pageCount, page + 1))}>Sau</Button></div>
+    <div>{onPageSizeChange && <label className={s.pageSize}>Số dòng/trang<select aria-label="Số lớp mỗi trang" value={pageSize} onChange={event => onPageSizeChange(Number(event.target.value))}>{[5, 10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}</select></label>}<Button type="button" size="1" variant="soft" color="gray" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))}>Trước</Button><span>Trang {page}/{pageCount}</span><Button type="button" size="1" variant="soft" color="gray" disabled={page >= pageCount} onClick={() => onPageChange(Math.min(pageCount, page + 1))}>Sau</Button></div>
   </div>;
 }

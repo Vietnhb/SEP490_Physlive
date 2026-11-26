@@ -12,6 +12,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment, UUID> {
     
+    interface StudentClassCount { long getTotal(); }
+
+    @Query("SELECT COUNT(DISTINCT e.schoolClass.id) AS total FROM ClassEnrollment e WHERE e.schoolClass.school.id = :schoolId AND e.schoolClass.isActive = true AND e.status = 'ACTIVE' GROUP BY e.student.id")
+    List<StudentClassCount> activeClassCountsPerStudent(@Param("schoolId") UUID schoolId);
+
     interface ClassCount {
         UUID getClassId();
         long getTotal();

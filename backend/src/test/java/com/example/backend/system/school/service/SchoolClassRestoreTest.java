@@ -149,4 +149,46 @@ class SchoolClassRestoreTest {
         assertTrue(service.list(schoolId).isEmpty());
         assertFalse(service.list(schoolId, true).getFirst().active());
     }
+
+    @Test
+    void classStatisticsIncludesEmptyClassesAndCountsUniqueStudents() {
+        UUID secondId = UUID.randomUUID();
+        var first = mock(SchoolClassRepository.ProfileClass.class);
+        var second = mock(SchoolClassRepository.ProfileClass.class);
+        when(first.getId()).thenReturn(classId); when(first.getName()).thenReturn("10A1"); when(first.getGradeLevel()).thenReturn(10);
+        when(second.getId()).thenReturn(secondId); when(second.getName()).thenReturn("11A1"); when(second.getGradeLevel()).thenReturn(11);
+        when(classes.activeStatisticsClasses(schoolId)).thenReturn(List.of(first, second));
+        var size = mock(ClassEnrollmentRepository.ClassCount.class);
+        when(size.getClassId()).thenReturn(classId); when(size.getTotal()).thenReturn(2L);
+        when(enrollments.countActiveByClasses(List.of(classId, secondId))).thenReturn(List.of(size));
+        var teacher = mock(ClassTeacherAssignmentRepository.ClassCount.class);
+        when(teacher.getClassId()).thenReturn(classId); when(teacher.getTotal()).thenReturn(1L);
+        when(assignments.countActiveByClasses(List.of(classId, secondId))).thenReturn(List.of(teacher));
+        var student = mock(ClassEnrollmentRepository.StudentClassCount.class);
+        when(student.getTotal()).thenReturn(2L);
+        when(enrollments.activeClassCountsPerStudent(schoolId)).thenReturn(List.of(student));
+        var stats = service.statistics(schoolId);
+        assertEquals(2, stats.activeClasses()); assertEquals(1, stats.unassignedClasses());
+        assertEquals(1.0, stats.averageSize()); assertEquals(0, stats.minimumSize()); assertEquals(2, stats.maximumSize());
+        assertEquals(1, stats.enrolledStudents()); assertEquals(1, stats.multiClassStudents());
+        assertEquals(secondId, stats.needsAttention().getFirst().id());
+        assertEquals(2.0, stats.grades().getFirst().averageSize());
+        assertEquals(0.0, stats.grades().get(1).averageSize());
+        verify(enrollments, never()).findActiveStudentsByClassId(any());
+    }
+
+    @Test
+    void emptySchoolStatisticsHasNoInventedNumbers() {
+        var stats = service.statistics(schoolId);
+        assertEquals(0, stats.activeClasses()); assertEquals(0, stats.averageSize());
+        assertTrue(stats.grades().isEmpty()); assertTrue(stats.needsAttention().isEmpty());
+        verifyNoInteractions(enrollments, assignments);
+    }
+
+    @Test
+    void statisticsRejectsAccessToAnotherSchool() {
+        UUID otherSchool = UUID.randomUUID();
+        assertThrows(ApiException.class, () -> service.statistics(otherSchool));
+        verify(classes, never()).activeStatisticsClasses(any());
+    }
 }

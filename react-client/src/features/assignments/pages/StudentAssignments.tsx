@@ -1,4 +1,5 @@
 import { StudentRecentResults } from "../components/StudentRecentResults";
+import { StudentLearningResults } from "../components/StudentLearningInsights";
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
 import { AssignmentList } from "../components/StudentAssignmentList";
@@ -67,6 +68,7 @@ export function StudentHomePage() {
       onRetryClasses={() => void resources.loadClasses()}
       onAssignments={() => navigate("/student/assignments")}
       onExplore={() => navigate("/student/community")}
+      learningResults={<StudentLearningResults {...practice.list} onSelect={assignment => navigate(`/student/assignments?bai=${encodeURIComponent(assignment.id)}`)} />}
       results={<StudentRecentResults {...practice.list} onSelect={assignment => navigate(`/student/assignments?bai=${encodeURIComponent(assignment.id)}`)} />}
       upNext={<StudentUpNext {...practice.list} onSelect={assignment => navigate(`/student/assignments?bai=${encodeURIComponent(assignment.id)}`)} onAll={() => navigate("/student/assignments")} />}
     />
@@ -108,5 +110,5 @@ export function StudentAssignmentsPage() {
 
 export function StudentCommunityPage() {
   const { practice, resources } = useStudent();
-  return <StudentPage layout="library"><Suspense fallback={<p role="status">Đang tải kho cộng đồng…</p>}><ResourceDiscovery {...resources.discovery} titleHidden vectors={practice.vectors} /></Suspense></StudentPage>;
+  return <StudentPage layout="library"><Suspense fallback={<p role="status">Đang tải kho cộng đồng…</p>}><ResourceDiscovery {...resources.discovery} studentDesign vectors={practice.vectors} /></Suspense></StudentPage>;
 }

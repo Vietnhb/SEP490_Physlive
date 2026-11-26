@@ -43,9 +43,10 @@
   pointer-events: none;
 }
 .heroCopy {
-  max-width: 900px;
+  box-sizing: border-box;
+  width: min(1240px, 100%);
   margin: 0 auto;
-  padding: clamp(56px, 8vw, 104px) var(--gutter) clamp(56px, 7vw, 88px);
+  padding: clamp(56px, 8vw, 104px) clamp(20px, 4vw, 48px) clamp(56px, 7vw, 88px);
   text-align: center;
 }
 .page h1 {

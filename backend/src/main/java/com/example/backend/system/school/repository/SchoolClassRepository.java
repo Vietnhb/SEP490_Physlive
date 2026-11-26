@@ -28,6 +28,9 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, UUID>,
 
     boolean existsBySchoolIdAndNameIgnoreCaseAndSchoolYear(UUID schoolId, String name, String schoolYear);
 
+    @Query("SELECT c.id AS id, c.name AS name, c.gradeLevel AS gradeLevel, c.schoolYear AS schoolYear, c.subject AS subject FROM SchoolClass c WHERE c.school.id = :schoolId AND c.isActive = true ORDER BY c.name, c.id")
+    List<ProfileClass> activeStatisticsClasses(@Param("schoolId") UUID schoolId);
+
     interface ProfileClass {
         UUID getId();
         String getName();

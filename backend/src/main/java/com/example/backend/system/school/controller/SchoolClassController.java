@@ -51,6 +51,11 @@ public class SchoolClassController {
     @GetMapping
     public List<SchoolClassContracts.ClassSummary> list(@PathVariable UUID schoolId,
             @RequestParam(defaultValue = "false") boolean includeInactive) { return service.list(schoolId, includeInactive); }
+    @GetMapping("/statistics")
+    public SchoolClassContracts.ClassStatistics statistics(@PathVariable UUID schoolId) {
+        return service.statistics(schoolId);
+    }
+
     @GetMapping("/page")
     public SchoolClassService.ClassPage page(@PathVariable UUID schoolId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size,

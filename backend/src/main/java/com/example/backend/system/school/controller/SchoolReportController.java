@@ -26,6 +26,11 @@ public class SchoolReportController {
         return service.classes(schoolId);
     }
 
+    @GetMapping("/tokens/monthly")
+    public List<SchoolReportContracts.MonthlyTokenRow> monthlyTokens(@PathVariable UUID schoolId) {
+        return service.monthlyTokens(schoolId);
+    }
+
     @GetMapping("/token-audit")
     public List<SchoolReportContracts.TokenRow> tokenAudit(@PathVariable UUID schoolId) {
         return service.tokenAudit(schoolId);

@@ -15,6 +15,7 @@ import {
   type ImportResult,
 } from "../api/importApi";
 import s from "./SchoolBulkImport.module.css";
+import ImportTemplateExample from "./ImportTemplateExample";
 
 const columnLabels: Record<string, string> = {
   fullName: "Họ và tên",
@@ -34,9 +35,10 @@ const columnLabels: Record<string, string> = {
 
 const STEPS = ["Chọn tệp", "Kiểm tra dữ liệu", "Xem trước & xác nhận"] as const;
 type Props = { schoolId: string; kind: ImportKind; label?: string; disabled?: boolean; onImported?: () => void | Promise<void> };
-type WorkflowProps = Props & { onPendingChange?: (pending: boolean) => void; onBusyChange?: (busy: boolean) => void };
+export type ImportCompletion = { kind: ImportKind; filename: string; imported: number; warnings: number; completedAt: string };
+type WorkflowProps = Props & { showTemplateExample?: boolean; onCompleted?: (entry: ImportCompletion) => void; onPendingChange?: (pending: boolean) => void; onBusyChange?: (busy: boolean) => void };
 
-export function SchoolImportWorkflow({ schoolId, kind, onImported, onPendingChange, onBusyChange }: Readonly<WorkflowProps>) {
+export function SchoolImportWorkflow({ schoolId, kind, onImported, onPendingChange, onBusyChange, showTemplateExample = false, onCompleted }: Readonly<WorkflowProps>) {
   const fileRef = useRef<HTMLInputElement>(null);
   const busyRef = useRef(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -156,6 +158,7 @@ export function SchoolImportWorkflow({ schoolId, kind, onImported, onPendingChan
     try {
       const next = await commitImport(schoolId, preview);
       setResult(next);
+      onCompleted?.({ kind, filename: selectedFile?.name ?? "Dữ liệu CSV", imported: next.imported, warnings: preview.rows.filter(row => row.warnings.length > 0).length, completedAt: new Date().toISOString() });
       setPreview(null);
       setSelectedFile(null);
       setDirty(false);
@@ -188,14 +191,14 @@ export function SchoolImportWorkflow({ schoolId, kind, onImported, onPendingChan
 
   if (result) return <div className={s.result} role="status">
     <span className={s.resultIcon}><CheckCircledIcon width="28" height="28" /></span>
-    <div><Text as="p" size="5" weight="bold">Nhập dữ liệu thành công</Text><Text as="p" size="2" color="gray">Backend đã xử lý và xác nhận {result.imported.toLocaleString("vi-VN")} bản ghi.</Text></div>
+    <div><Text as="p" size="5" weight="bold">Nhập dữ liệu thành công</Text><Text as="p" size="2" color="gray">Đã nhập thành công {result.imported.toLocaleString("vi-VN")} bản ghi.</Text></div>
     <div className={s.resultCount}><span>Đã xử lý</span><strong>{result.imported.toLocaleString("vi-VN")}</strong></div>
     {error && <Callout.Root color="amber" role="alert"><Callout.Text>{error}</Callout.Text></Callout.Root>}
     {result.credentials.length > 0 && <div className={s.credentials}><Text as="p" size="2">Hãy tải danh sách tài khoản và mật khẩu ban đầu ngay. Mật khẩu sẽ không hiển thị lại trong danh sách người dùng.</Text><Button onClick={() => downloadBlob(new Blob([credentialsCsv(result.credentials)], { type: "text/csv;charset=utf-8" }), "tai-khoan-moi.csv")}><DownloadIcon />Tải tài khoản và mật khẩu</Button></div>}
     <Button variant="soft" color="gray" onClick={reset}><ReloadIcon />Nhập tệp khác</Button>
   </div>;
 
-  return <div className={s.workflow}>
+  return <div className={`${s.workflow} ${showTemplateExample ? s.pageWorkflow : ""}`}>
     <ol className={s.stepper} aria-label="Tiến trình nhập dữ liệu">
       {STEPS.map((label, index) => {
         const number = index + 1;
@@ -216,6 +219,7 @@ export function SchoolImportWorkflow({ schoolId, kind, onImported, onPendingChan
         <Button type="button" variant="soft" disabled={busy} onClick={() => fileRef.current?.click()}><FileTextIcon />{selectedFile ? "Chọn tệp khác" : "Chọn tệp CSV"}</Button>
         <input ref={fileRef} type="file" accept=".csv,text/csv" hidden aria-label="Chọn tệp CSV" disabled={busy} onChange={chooseFile} />
       </div>
+      {showTemplateExample && <ImportTemplateExample kind={kind} />}
       <div className={s.guide}>{kind === "USERS" ? <Text as="p" size="2">Ngày sinh dùng định dạng yyyy-MM-dd. Có thể để trống mật khẩu để hệ thống tạo tự động. Email phải duy nhất; mã lớp và năm học là tùy chọn.</Text> : <Text as="p" size="2">Mã lớp là tên lớp trong trường. Năm học gồm hai năm liên tiếp, ví dụ 2026-2027. Xếp lớp và phân công chỉ dùng email tài khoản đã tồn tại trong trường.</Text>}</div>
       <div className={s.actions}><span /><Button size="3" disabled={!selectedFile || busy} loading={busy} onClick={() => void inspectFile()}>Tiếp tục kiểm tra</Button></div>
     </section>}
