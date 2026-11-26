@@ -1,3 +1,4 @@
+import { CommunityArt } from "./CommunityArt";
 import SimulationThumb from "./SimulationThumb";
 import { useMemo, useRef, useState } from "react";
 import { Avatar, Badge, Button, Dialog, IconButton, SegmentedControl, Select, Spinner, TextField, Theme } from "@radix-ui/themes";
@@ -31,6 +32,7 @@ type Props = {
   headingLevel?: "h1" | "h2";
   /** The area's breadcrumb already names the page: the heading stays for screen readers only. */
   titleHidden?: boolean;
+  studentDesign?: boolean;
 };
 
 type Accent = "indigo" | "cyan" | "amber";
@@ -118,7 +120,7 @@ function CatalogNav({ catalog, selection, total, counts, onSelect }: Readonly<Ca
   </nav>;
 }
 
-export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = false, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
+export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = false, studentDesign = false, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
   const [selection, setSelection] = useState<CatalogSelection>({});
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<LibraryScope>("ALL");
@@ -153,15 +155,20 @@ export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = fa
   const filtered = Boolean(query.trim() || selection.subjectId || (allowSchoolScope && scope !== "ALL"));
   const resetFilters = () => { setQuery(""); setSelection({}); setScope("ALL"); };
 
-  return <Theme asChild accentColor="indigo" grayColor="slate" radius="large" scaling="100%" hasBackground={false}><motion.section className={styles.discovery} aria-label="Kho cộng đồng" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={transition}>
-    <header className={titleHidden ? "sr-only" : styles.pageHeading}><div>{headingLevel === "h1" ? <h1>Kho cộng đồng</h1> : <h2>Kho cộng đồng</h2>}<p>Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay.</p></div>{!titleHidden && !loading && !error && <Badge size="2" variant="soft">{scopedItems.length} mô phỏng</Badge>}</header>
+  return <Theme asChild accentColor="indigo" grayColor="slate" radius="large" scaling="100%" hasBackground={false}><motion.section className={styles.discovery + (studentDesign ? " " + styles.studentCommunity : "")} aria-label="Kho cộng đồng" initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={transition}>
+    <header className={titleHidden && !studentDesign ? "sr-only" : styles.pageHeading}><div>{headingLevel === "h1" ? <h1>Kho cộng đồng</h1> : <h2>Kho cộng đồng</h2>}<p>Mô phỏng giáo viên chia sẻ, đã được duyệt. Mở ra là chạy được ngay.</p></div>{studentDesign && <CommunityArt hero />}{!studentDesign && !titleHidden && !loading && !error && <Badge size="2" variant="soft">{scopedItems.length} mô phỏng</Badge>}</header>
     <div className={`${styles.layout} ${curriculum ? "" : styles.withoutCatalog}`}>
+      {studentDesign && <nav className={styles.studentCatalog} aria-label="Mục lục mô phỏng"><h2>Mục lục</h2><button type="button" aria-pressed={!selection.subjectId} onClick={() => setSelection({})}><span>Tất cả mô phỏng</span><small>{loading ? "—" : scopedItems.length}</small></button>{catalog.map(subject => <div key={subject.id}>{catalog.length > 1 && <h3>{subject.name}</h3>}{subject.grades.map(grade => {
+        const sum = (lessons: {id:string}[]) => lessons.reduce((value,lesson) => value+(counts.get(lesson.id)??0),0);
+        const gradeCount = sum(grade.modules.flatMap(module => module.lessons));
+        return <div key={grade.name}><button type="button" aria-pressed={selection.subjectId===subject.id && selection.grade===grade.name && !selection.moduleId} onClick={() => setSelection({subjectId:subject.id,grade:grade.name})}><span>{grade.name}</span><small>{loading ? "—" : gradeCount}</small></button>{grade.modules.filter(module => sum(module.lessons)>0).map(module => <button type="button" className={styles.studentModule} key={module.id} aria-pressed={selection.subjectId===subject.id && selection.grade===grade.name && selection.moduleId===module.id} onClick={() => setSelection({subjectId:subject.id,grade:grade.name,moduleId:module.id})}><span>{module.name}</span><small>{sum(module.lessons)}</small></button>)}</div>;
+      })}</div>)}{!loading && !catalog.length && <p>Chưa có mục lục chương trình học.</p>}</nav>}
       <div className={styles.results}>
         <div className={styles.toolbar}>
           <TextField.Root className={styles.search} size="3" type="search" aria-label="Tìm tài nguyên" value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm mô phỏng, bài học, giáo viên…"><TextField.Slot><MagnifyingGlassIcon width="18" height="18" /></TextField.Slot></TextField.Root>
           <div className={styles.filterRow}>
-          {curriculum && <details className={styles.catalogFilter}><summary><ReaderIcon />{breadcrumb.length ? breadcrumb.join(" › ") : "Lọc theo khối, chương, bài"}<ChevronRightIcon /></summary><div className={styles.catalog}><CatalogNav catalog={catalog} selection={selection} total={scopedItems.length} counts={counts} onSelect={setSelection} /></div></details>}
-          {allowSchoolScope && <SegmentedControl.Root size="2" value={scope} onValueChange={value => { if (value) setScope(value as LibraryScope); }} aria-label="Phạm vi chia sẻ"><SegmentedControl.Item value="ALL">Tất cả</SegmentedControl.Item><SegmentedControl.Item value="PUBLIC">Toàn hệ thống</SegmentedControl.Item><SegmentedControl.Item value="SHARED">Trong trường</SegmentedControl.Item></SegmentedControl.Root>}
+          {curriculum && !studentDesign && <details className={styles.catalogFilter}><summary><ReaderIcon />{breadcrumb.length ? breadcrumb.join(" › ") : "Lọc theo khối, chương, bài"}<ChevronRightIcon /></summary><div className={styles.catalog}><CatalogNav catalog={catalog} selection={selection} total={scopedItems.length} counts={counts} onSelect={setSelection} /></div></details>}
+          {allowSchoolScope && (studentDesign ? <Select.Root size="3" value={scope} onValueChange={value => setScope(value as LibraryScope)}><Select.Trigger aria-label="Phạm vi chia sẻ" className={styles.scopeSelect} variant="surface" /><Select.Content position="popper"><Select.Item value="ALL">Tất cả</Select.Item><Select.Item value="PUBLIC">Toàn hệ thống</Select.Item><Select.Item value="SHARED">Trong trường</Select.Item></Select.Content></Select.Root> : <SegmentedControl.Root size="2" value={scope} onValueChange={value => { if (value) setScope(value as LibraryScope); }} aria-label="Phạm vi chia sẻ"><SegmentedControl.Item value="ALL">Tất cả</SegmentedControl.Item><SegmentedControl.Item value="PUBLIC">Toàn hệ thống</SegmentedControl.Item><SegmentedControl.Item value="SHARED">Trong trường</SegmentedControl.Item></SegmentedControl.Root>)}
           <Select.Root size="3" value={sort} onValueChange={value => setSort(value as typeof sort)}><Select.Trigger aria-label="Sắp xếp tài nguyên" className={styles.sort} variant="surface" /><Select.Content><Select.Item value="latest">Mới nhất</Select.Item><Select.Item value="featured">Nổi bật</Select.Item><Select.Item value="title">Tên A–Z</Select.Item></Select.Content></Select.Root>
           </div>
         </div>
@@ -177,10 +184,10 @@ export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = fa
           const featured = item.moderationStatus === "FEATURED";
           return <motion.article layout className={styles.resourceMotion} key={item.id} initial={reducedMotion ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: reducedMotion ? 1 : .97 }} whileHover={reducedMotion ? undefined : { y: -4 }} transition={reducedMotion ? transition : { duration: .28, delay: Math.min(index, 8) * .035 }}>
             <SpotlightCard className={styles.resource}>
-              <div className={styles.cover} data-accent={accent}><SimulationThumb simulationId={item.simulationId} />{featured && <span className={styles.featured}><StarFilledIcon /> Nổi bật</span>}</div>
+              <div className={styles.cover} data-accent={accent}>{studentDesign ? <CommunityArt topic={item.topic || path?.topic} title={item.title} /> : <SimulationThumb simulationId={item.simulationId} />}{featured && <span className={styles.featured}><StarFilledIcon /> Nổi bật</span>}</div>
               <div className={styles.resourceBody}>
                 <p className={styles.eyebrow}>{[path?.grade, path?.module].filter(Boolean).join(" · ") || "Mô phỏng vật lý"}</p>
-                <h2 title={item.title}>{item.title}</h2>
+                <h2 title={item.title}>{studentDesign ? <button type="button" className={styles.studentTitle} onClick={event => { returnFocusRef.current = event.currentTarget; onOpen(item); }}>{item.title}</button> : item.title}</h2>
                 {path?.lesson && <p className={styles.lesson}>Bài học: {path.lesson}</p>}
                 <div className={styles.resourceFooter}>
                   <div className={styles.author}><Avatar size="1" color={accent} radius="full" fallback={(item.sharedByName || "GV").trim().charAt(0).toUpperCase()} /><div><strong>{item.sharedByName || "Giáo viên"}</strong><span>{item.visibility === "PUBLIC" ? item.schoolName || "PhysLive" : "Trong trường"}</span></div></div>

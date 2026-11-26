@@ -95,3 +95,12 @@
  .student-workspace .student-dashboard[data-student-design="study"] .student-class-card > h3 { font-size:16px; }
  .student-workspace .student-dashboard[data-student-design="study"] .student-class-card > p { font-size:12px; }
 }
+
+/* Study overview: paired reflection and confirmed learning results. */
+.student-workspace .student-dashboard[data-student-design="study"] .student-dashboard-grid { grid-template-columns:minmax(0,1.15fr) minmax(340px,.9fr); }
+.student-study-banner { display:flex; align-items:center; gap:22px; padding:8px 22px; margin-bottom:18px; border:1px solid var(--sd-outline-variant); border-radius:14px; background:linear-gradient(105deg,var(--sd-surface) 50%,var(--teal-2)); }
+.student-study-banner > div { flex:1; min-width:0; }
+.student-study-banner h2 { margin:0 0 6px; font-size:20px; font-weight:600; color:var(--gray-12); }
+.student-study-banner p { margin:0; font-size:12px; line-height:1.6; color:var(--gray-11); }
+@media(max-width:1000px) { .student-workspace .student-dashboard[data-student-design="study"] .student-dashboard-grid { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:640px) { .student-study-banner { flex-wrap:wrap; gap:12px; padding:16px; } .student-study-banner > div { flex-basis:calc(100% - 135px); } .student-study-banner > button { order:3; } }

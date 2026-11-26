@@ -1,0 +1,3 @@
+export function StudentAssignmentsArt() {
+  return <svg viewBox="0 0 190 105" width="165" height="92" aria-hidden="true"><ellipse cx="96" cy="77" rx="74" ry="22" fill="var(--teal-3)" /><path d="M34 23q29-9 60 4 30-13 61-4v58q-31-8-61 4-30-12-60-4Z" fill="var(--color-panel-solid)" stroke="#6d91ab" strokeWidth="1.5" /><path d="M94 27v58" stroke="#6d91ab" /><path d="M45 32h32m-32 6h26" stroke="#aec7d2" /><path d="M55 49h24m-12 0v19" stroke="#76a5b5" /><circle cx="67" cy="71" r="5" fill="#23919a" /><path d="M107 66q10-32 18-13t18-15M106 72h40" fill="none" stroke="#76a5b5" strokeWidth="1.5" /><path d="m132 92 35-20 3 5-35 20-6 1Z" fill="#dfebf0" stroke="#6d91ab" /><path d="m165 73 3 5" stroke="#6d91ab" /><circle cx="161" cy="30" r="3" fill="#a4d0d2" /></svg>;
+}
