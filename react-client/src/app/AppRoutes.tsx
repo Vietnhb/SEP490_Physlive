@@ -25,7 +25,6 @@ const Library = lazy(() => import("../features/library/pages/Library"));
 const CommunityLibrary = lazy(() => import("../features/library/pages/CommunityLibrary"));
 const Login = lazy(() => import("../features/auth/pages/Login"));
 const ForcedPasswordChange = lazy(() => import("../features/auth/pages/ForcedPasswordChange"));
-const DepartmentWorkspace = lazy(() => import("../features/school/pages/DepartmentWorkspace"));
 const reviewerModule = () => import("../features/reviewer/pages/ReviewerConsole");
 const Reviewer = lazy(reviewerModule);
 const ReviewerHome = lazy(() => reviewerModule().then(module => ({ default: module.ReviewerHomePage })));
@@ -40,6 +39,7 @@ const Signup = lazy(() => import("../features/auth/pages/Signup"));
 const SchoolPaymentResult = lazy(() => import("../features/billing/pages/SchoolPaymentResult"));
 const SchoolBilling = lazy(() => import("../features/billing/pages/SchoolBilling"));
 const SchoolClasses = lazy(() => import("../features/school/components/SchoolClasses"));
+const DepartmentClassPage = lazy(() => import("../features/school/pages/DepartmentClassPage"));
 const SchoolClassDetailPage = lazy(() => import("../features/school/pages/SchoolClassDetailPage"));
 const SchoolImportPage = lazy(() => import("../features/school/pages/SchoolImportPage"));
 const SchoolReports = lazy(() => import("../features/school/pages/SchoolReports"));
@@ -55,9 +55,12 @@ const TeacherComplaints = lazy(() => teacherAreaModule().then(module => ({ defau
 const CustomerEmailInbox = lazy(() => import("../features/management/pages/CustomerEmailInbox"));
 const CustomerUsageReport = lazy(() => import("../features/management/pages/CustomerUsageReport"));
 const TeacherDashboard = lazy(() => import("../features/assignments/pages/TeacherDashboard"));
+const TeacherLibrary = lazy(() => import("../features/library/pages/TeacherLibrary"));
+const TeacherCommunity = lazy(() => import("../features/library/pages/TeacherCommunity"));
+const TeacherDepartment = lazy(() => import("../features/school/pages/TeacherDepartment"));
 const TeacherClassReport = lazy(() => import("../features/assignments/pages/TeacherClassReport"));
 const TeacherClasses = lazy(() => import("../features/assignments/pages/TeacherClassesPage"));
-const Lab = lazy(() => import("../features/simulation/pages/Lab"));
+const TeacherAssignmentsRedirect = lazy(() => import("../features/assignments/pages/TeacherAssignmentsRedirect"));
 const studentModule = () => import("../features/assignments/pages/StudentAssignments");
 const StudentArea = lazy(studentModule);
 const StudentHome = lazy(() => studentModule().then(module => ({ default: module.StudentHomePage })));
@@ -117,13 +120,18 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
           <Route path="/" element={!authReady ? <RouteLoading /> : user ? <Navigate to={userHome(user)} replace /> : inAndroidApp() ? <Navigate to="/login" replace /> : <Home />} />
           <Route path="/change-password" element={<RequireAccess ready={authReady}><ForcedPasswordChange /></RequireAccess>} />
           <Route path="/department" element={roleElement([ROLE_NAMES.STAFF],
-            isDepartmentHead(user) && user?.schoolId ? <DepartmentWorkspace /> : <Navigate to="/assignments" replace />)} />
+            !isDepartmentHead(user) || !user?.schoolId ? <Navigate to="/assignments" replace /> : <TeacherArea />)}>
+            <Route index element={canTeach(user) ? <Navigate to="/lab/department" replace /> : <TeacherDepartment />} />
+            <Route path="classes/:classId" element={canTeach(user) ? <Navigate to="/lab/department" replace /> : <DepartmentClassPage />} />
+          </Route>
           <Route path="/player" element={<Navigate to={`/workspace${search}`} replace />} />
-          <Route path="/teacher" element={roleElement([ROLE_NAMES.STAFF], teachingElement(<TeacherDashboard />))} />
-          <Route path="/workspace" element={workspaceElement(<Workspace />)} />
+          <Route path="/teacher" element={roleElement([ROLE_NAMES.STAFF], teachingElement(<TeacherArea />))}>
+            <Route index element={<TeacherDashboard />} />
+          </Route>
+          <Route path="/workspace" element={workspaceElement(canTeach(user) ? <TeacherArea mini><Workspace embedded /></TeacherArea> : <Workspace />)} />
           <Route
             path="/assignments/workspace"
-            element={workspaceElement(<AssignmentWorkspace />)}
+            element={workspaceElement(canTeach(user) ? <TeacherArea><AssignmentWorkspace embedded /></TeacherArea> : <AssignmentWorkspace />)}
           />
           <Route
             path="/models"
@@ -135,14 +143,15 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             }
           />
           <Route path="/lab" element={workspaceElement(<TeacherArea />)}>
-            <Route index element={<Lab />} />
-            <Route path="reports" element={<TeacherThemed><TeacherClassReport /></TeacherThemed>} />
-            <Route path="classes" element={<TeacherThemed><TeacherClasses /></TeacherThemed>} />
-            <Route path="classes/:classId" element={<TeacherThemed><TeacherClasses /></TeacherThemed>} />
+            <Route index element={<TeacherAssignmentsRedirect />} />
+            <Route path="reports" element={<TeacherClassReport />} />
+            <Route path="classes" element={<TeacherClasses />} />
+            <Route path="classes/:classId" element={<TeacherClasses />} />
             <Route path="complaints" element={<TeacherThemed><TeacherComplaints /></TeacherThemed>} />
-            <Route path="library" element={<Library />} />
-            <Route path="community" element={<TeacherThemed><CommunityLibrary inApp /></TeacherThemed>} />
-            <Route path="department" element={isDepartmentHead(user) && user?.schoolId ? <DepartmentWorkspace /> : <Navigate to="/lab" replace />} />
+            <Route path="library" element={<TeacherLibrary />} />
+            <Route path="community" element={<TeacherThemed><TeacherCommunity /></TeacherThemed>} />
+            <Route path="department" element={isDepartmentHead(user) && user?.schoolId ? <TeacherDepartment /> : <Navigate to="/lab" replace />} />
+            <Route path="department/classes/:classId" element={isDepartmentHead(user) && user?.schoolId ? <DepartmentClassPage /> : <Navigate to="/lab" replace />} />
             <Route path="*" element={<NotFoundPage home="/lab" />} />
           </Route>
           {/* Teachers use the library inside their management area, next to submissions and complaints. */}

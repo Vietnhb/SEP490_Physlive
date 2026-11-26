@@ -174,7 +174,7 @@ public class SchoolClassService {
 
     @Transactional
     public ClassDetail update(UUID schoolId, UUID classId, SchoolClassRequest request) {
-        requireWriteAccess(schoolId);
+        requireSchoolManager(schoolId);
         SchoolClass schoolClass = activeClassInSchool(schoolId, classId);
         String name = clean(request.name());
         String year = clean(request.schoolYear());
@@ -190,7 +190,7 @@ public class SchoolClassService {
 
     @Transactional
     public void archive(UUID schoolId, UUID classId) {
-        requireWriteAccess(schoolId);
+        requireSchoolManager(schoolId);
         schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass schoolClass = activeClassInSchool(schoolId, classId);
         schoolClass.setIsActive(false); classes.save(schoolClass);
@@ -200,7 +200,7 @@ public class SchoolClassService {
 
     @Transactional
     public ClassSummary restore(UUID schoolId, UUID classId) {
-        requireWriteAccess(schoolId);
+        requireSchoolManager(schoolId);
         schools.findByIdForUpdate(schoolId).orElseThrow(() -> ApiException.notFound(SCHOOL_NOT_FOUND));
         SchoolClass schoolClass = classInSchool(schoolId, classId);
         if (!Boolean.TRUE.equals(schoolClass.getIsActive())) {
@@ -322,6 +322,17 @@ public class SchoolClassService {
     private User requireWriteAccess(UUID schoolId) {
         User actor = requireSchoolAccess(schoolId);
         if (!RoleName.MANAGER.matches(actor.getRole() == null ? null : actor.getRole().getName())) licenseCheck.requireWriteAccess(actor);
+        return actor;
+    }
+
+    /**
+     * Renaming, deleting (archiving) and reopening a class belong to the school account. A department head only
+     * places teachers and students in classes, so these stay closed to them even inside their own school.
+     */
+    private User requireSchoolManager(UUID schoolId) {
+        User actor = requireWriteAccess(schoolId);
+        if (!roleValidation.canManageSchool(actor, schoolId))
+            throw ApiException.forbidden("Chỉ tài khoản trường được sửa, xóa hoặc mở lại lớp học.");
         return actor;
     }
 

@@ -86,9 +86,23 @@ public class AssignmentService {
         };
         java.util.List<Double> values = group == null ? null : group.get(path[1]);
         java.util.List<Double> times = simulation.time();
+        if ("timeline".equals(path[0])) {
+            // Scenes built by the new pipeline keep their series only in the stored solver timeline.
+            JsonNode frames = simulation.rawResult() == null ? null : simulation.rawResult().path("simulationSpec").path("solverTimeline").path("frames");
+            times = new java.util.ArrayList<>();
+            values = new java.util.ArrayList<>();
+            if (frames != null && frames.isArray()) for (JsonNode frame : frames) {
+                JsonNode value = frame.path("values").path(path[1]);
+                if (!frame.path("t").isNumber() || !value.isNumber()) continue;
+                times.add(frame.path("t").asDouble());
+                values.add(value.asDouble());
+            }
+        }
         if (values == null || values.isEmpty() || times == null || times.size() != values.size()
-                || sampleTime < times.getFirst() || sampleTime > times.getLast())
+                || sampleTime < times.getFirst() - 1e-3 || sampleTime > times.getLast() + 1e-3)
             throw ApiException.badRequest("Không có dữ liệu đo tại thời điểm đã chọn");
+        // the form rounds to the millisecond, so an end of 7.4999… is asked for as 7.5
+        sampleTime = Math.max(times.getFirst(), Math.min(times.getLast(), sampleTime));
         if (sampleTime <= times.getFirst()) return values.getFirst();
         for (int i = 1; i < times.size(); i++) {
             if (times.get(i) >= sampleTime) {

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none">
+<style>
+.f{stroke-dasharray:2 14;animation:f 1s linear infinite}
+.g{animation:g 2s ease-in-out infinite alternate}
+@keyframes f{to{stroke-dashoffset:-16}}
+@keyframes g{from{opacity:.25}to{opacity:.7}}
+@media (prefers-reduced-motion:reduce){.f,.g{animation:none}}
+</style>
+<path d="M60 40H260V160H60Z" stroke="#0B3262" stroke-opacity=".45" stroke-width="2" stroke-linejoin="round"/>
+<path d="M60 40H260V160H60Z" class="f" stroke="#23919A" stroke-width="3.5" stroke-linecap="round"/>
+<rect x="128" y="30" width="64" height="20" rx="3" fill="#FFFFFF" stroke="#0B3262" stroke-opacity=".7" stroke-width="2"/>
+<text x="160" y="24" text-anchor="middle" font-family="monospace" font-size="12" fill="#0B3262" fill-opacity=".7">R</text>
+<rect x="44" y="86" width="32" height="28" fill="#FFFFFF"/>
+<path d="M44 92H76M50 108H70" stroke="#0B3262" stroke-opacity=".8" stroke-width="2.5"/>
+<text x="86" y="104" font-family="monospace" font-size="12" fill="#0B3262" fill-opacity=".7">E, r</text>
+<circle cx="260" cy="100" r="30" fill="#23919A" class="g"/>
+<circle cx="260" cy="100" r="16" fill="#FFFFFF" stroke="#0B3262" stroke-opacity=".7" stroke-width="2"/>
+<path d="M249 89l22 22M271 89l-22 22" stroke="#0B3262" stroke-opacity=".7" stroke-width="1.75"/>
+</svg>

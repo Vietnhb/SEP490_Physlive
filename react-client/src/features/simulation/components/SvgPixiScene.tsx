@@ -145,8 +145,8 @@ export default function SvgPixiScene({ program, timeline, parameters, parameterI
     ? <SceneReadouts scene={scene} values={presentation ? backendSample?.values ?? {} : sampleTimeline(timeline, time)} theme={theme} exact={Boolean(presentation)} /> : null;
   return <div className="sim-player" data-theme={theme === "DARK" ? "dark" : "light"}>
     <div className="sim-player__toolbar">
-      <span className={"sim-status sim-status--" + (verification.tone === "ok" || verification.tone === "partial" ? "ok" : verification.tone === "pending" ? "pending" : "warn")}>
-        {verification.badge}
+      <span className={"sim-status sim-status--" + verification.tone} title={verification.sentence}>
+        <span className="sim-status__dot" aria-hidden="true" />{verification.badge}
       </span>
       {toolbarActions && <div className="sim-player__actions">{toolbarActions}</div>}
     </div>

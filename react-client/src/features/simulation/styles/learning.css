@@ -1481,3 +1481,27 @@
     min-height: 0;
   }
 }
+
+/* entry picture: a horizontal throw drawn like a textbook multi-exposure photo */
+.throw-illustration { display: block; width: 168px; height: 120px; margin-bottom: 20px; color: var(--learn-blue); }
+.throw-illustration .throw-paper { fill: color-mix(in srgb, var(--learn-blue) 7%, var(--surface, #fff)); stroke: color-mix(in srgb, var(--learn-blue) 22%, transparent); }
+.throw-illustration .throw-grid { opacity: .16; }
+.throw-illustration .throw-ground, .throw-illustration .throw-ledge { fill: none; stroke: var(--learn-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; }
+.throw-illustration .throw-path { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-dasharray: 2 3.5; opacity: .7; }
+.throw-illustration .throw-drop { stroke: currentColor; stroke-width: .8; stroke-dasharray: 1 3; opacity: .35; }
+.throw-illustration .throw-ball { fill: currentColor; }
+.throw-illustration .throw-vector { fill: none; stroke: #E0712C; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.throw-illustration .throw-label { fill: #E0712C; font: italic 600 12px/1 Georgia, "Times New Roman", serif; }
+@media (prefers-reduced-motion: no-preference) {
+  .throw-illustration .throw-ball { animation: throw-ball-in .5s ease-out both; }
+  .throw-illustration g:nth-of-type(2) .throw-ball { animation-delay: .08s; } .throw-illustration g:nth-of-type(3) .throw-ball { animation-delay: .16s; }
+  .throw-illustration g:nth-of-type(4) .throw-ball { animation-delay: .24s; } .throw-illustration g:nth-of-type(5) .throw-ball { animation-delay: .32s; }
+  .throw-illustration g:nth-of-type(6) .throw-ball { animation-delay: .4s; }
+}
+@keyframes throw-ball-in { from { opacity: 0; } }
+/* each quick example carries a drawing of its own situation */
+.simulation-shortcut-glyph { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--learn-blue) 10%, transparent); color: var(--learn-blue); }
+.simulation-shortcut-glyph .physics-glyph { width: 26px; height: 26px; }
+/* a short title must not float to the middle: shortcuts always read from the left edge */
+.learning-app .simulation-shortcut { justify-content: flex-start; }
+.learning-app .simulation-shortcut > span:last-child { flex: 1 1 auto; min-width: 0; }

@@ -13,18 +13,25 @@ import { useTeacherLibrary } from "../../library/hooks/useTeacherLibrary";
 import { TeacherAssignmentForm } from "../components/TeacherAssignmentForm";
 import { TeacherAssignmentHistory } from "../components/TeacherAssignmentHistory";
 import "../styles/assignment-flow.css";
+import TeacherComposerForm from "../components/TeacherComposerForm";
+import { measurableSeries, simulationEnd } from "../components/assignmentComposer";
 
 
 type Props = {
   workspaceLayout?: boolean;
+  /** the canvas page of the teacher shell: the composer alone, history lives on "Bài tập đã giao" */
+  canvas?: boolean;
 };
 
 
 
 
 export default function Assignments({
-  workspaceLayout = false,
+  workspaceLayout: layout = false,
+  canvas = false,
 }: Readonly<Props>) {
+  // the canvas composer keeps the workspace behaviour (starts on the form, keeps the chosen simulation in the URL)
+  const workspaceLayout = layout || canvas;
   const user = useSessionStore((state) => state.user);
   const [confirm, confirmDialog] = useConfirm();
   const { folders, libraryItems, libraryLoading, libraryError, retryLibrary, setFolders } = useTeacherLibrary();
@@ -107,7 +114,8 @@ export default function Assignments({
 
   useEffect(() => {
     const selected = saved.find((item) => item.id === libraryItemId);
-    if (selected) setTitle(current => current || selected.title);
+    // library titles are often the whole problem statement: prefill at most the form's 160 characters, on a word boundary
+    if (selected) setTitle(current => current || (selected.title.length <= 160 ? selected.title : selected.title.slice(0, 159).replace(/\s+\S*$/, "") + "…"));
   }, [saved, libraryItemId]);
 
   const selectedLibrary = useMemo(
@@ -127,10 +135,10 @@ export default function Assignments({
     void getSimulation(selectedLibrary.simulationId).then(simulation => {
       if (!active) return;
       setAssignmentSimulation(simulation);
-      const firstSeries = simulation.visualization?.series?.[0];
+      const firstSeries = measurableSeries(simulation)[0];
       setTargetSeriesSource(firstSeries?.source ?? "");
       setInvestigationOutcome(firstSeries?.source ?? "");
-      setSampleTime(String(simulation.time.at(-1) ?? 0));
+      setSampleTime(String(simulationEnd(simulation)));
       setInvestigationParameter(Object.keys(simulation.parameters)[0] ?? "");
     }).catch(() => {
       if (active) { setAssignmentSimulation(null); setSimulationOptionsError(true); }
@@ -201,8 +209,8 @@ export default function Assignments({
     setError("");
     setNotice("");
     try {
-      const selectedSeries = assignmentSimulation?.visualization?.series?.find(series => series.source === targetSeriesSource);
-      const outcomeSeries = assignmentSimulation?.visualization?.series?.find(series => series.source === investigationOutcome);
+      const selectedSeries = measurableSeries(assignmentSimulation).find(series => series.source === targetSeriesSource);
+      const outcomeSeries = measurableSeries(assignmentSimulation).find(series => series.source === investigationOutcome);
       const selectedControl = assignmentSimulation?.visualization?.controls?.find(control => control.key === investigationParameter);
       await createAssignment({
         libraryItemId,
@@ -246,8 +254,8 @@ export default function Assignments({
     }
   };
 
-  // Grading lives on the "Bài nộp" page; open it on this assignment.
-  const handleOpenSubmissions = (assignment: Assignment) => navigate(assignment.classId ? `/lab/classes/${assignment.classId}?tab=assignments&assignment=${encodeURIComponent(assignment.id)}` : `/lab?assignment=${encodeURIComponent(assignment.id)}`);
+  // Grading lives in the class, on the tab that lists the submissions of this assignment.
+  const handleOpenSubmissions = (assignment: Assignment) => navigate(assignment.classId ? `/lab/classes/${assignment.classId}?tab=assignments&assignment=${encodeURIComponent(assignment.id)}` : "/lab/classes");
 
   const handleToggleOpen = async (assignment: Assignment) => {
     const closing = assignment.status === "ACTIVE";
@@ -275,6 +283,64 @@ export default function Assignments({
         </div>
       </main>
     );
+
+  const formProps = {
+    workspaceLayout,
+    saved,
+    selectedLibrary,
+    libraryItemId,
+    title,
+    description,
+    prompt,
+    activityType,
+    simulation: assignmentSimulation,
+    simulationOptionsLoading,
+    simulationOptionsError,
+    targetSeriesSource,
+    sampleTime,
+    measurementTolerance,
+    investigationParameter,
+    investigationOutcome,
+    maxScore,
+    dueAt,
+    allowLateSubmission,
+    onAllowLateSubmissionChange: setAllowLateSubmission,
+    students: classStudents,
+    classes,
+    selectedClassId,
+    selectedStudents,
+    submitting,
+    onSubmit: handleSubmit,
+    onLibraryChange: updateLibrarySelection,
+    onTitleChange: setTitle,
+    onPromptChange: setPrompt,
+    onActivityTypeChange: setActivityType,
+    onTargetSeriesSourceChange: setTargetSeriesSource,
+    onSampleTimeChange: setSampleTime,
+    onMeasurementToleranceChange: setMeasurementTolerance,
+    onInvestigationParameterChange: setInvestigationParameter,
+    onInvestigationOutcomeChange: setInvestigationOutcome,
+    onMaxScoreChange: setMaxScore,
+    onDueAtChange: setDueAt,
+    onDescriptionChange: setDescription,
+    onToggleStudent: toggleStudent,
+    onSelectAll: handleSelectAllStudents,
+    onClassChange: handleClassChange,
+  };
+
+  if (canvas) return (
+    <main className="page">
+      <div className="ph"><div><p className="eyebrow">Giao bài mới</p><h1 className="h1">Thiết kế bài tập mô phỏng</h1><p className="sub">Chọn mô phỏng, đặt câu hỏi và giao cho lớp của bạn.</p></div>
+        {queryClassId && classes.some(item => item.id === queryClassId) && <Link className="btn btn-ghost" to={"/lab/classes/" + encodeURIComponent(queryClassId)}>Quay lại lớp {classes.find(item => item.id === queryClassId)?.name}</Link>}</div>
+      {notice && <p className="badge b-success" role="status" style={{ alignSelf: "flex-start", margin: 0 }}>{notice}</p>}
+      {error && <p className="badge b-danger" role="alert" style={{ alignSelf: "flex-start", margin: 0 }}>{error}</p>}
+      {libraryLoading || (loading && saved.length === 0)
+        ? <section className="card" role="status" aria-busy="true" aria-label="Đang tải dữ liệu bài tập"><div className="card-b form">
+          {["38%", "100%", "100%", "64%", "100%", "100%"].map((width, index) => <span key={index} className="sk" style={{ height: index % 3 === 0 ? 12 : 36, width }} />)}</div></section>
+        : <TeacherComposerForm key={formVersion} {...formProps} />}
+      {confirmDialog}
+    </main>
+  );
 
   return (
     <div
@@ -333,47 +399,7 @@ export default function Assignments({
         >
           {view === "create" && !libraryLoading && (!loading || (workspaceLayout && saved.length > 0)) && <TeacherAssignmentForm
             key={formVersion}
-            workspaceLayout={workspaceLayout}
-            saved={saved}
-            selectedLibrary={selectedLibrary}
-            libraryItemId={libraryItemId}
-            title={title}
-            description={description}
-            prompt={prompt}
-            activityType={activityType}
-            simulation={assignmentSimulation}
-            simulationOptionsLoading={simulationOptionsLoading}
-            simulationOptionsError={simulationOptionsError}
-            targetSeriesSource={targetSeriesSource}
-            sampleTime={sampleTime}
-            measurementTolerance={measurementTolerance}
-            investigationParameter={investigationParameter}
-            investigationOutcome={investigationOutcome}
-            maxScore={maxScore}
-            dueAt={dueAt}
-            allowLateSubmission={allowLateSubmission}
-            onAllowLateSubmissionChange={setAllowLateSubmission}
-            students={classStudents}
-            classes={classes}
-            selectedClassId={selectedClassId}
-            selectedStudents={selectedStudents}
-            submitting={submitting}
-            onSubmit={handleSubmit}
-            onLibraryChange={updateLibrarySelection}
-            onTitleChange={setTitle}
-            onPromptChange={setPrompt}
-            onActivityTypeChange={setActivityType}
-            onTargetSeriesSourceChange={setTargetSeriesSource}
-            onSampleTimeChange={setSampleTime}
-            onMeasurementToleranceChange={setMeasurementTolerance}
-            onInvestigationParameterChange={setInvestigationParameter}
-            onInvestigationOutcomeChange={setInvestigationOutcome}
-            onMaxScoreChange={setMaxScore}
-            onDueAtChange={setDueAt}
-            onDescriptionChange={setDescription}
-            onToggleStudent={toggleStudent}
-            onSelectAll={handleSelectAllStudents}
-            onClassChange={handleClassChange}
+            {...formProps}
           />}
 
           {!workspaceLayout && view === "history" && <TeacherAssignmentHistory

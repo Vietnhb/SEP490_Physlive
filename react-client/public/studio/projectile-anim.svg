@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none">
+<style>
+.x{animation:x 2.6s infinite}.y{animation:y 2.6s infinite}
+.t{opacity:0;animation:t 2.6s linear infinite}
+@keyframes x{0%{transform:translateX(0);animation-timing-function:linear}75%,100%{transform:translateX(200px)}}
+@keyframes y{0%{transform:translateY(0);animation-timing-function:cubic-bezier(.33,0,.67,0)}75%,100%{transform:translateY(117px)}}
+@keyframes t{0%,70%{opacity:.55}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.x,.y,.t{animation:none}.t{opacity:.55}}
+</style>
+<path d="M14 180H306" stroke="#0B3262" stroke-opacity=".45" stroke-width="1.5"/>
+<path d="M30 180l-8 10M54 180l-8 10M78 180l-8 10M102 180l-8 10M126 180l-8 10M150 180l-8 10M174 180l-8 10M198 180l-8 10M222 180l-8 10M246 180l-8 10M270 180l-8 10M294 180l-8 10" stroke="#0B3262" stroke-opacity=".25"/>
+<rect x="30" y="63" width="25" height="117" stroke="#0B3262" stroke-opacity=".5" stroke-width="1.5"/>
+<path d="M62 56Q162 56 262 173" stroke="#0B3262" stroke-opacity=".3" stroke-width="1.5" stroke-dasharray="3 6"/>
+<g fill="#23919A"><circle class="t" style="animation-delay:.39s" cx="102" cy="60.7" r="3"/><circle class="t" style="animation-delay:.78s" cx="142" cy="74.7" r="3"/><circle class="t" style="animation-delay:1.17s" cx="182" cy="98.1" r="3"/><circle class="t" style="animation-delay:1.56s" cx="222" cy="130.9" r="3"/></g>
+<g class="x"><g class="y"><circle cx="62" cy="56" r="8" fill="#23919A"/><circle cx="59" cy="53" r="2.5" fill="#FFFFFF" fill-opacity=".6"/></g></g>
+</svg>

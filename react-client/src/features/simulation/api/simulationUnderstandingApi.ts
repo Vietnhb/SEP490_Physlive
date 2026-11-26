@@ -54,7 +54,15 @@ export type SimulationValidation = {
     | "VERIFIED_ANALYTICAL" | "VERIFIED_NUMERICAL" | "ASSUMPTION_REVIEW" | "VISUAL_ONLY_UNVERIFIED" | "UNSUPPORTED";
   flags: string[]; metrics?: Record<string, number>;
   /** Every curriculum law that applied to the run, and whether it held. */
-  lawChecks?: Array<{ law: string; title: string; curriculum?: string; status: "PASSED" | "FAILED" | "AMBIGUOUS"; scope?: Record<string, string> }>;
+  lawChecks?: Array<{
+    law: string; title: string; curriculum?: string; status: "PASSED" | "FAILED" | "AMBIGUOUS"; scope?: Record<string, string>;
+    /** The relation tested ("equal": both sides agree, "atMost": the left never exceeds the right), as an expression tree. */
+    relationKind?: "equal" | "atMost"; relation?: import("../model/lawFormula").LawNode[];
+    /** What each letter of the relation stood for in this run. */
+    symbols?: Record<string, import("../model/lawFormula").LawSymbol[]>;
+    /** Instants at which both sides were computed, the worst gap between them (share of their size), and the gap allowed. */
+    samples?: number; relativeDeviation?: number; tolerance?: number; message?: string;
+  }>;
   /** Ids of the model's quantities that no law checked. */
   uncheckedQuantities?: string[];
   executionMethod?: string; solverMethod?: string; verificationMethod?: string; verificationScope?: string;

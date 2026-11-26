@@ -999,3 +999,60 @@
   background: var(--surface); box-shadow: 0 10px 30px rgb(15 23 42 / 0.14); }
 .sim-export-menu__item { padding: 8px 10px; border-radius: 6px; font-size: 14px; color: var(--ink); cursor: pointer; outline: none; user-select: none; }
 .sim-export-menu__item[data-highlighted] { background: var(--accent-soft); color: var(--accent); }
+
+.simulation-validation__curriculum { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.simulation-validation__source { margin: 8px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.simulation-validation__source a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* each law with its evidence: the formula tested, what its letters were, how closely both sides agreed */
+.law-checks { display: grid; gap: 12px; margin: 10px 0 0; padding: 0; list-style: none; }
+.law-check { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; }
+.law-check__mark { font-weight: 700; line-height: 1.5; color: var(--success); }
+.law-check.is-failed .law-check__mark { color: var(--warning); }
+.law-check.is-ambiguous .law-check__mark { color: var(--muted); }
+.law-check__body { display: grid; gap: 4px; min-width: 0; }
+.law-check__body > b { font-weight: 600; line-height: 1.45; }
+.law-check__formula { justify-self: start; max-width: 100%; padding: 4px 10px; border-radius: 8px; background: var(--surface-3); color: var(--ink); font-size: 14px; overflow-x: auto; }
+.law-check__legend { display: grid; gap: 2px; margin: 0; color: var(--ink-2); font-size: 12px; line-height: 1.45; }
+.law-check__legend .math-formula { font-size: 13px; }
+.law-check__evidence { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.law-check__evidence.is-failed { color: var(--warning); }
+.law-check__curriculum { color: var(--muted); font-size: 12px; }
+
+/* a saved notice floats in the corner and leaves by itself; the bar along its foot shows the time left */
+.saved-toast {
+  --toast-bg: #ffffff; --toast-ink: #0f1f2e; --toast-muted: #5b6b7b; --toast-line: #dce5ea; --toast-ok: #1f8a63; --toast-ok-soft: #e3f5ec;
+  position: fixed; right: 24px; bottom: 24px; z-index: 1000; display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 10px;
+  width: min(380px, calc(100vw - 32px)); padding: 12px 10px 14px 12px; overflow: hidden;
+  border: 1px solid var(--toast-line); border-radius: 12px; background: var(--toast-bg); color: var(--toast-ink);
+  box-shadow: 0 18px 40px -18px rgba(11, 50, 98, .35), 0 2px 6px rgba(11, 50, 98, .08);
+  animation: saved-toast-in .22s cubic-bezier(.2, .8, .2, 1);
+}
+:root[data-theme-effective="dark"] .saved-toast { --toast-bg: #16202c; --toast-ink: #eaf1f9; --toast-muted: #9fb0c3; --toast-line: #2a3a4c; --toast-ok: #4cc59a; --toast-ok-soft: #12322a; }
+.saved-toast__icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--toast-ok-soft); color: var(--toast-ok); font-weight: 700; }
+.saved-toast__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.saved-toast__text b { font-size: 14px; font-weight: 600; }
+.saved-toast__text small { overflow: hidden; color: var(--toast-muted); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+.saved-toast__close { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--toast-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.saved-toast__close:hover { background: var(--toast-ok-soft); color: var(--toast-ink); }
+.saved-toast__close:focus-visible { outline: 2px solid var(--toast-ok); outline-offset: 1px; }
+.saved-toast__timer { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--toast-ok); transform-origin: left; animation: saved-toast-timer linear forwards; }
+@keyframes saved-toast-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes saved-toast-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .saved-toast { animation: none; } .saved-toast__timer { animation: none; display: none; } }
+@media (max-width: 640px) { .saved-toast { right: 16px; bottom: 16px; } }
+
+/* the verdict on the player's toolbar: a quiet pill with a coloured dot, one colour per verdict */
+.sim-status { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; line-height: 1.3; white-space: nowrap; }
+.sim-status__dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sim-status--ok { background: #e3f5ec; border-color: #bfe6d3; color: #1f7a57; }
+.sim-status--partial { background: #e8f3f4; border-color: #c4e2e5; color: #17707a; }
+.sim-status--info, .sim-status--pending { background: #eef1f5; border-color: #dbe1e8; color: #4f5d6b; }
+.sim-status--warn { background: #fdf1e3; border-color: #f3d6b0; color: #9a5a12; }
+:root[data-theme-effective="dark"] .sim-status--ok { background: #12322a; border-color: #1f4f40; color: #6fd7ad; }
+:root[data-theme-effective="dark"] .sim-status--partial { background: #102c31; border-color: #1d4a52; color: #6cc9d2; }
+:root[data-theme-effective="dark"] :is(.sim-status--info, .sim-status--pending) { background: #1c2632; border-color: #2c3a4a; color: #a9b7c6; }
+:root[data-theme-effective="dark"] .sim-status--warn { background: #33240f; border-color: #57401c; color: #f0b866; }
+/* the tested relation reads as a line of the textbook, not a button */
+.law-check__formula { padding: 2px 0 2px 10px; border-left: 2px solid var(--accent-line, #c4e2e5); border-radius: 0; background: none; }
+.law-check__legend { padding-left: 10px; }

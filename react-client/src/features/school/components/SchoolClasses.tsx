@@ -150,11 +150,11 @@ export default function SchoolClasses() {
                 <Table.Cell>{item.teacherNames?.filter(Boolean).join(", ") || "Chưa phân công"}</Table.Cell>
                 <Table.Cell>{item.studentCount}</Table.Cell>
                 <Table.Cell><Badge color={item.active ? "green" : "gray"} variant="soft">{item.active ? "Hoạt động" : "Đã xóa"}</Badge></Table.Cell>
-                <Table.Cell><RowActions subject={item.name} disabled={busy} actions={item.active ? [
+                <Table.Cell>{actorRole !== "SCHOOL" ? <span className={s.empty} style={{ padding: 0 }}>—</span> : <RowActions subject={item.name} disabled={busy} actions={item.active ? [
                   { label: "Xem lớp", onSelect: () => navigate(`/school/classes/${item.id}`) },
                   { label: "Sửa lớp", onSelect: () => navigate(`/school/classes/${item.id}?mode=edit`) },
                   { label: "Xóa lớp", danger: true, onSelect: () => setStatusTarget(item) },
-                ] : [{ label: "Mở lại", onSelect: () => setStatusTarget(item) }]} /></Table.Cell>
+                ] : [{ label: "Mở lại", onSelect: () => setStatusTarget(item) }]} />}</Table.Cell>
               </Table.Row>)}
             </Table.Body>
           </Table.Root></div>

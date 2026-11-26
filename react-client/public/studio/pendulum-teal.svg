@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" width="320" height="240" fill="none">
+  <g stroke="#0B3262" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M78 20 H242"/>
+    <path d="M86 20 l-8 -9 M106 20 l-8 -9 M126 20 l-8 -9 M146 20 l-8 -9 M166 20 l-8 -9 M186 20 l-8 -9 M206 20 l-8 -9 M226 20 l-8 -9 M246 20 l-8 -9"/>
+    <path d="M100 20 V34 M220 20 V34 M96 34 H224"/>
+    <path d="M160 34 V198" stroke-width="1.6" stroke-dasharray="4 7"/>
+    <path d="M100 172 Q160 214 220 172" stroke-width="1.6" stroke-dasharray="4 7"/>
+    <path d="M160 34 L207 168"/>
+    <path d="M160 76 A42 42 0 0 0 173.9 73.6" stroke-width="2"/>
+    <path d="M211 204 V222"/>
+    <path d="M205 216 L211 224 L217 216"/>
+  </g>
+  <circle cx="160" cy="34" r="4.5" fill="#0B3262"/>
+  <circle cx="211" cy="183" r="20" fill="#23919A" stroke="#0B3262" stroke-width="2.5"/>
+  <circle cx="203" cy="175" r="5" fill="#FFFFFF" fill-opacity="0.55"/>
+  <text x="176" y="96" font-family="JetBrains Mono, monospace" font-size="15" fill="#0B3262">θ</text>
+  <text x="168" y="130" font-family="JetBrains Mono, monospace" font-size="13" fill="#0B3262">l</text>
+  <text x="222" y="226" font-family="JetBrains Mono, monospace" font-size="13" fill="#0B3262">mg</text>
+</svg>

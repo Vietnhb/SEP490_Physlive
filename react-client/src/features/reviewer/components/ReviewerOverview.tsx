@@ -187,103 +187,104 @@ export function ReviewerOverview({ access, onOpen }: Readonly<{ access: Reviewer
       <h2><ReviewerIcon name={task.icon} />{task.title}</h2><strong aria-label={task.count == null ? "Chưa có số liệu" : number(task.count) + " mục"}>{task.count == null ? "—" : number(task.count)}</strong><p title={task.count === 0 ? task.empty : undefined}>{task.error ? "Chưa cập nhật được số liệu" : task.count == null ? "Đang tải công việc…" : task.count > 0 ? "Đang chờ xử lý" : "Không có việc đang chờ"}</p><Button variant="ghost" onClick={() => onOpen(task.view)}>{task.action}<ReviewerIcon name="arrow" size={16} /></Button>
     </article>)}</section>
 
-    <section className={s.chartsGrid} aria-label="Thống kê kiểm duyệt và chất lượng dữ liệu">
-      {access.canReview && <article className={s.panel} aria-labelledby="rev-chart-moderation">
-        <div className={s.panelHeading}>
-          <div>
-            <h2 id="rev-chart-moderation">Phân bổ kiểm duyệt mô phỏng</h2>
-            <p>{libDecided > 0 ? `Tỷ lệ đạt duyệt ${approvalRate}% trên ${number(libDecided)} mô phỏng đã xử lý.` : "Theo dõi chất lượng mô phỏng giáo viên chia sẻ công khai."}</p>
-          </div>
-          <Button variant="ghost" onClick={() => onOpen("moderation")}>Mở danh sách<ReviewerIcon name="arrow" size={16} /></Button>
-        </div>
-        <DonutChart
-          segments={moderationSegments}
-          centerValue={libDecided > 0 ? `${approvalRate}%` : number(libPending)}
-          centerLabel={libDecided > 0 ? "Đạt duyệt" : "Chờ duyệt"}
-          ariaLabel={moderationSegments.map(item => `${item.label}: ${item.value}`).join(", ")}
-        />
-      </article>}
-
-      {canHandleComplaints && <article className={s.panel} aria-labelledby="rev-chart-complaints">
-        <div className={s.panelHeading}>
-          <div>
-            <h2 id="rev-chart-complaints">Xử lý khiếu nại & thời gian chờ</h2>
-            <p>{complaintTotal > 0 ? `Đã giải quyết ${complaintResolveRate}% (${number(complaintResolved)}/${number(complaintTotal)} khiếu nại).` : "Chưa có khiếu nại mô phỏng nào được ghi nhận."}</p>
-          </div>
-          <Button variant="ghost" onClick={() => onOpen("complaints")}>Xử lý<ReviewerIcon name="arrow" size={16} /></Button>
-        </div>
-        <div className={s.stackedBar} role="img" aria-label={`Mới: ${complaintOpen}, Đang xem xét: ${complaintRead}, Đã giải quyết: ${complaintResolved}`}>
-          {complaintTotal > 0 ? <>
-            {complaintResolved > 0 && <span style={{ width: `${pct(complaintResolved, complaintTotal)}%`, background: "#15803d" }} title={`Đã giải quyết: ${complaintResolved}`} />}
-            {complaintRead > 0 && <span style={{ width: `${pct(complaintRead, complaintTotal)}%`, background: "#2563eb" }} title={`Đang xem xét: ${complaintRead}`} />}
-            {complaintOpen > 0 && <span style={{ width: `${pct(complaintOpen, complaintTotal)}%`, background: "#d97706" }} title={`Mới tiếp nhận: ${complaintOpen}`} />}
-          </> : <span style={{ width: "100%", background: "var(--m3-surface-container)" }} />}
-        </div>
-        <div className={s.miniStats}>
-          <span><i style={{ background: "#d97706" }} />Mới: <strong>{number(complaintOpen)}</strong></span>
-          <span><i style={{ background: "#2563eb" }} />Đang xem xét: <strong>{number(complaintRead)}</strong></span>
-          <span><i style={{ background: "#15803d" }} />Đã giải quyết: <strong>{number(complaintResolved)}</strong></span>
-        </div>
-        <div className={s.subBlock}>
-          <h3>Tuổi hàng đợi khiếu nại chưa giải quyết</h3>
-          <ul className={s.hBars}>
-            <li><span>Dưới 24 giờ</span><div className={s.barTrack}><i style={{ width: `${(slaUnder24 / slaMax) * 100}%`, background: "#2563eb" }} /></div><strong>{number(slaUnder24)}</strong></li>
-            <li><span>24 – 48 giờ</span><div className={s.barTrack}><i style={{ width: `${(sla24to48 / slaMax) * 100}%`, background: "#d97706" }} /></div><strong>{number(sla24to48)}</strong></li>
-            <li><span>Quá 48 giờ (cần gấp)</span><div className={s.barTrack}><i style={{ width: `${(slaOver48 / slaMax) * 100}%`, background: "#dc2626" }} /></div><strong>{number(slaOver48)}</strong></li>
-          </ul>
-        </div>
-      </article>}
-
-      {access.canEdit && <article className={s.panel} aria-labelledby="rev-chart-gaps">
-        <div className={s.panelHeading}>
-          <div>
-            <h2 id="rev-chart-gaps">Lỗ hổng định luật theo tác động</h2>
-            <p>{gapTotalAll > 0 ? `Đã rà soát ${gapResolutionRate}% (${number((gapCounts?.RESOLVED ?? 0) + (gapCounts?.DISMISSED ?? 0))}/${number(gapTotalAll)} mục).` : "Tổng hợp số lần mô phỏng gặp đại lượng chưa có định luật kiểm."}</p>
-          </div>
-          <Button variant="ghost" onClick={() => onOpen("gaps")}>Rà soát<ReviewerIcon name="arrow" size={16} /></Button>
-        </div>
-        <ul className={s.hBars}>
-          {gapByKind.map(row => <li key={row.kind}>
-            <span>{row.label} <small>({number(row.items)} mục)</small></span>
-            <div className={s.barTrack}><i style={{ width: `${row.occurrences > 0 ? Math.max(6, (row.occurrences / maxGapOcc) * 100) : 0}%`, background: row.kind === "VIOLATION" ? "#dc2626" : row.kind === "AMBIGUOUS" ? "#d97706" : "#315da8" }} /></div>
-            <strong>{number(row.occurrences)} lần</strong>
-          </li>)}
-        </ul>
-        {topGapTopics.length > 0 && <div className={s.subBlock}>
-          <h3>Chủ đề cần ưu tiên bổ sung định luật</h3>
-          <div className={s.topicChips}>
-            {topGapTopics.map(([topic, count]) => <Badge key={topic} color="indigo" variant="soft">{topicName(topic)} · {number(count)} lần</Badge>)}
-          </div>
-        </div>}
-      </article>}
-
-      {access.canEdit && <article className={s.panel} aria-labelledby="rev-chart-schemas">
-        <div className={s.panelHeading}>
-          <div>
-            <h2 id="rev-chart-schemas">Tình trạng bộ dữ liệu Chủ đề vật lý</h2>
-            <p>Hiện có {number(uniqueTopics)} chủ đề với {number(schemas.length)} phiên bản trong hệ thống.</p>
-          </div>
-          <Button variant="ghost" onClick={() => onOpen("topics")}>Quản lý<ReviewerIcon name="arrow" size={16} /></Button>
-        </div>
-        <div className={s.stackedBar} role="img" aria-label={`Đang dùng: ${schemaApproved}, Bản nháp: ${schemaDraft}, Ngừng dùng: ${schemaRetired}`}>
-          {schemas.length > 0 ? <>
-            {schemaApproved > 0 && <span style={{ width: `${pct(schemaApproved, schemas.length)}%`, background: "#15803d" }} title={`Đang dùng: ${schemaApproved}`} />}
-            {schemaDraft > 0 && <span style={{ width: `${pct(schemaDraft, schemas.length)}%`, background: "#d97706" }} title={`Bản nháp: ${schemaDraft}`} />}
-            {schemaRetired > 0 && <span style={{ width: `${pct(schemaRetired, schemas.length)}%`, background: "#64748b" }} title={`Ngừng dùng: ${schemaRetired}`} />}
-          </> : <span style={{ width: "100%", background: "var(--m3-surface-container)" }} />}
-        </div>
-        <ul className={s.hBars} style={{ marginTop: 14 }}>
-          <li><span>Đang dùng (đã phát hành)</span><div className={s.barTrack}><i style={{ width: `${pct(schemaApproved, schemas.length)}%`, background: "#15803d" }} /></div><strong>{number(schemaApproved)}</strong></li>
-          <li><span>Bản nháp chờ phê duyệt</span><div className={s.barTrack}><i style={{ width: `${pct(schemaDraft, schemas.length)}%`, background: "#d97706" }} /></div><strong>{number(schemaDraft)}</strong></li>
-          <li><span>Phiên bản ngừng dùng</span><div className={s.barTrack}><i style={{ width: `${pct(schemaRetired, schemas.length)}%`, background: "#64748b" }} /></div><strong>{number(schemaRetired)}</strong></li>
-        </ul>
-      </article>}
-    </section>
-
     <div className={s.content}>
-      <section className={s.panel} aria-labelledby="reviewer-priority-title"><div className={s.panelHeading}><div><h2 id="reviewer-priority-title">Ưu tiên xử lý</h2><p>Nhóm có yêu cầu cũ nhất được xếp trước.</p></div><span className={s.sectionIcon}><ReviewerIcon name="queue" /></span></div>
-        {pending.length > 0 ? <ul className={s.priorityList}>{pending.map(task => <li key={task.id}><span className={s.rowIcon}><ReviewerIcon name={task.icon} /></span><div className={s.taskCopy}><div><h3>{task.title}</h3><Badge color="amber">{number(task.count!)} mục</Badge></div><p>{task.detail}</p>{task.oldest && <small><ReviewerIcon name="clock" size={14} />Cũ nhất {timeAgo(task.oldest)}</small>}{task.error && <small className={s.warningText}>Đang hiển thị số liệu gần nhất.</small>}</div><Button variant="soft" onClick={() => onOpen(task.view)} aria-label={task.action + ": " + task.title}>Xử lý<ReviewerIcon name="arrow" size={16} /></Button></li>)}</ul> : <div className={s.empty}><span><ReviewerIcon name={ready ? "check" : "queue"} size={28} /></span><h3>{ready ? "Đã xử lý hết công việc" : failed.length ? "Chưa thể tổng hợp công việc" : "Đang tổng hợp công việc"}</h3><p>{ready ? "Bạn có thể xem lại các nhóm công việc hoặc cập nhật dữ liệu chuẩn." : failed.length ? "Thử làm mới để kiểm tra lại các nhóm chưa tải được." : "Số liệu sẽ xuất hiện khi tải xong."}</p></div>}
+      <div className={s.main}>
+      <section className={s.chartsGrid} aria-label="Thống kê kiểm duyệt và chất lượng dữ liệu">
+        {access.canReview && <article className={s.panel} aria-labelledby="rev-chart-moderation">
+          <div className={s.panelHeading}>
+            <div>
+              <h2 id="rev-chart-moderation">Phân bổ kiểm duyệt mô phỏng</h2>
+              <p>{libDecided > 0 ? `Tỷ lệ đạt duyệt ${approvalRate}% trên ${number(libDecided)} mô phỏng đã xử lý.` : "Theo dõi chất lượng mô phỏng giáo viên chia sẻ công khai."}</p>
+            </div>
+            <Button variant="ghost" onClick={() => onOpen("moderation")}>Mở danh sách<ReviewerIcon name="arrow" size={16} /></Button>
+          </div>
+          <DonutChart
+            segments={moderationSegments}
+            centerValue={libDecided > 0 ? `${approvalRate}%` : number(libPending)}
+            centerLabel={libDecided > 0 ? "Đạt duyệt" : "Chờ duyệt"}
+            ariaLabel={moderationSegments.map(item => `${item.label}: ${item.value}`).join(", ")}
+          />
+        </article>}
+
+        {canHandleComplaints && <article className={s.panel} aria-labelledby="rev-chart-complaints">
+          <div className={s.panelHeading}>
+            <div>
+              <h2 id="rev-chart-complaints">Xử lý khiếu nại & thời gian chờ</h2>
+              <p>{complaintTotal > 0 ? `Đã giải quyết ${complaintResolveRate}% (${number(complaintResolved)}/${number(complaintTotal)} khiếu nại).` : "Chưa có khiếu nại mô phỏng nào được ghi nhận."}</p>
+            </div>
+            <Button variant="ghost" onClick={() => onOpen("complaints")}>Xử lý<ReviewerIcon name="arrow" size={16} /></Button>
+          </div>
+          <div className={s.stackedBar} role="img" aria-label={`Mới: ${complaintOpen}, Đang xem xét: ${complaintRead}, Đã giải quyết: ${complaintResolved}`}>
+            {complaintTotal > 0 ? <>
+              {complaintResolved > 0 && <span style={{ width: `${pct(complaintResolved, complaintTotal)}%`, background: "#15803d" }} title={`Đã giải quyết: ${complaintResolved}`} />}
+              {complaintRead > 0 && <span style={{ width: `${pct(complaintRead, complaintTotal)}%`, background: "#2563eb" }} title={`Đang xem xét: ${complaintRead}`} />}
+              {complaintOpen > 0 && <span style={{ width: `${pct(complaintOpen, complaintTotal)}%`, background: "#d97706" }} title={`Mới tiếp nhận: ${complaintOpen}`} />}
+            </> : <span style={{ width: "100%", background: "var(--m3-surface-container)" }} />}
+          </div>
+          <div className={s.miniStats}>
+            <span><i style={{ background: "#d97706" }} />Mới: <strong>{number(complaintOpen)}</strong></span>
+            <span><i style={{ background: "#2563eb" }} />Đang xem xét: <strong>{number(complaintRead)}</strong></span>
+            <span><i style={{ background: "#15803d" }} />Đã giải quyết: <strong>{number(complaintResolved)}</strong></span>
+          </div>
+          <div className={s.subBlock}>
+            <h3>Tuổi hàng đợi khiếu nại chưa giải quyết</h3>
+            <ul className={s.hBars}>
+              <li><span>Dưới 24 giờ</span><div className={s.barTrack}><i style={{ width: `${(slaUnder24 / slaMax) * 100}%`, background: "#2563eb" }} /></div><strong>{number(slaUnder24)}</strong></li>
+              <li><span>24 – 48 giờ</span><div className={s.barTrack}><i style={{ width: `${(sla24to48 / slaMax) * 100}%`, background: "#d97706" }} /></div><strong>{number(sla24to48)}</strong></li>
+              <li><span>Quá 48 giờ (cần gấp)</span><div className={s.barTrack}><i style={{ width: `${(slaOver48 / slaMax) * 100}%`, background: "#dc2626" }} /></div><strong>{number(slaOver48)}</strong></li>
+            </ul>
+          </div>
+        </article>}
+
+        {access.canEdit && <article className={s.panel} aria-labelledby="rev-chart-gaps">
+          <div className={s.panelHeading}>
+            <div>
+              <h2 id="rev-chart-gaps">Lỗ hổng định luật theo tác động</h2>
+              <p>{gapTotalAll > 0 ? `Đã rà soát ${gapResolutionRate}% (${number((gapCounts?.RESOLVED ?? 0) + (gapCounts?.DISMISSED ?? 0))}/${number(gapTotalAll)} mục).` : "Tổng hợp số lần mô phỏng gặp đại lượng chưa có định luật kiểm."}</p>
+            </div>
+            <Button variant="ghost" onClick={() => onOpen("gaps")}>Rà soát<ReviewerIcon name="arrow" size={16} /></Button>
+          </div>
+          <ul className={s.hBars}>
+            {gapByKind.map(row => <li key={row.kind}>
+              <span>{row.label} <small>({number(row.items)} mục)</small></span>
+              <div className={s.barTrack}><i style={{ width: `${row.occurrences > 0 ? Math.max(6, (row.occurrences / maxGapOcc) * 100) : 0}%`, background: row.kind === "VIOLATION" ? "#dc2626" : row.kind === "AMBIGUOUS" ? "#d97706" : "#315da8" }} /></div>
+              <strong>{number(row.occurrences)} lần</strong>
+            </li>)}
+          </ul>
+          {topGapTopics.length > 0 && <div className={s.subBlock}>
+            <h3>Chủ đề cần ưu tiên bổ sung định luật</h3>
+            <div className={s.topicChips}>
+              {topGapTopics.map(([topic, count]) => <Badge key={topic} color="indigo" variant="soft">{topicName(topic)} · {number(count)} lần</Badge>)}
+            </div>
+          </div>}
+        </article>}
+
+        {access.canEdit && <article className={s.panel} aria-labelledby="rev-chart-schemas">
+          <div className={s.panelHeading}>
+            <div>
+              <h2 id="rev-chart-schemas">Tình trạng bộ dữ liệu Chủ đề vật lý</h2>
+              <p>Hiện có {number(uniqueTopics)} chủ đề với {number(schemas.length)} phiên bản trong hệ thống.</p>
+            </div>
+            <Button variant="ghost" onClick={() => onOpen("topics")}>Quản lý<ReviewerIcon name="arrow" size={16} /></Button>
+          </div>
+          <div className={s.stackedBar} role="img" aria-label={`Đang dùng: ${schemaApproved}, Bản nháp: ${schemaDraft}, Ngừng dùng: ${schemaRetired}`}>
+            {schemas.length > 0 ? <>
+              {schemaApproved > 0 && <span style={{ width: `${pct(schemaApproved, schemas.length)}%`, background: "#15803d" }} title={`Đang dùng: ${schemaApproved}`} />}
+              {schemaDraft > 0 && <span style={{ width: `${pct(schemaDraft, schemas.length)}%`, background: "#d97706" }} title={`Bản nháp: ${schemaDraft}`} />}
+              {schemaRetired > 0 && <span style={{ width: `${pct(schemaRetired, schemas.length)}%`, background: "#64748b" }} title={`Ngừng dùng: ${schemaRetired}`} />}
+            </> : <span style={{ width: "100%", background: "var(--m3-surface-container)" }} />}
+          </div>
+          <ul className={s.hBars} style={{ marginTop: 14 }}>
+            <li><span>Đang dùng (đã phát hành)</span><div className={s.barTrack}><i style={{ width: `${pct(schemaApproved, schemas.length)}%`, background: "#15803d" }} /></div><strong>{number(schemaApproved)}</strong></li>
+            <li><span>Bản nháp chờ phê duyệt</span><div className={s.barTrack}><i style={{ width: `${pct(schemaDraft, schemas.length)}%`, background: "#d97706" }} /></div><strong>{number(schemaDraft)}</strong></li>
+            <li><span>Phiên bản ngừng dùng</span><div className={s.barTrack}><i style={{ width: `${pct(schemaRetired, schemas.length)}%`, background: "#64748b" }} /></div><strong>{number(schemaRetired)}</strong></li>
+          </ul>
+        </article>}
       </section>
+        <section className={s.panel} aria-labelledby="reviewer-priority-title"><div className={s.panelHeading}><div><h2 id="reviewer-priority-title">Ưu tiên xử lý</h2><p>Nhóm có yêu cầu cũ nhất được xếp trước.</p></div><span className={s.sectionIcon}><ReviewerIcon name="queue" /></span></div>
+          {pending.length > 0 ? <ul className={s.priorityList}>{pending.map(task => <li key={task.id}><span className={s.rowIcon}><ReviewerIcon name={task.icon} /></span><div className={s.taskCopy}><div><h3>{task.title}</h3><Badge color="amber">{number(task.count!)} mục</Badge></div><p>{task.detail}</p>{task.oldest && <small><ReviewerIcon name="clock" size={14} />Cũ nhất {timeAgo(task.oldest)}</small>}{task.error && <small className={s.warningText}>Đang hiển thị số liệu gần nhất.</small>}</div><Button variant="soft" onClick={() => onOpen(task.view)} aria-label={task.action + ": " + task.title}>Xử lý<ReviewerIcon name="arrow" size={16} /></Button></li>)}</ul> : <div className={s.empty}><span><ReviewerIcon name={ready ? "check" : "queue"} size={28} /></span><h3>{ready ? "Đã xử lý hết công việc" : failed.length ? "Chưa thể tổng hợp công việc" : "Đang tổng hợp công việc"}</h3><p>{ready ? "Bạn có thể xem lại các nhóm công việc hoặc cập nhật dữ liệu chuẩn." : failed.length ? "Thử làm mới để kiểm tra lại các nhóm chưa tải được." : "Số liệu sẽ xuất hiện khi tải xong."}</p></div>}
+        </section>
+      </div>
       <aside className={s.aside} aria-label="Tình trạng và phạm vi công việc"><ReportChart title="Phân bổ công việc" description="Các mục đang chờ theo từng nhóm." variant="donut" unit="mục đang chờ" items={tasks.filter(task => !task.error).map(task => ({ label: task.title, value: task.count }))} />
         <section className={s.queueSummary} aria-labelledby="reviewer-queue-title"><span className={s.summaryIcon}><ReviewerIcon name="clock" size={24} /></span><h2 id="reviewer-queue-title">Tình trạng hàng đợi</h2><dl><div><dt>Công việc đang chờ</dt><dd>{ready ? number(total) : "—"}</dd></div><div><dt>Nhóm còn công việc</dt><dd>{ready ? number(pending.length) + " / " + number(tasks.length) : loaded + " / " + tasks.length + " nhóm đã tải"}</dd></div><div><dt>Yêu cầu cũ nhất</dt><dd>{oldest ? timeAgo(oldest) : "—"}</dd></div></dl></section>
         <details className="reviewer-role-guide"><summary>Phạm vi công việc</summary><section data-panel className={s.panel + " " + s.guide} aria-labelledby="reviewer-scope-title"><div className={s.panelHeading}><div><h2 id="reviewer-scope-title">Phạm vi công việc</h2><p>Các chức năng tài khoản được cấp.</p></div></div><ul>

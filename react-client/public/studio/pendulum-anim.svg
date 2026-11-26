@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 220" fill="none">
+<style>
+.sw{transform-origin:120px 22px;animation:s 1.8s cubic-bezier(.37,0,.63,1) infinite alternate}
+@keyframes s{from{transform:rotate(14deg)}to{transform:rotate(-14deg)}}
+@media (prefers-reduced-motion:reduce){.sw{animation:none;transform:rotate(8deg)}}
+</style>
+<path d="M60 22H180" stroke="#0B3262" stroke-opacity=".55" stroke-width="2"/>
+<path d="M68 22l-7-9M84 22l-7-9M100 22l-7-9M116 22l-7-9M132 22l-7-9M148 22l-7-9M164 22l-7-9M180 22l-7-9" stroke="#0B3262" stroke-opacity=".25"/>
+<path d="M120 22V196" stroke="#0B3262" stroke-opacity=".15" stroke-dasharray="3 5"/>
+<path d="M81.3 177.2A160 160 0 0 0 158.7 177.2" stroke="#23919A" stroke-opacity=".45" stroke-width="1.5" stroke-dasharray="2 6" stroke-linecap="round"/>
+<g class="sw"><path d="M120 22V182" stroke="#0B3262" stroke-opacity=".7" stroke-width="1.75"/><circle cx="120" cy="22" r="3.5" fill="#0B3262"/><circle cx="120" cy="182" r="14" fill="#23919A"/><circle cx="115" cy="177" r="4" fill="#FFFFFF" fill-opacity=".55"/></g>
+</svg>

@@ -70,3 +70,9 @@ export const libraryFolders = () =>
 
 export const createLibraryFolder = (name: string) => 
   axiosClient.post<LibraryFolder>("/library/folders", { name }).then(r => r.data);
+
+export const renameLibraryFolder = (id: string, name: string) =>
+  axiosClient.patch<LibraryFolder>(`/library/folders/${id}`, { name }).then(r => r.data);
+
+export const deleteLibraryFolder = (id: string) =>
+  axiosClient.delete<void>(`/library/folders/${id}`).then(() => undefined);

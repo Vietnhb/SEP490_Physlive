@@ -10,12 +10,14 @@ import "../../simulation/styles/learning.css";
 
 const Assignments = lazy(() => import("./Assignments"));
 
-export default function AssignmentWorkspace() {
+export default function AssignmentWorkspace({ embedded = false }: Readonly<{ embedded?: boolean }>) {
   const user = useSessionStore((state) => state.user);
   const appearance = useEffectiveTheme();
+  // inside the teacher shell the composer is a canvas page (artboard TeacherComposer)
+  if (embedded && canTeach(user)) return <Suspense fallback={<main className="page" aria-busy="true" />}><FallbackHeading title="Giao bài mới" /><Assignments canvas /></Suspense>;
   return (
     <div className="learning-app">
-      <LearningHeader />
+      {!embedded && <LearningHeader />}
       <FallbackHeading title="Giao bài" />
       {canTeach(user) ? (
         <Suspense fallback={<main className="route-loading" aria-busy="true" />}>

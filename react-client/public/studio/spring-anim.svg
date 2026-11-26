@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" fill="none">
+<style>
+.sp{transform-origin:110px 24px;animation:sp 1.6s cubic-bezier(.37,0,.63,1) infinite alternate}
+.m{animation:m 1.6s cubic-bezier(.37,0,.63,1) infinite alternate}
+@keyframes sp{from{transform:scaleY(.78)}to{transform:scaleY(1.22)}}
+@keyframes m{from{transform:translateY(-22px)}to{transform:translateY(22px)}}
+@media (prefers-reduced-motion:reduce){.sp,.m{animation:none}}
+</style>
+<path d="M50 24H170" stroke="#0B3262" stroke-opacity=".55" stroke-width="2"/>
+<path d="M58 24l-7-9M74 24l-7-9M90 24l-7-9M106 24l-7-9M122 24l-7-9M138 24l-7-9M154 24l-7-9M170 24l-7-9" stroke="#0B3262" stroke-opacity=".25"/>
+<path d="M40 144H180" stroke="#23919A" stroke-opacity=".45" stroke-dasharray="3 6"/>
+<g class="sp"><path d="M110 24V36L128 44L92 58L128 72L92 86L128 100L92 114L110 122V124" stroke="#0B3262" stroke-opacity=".75" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>
+<g class="m"><rect x="84" y="124" width="52" height="40" rx="6" fill="#23919A"/><path d="M92 132H110" stroke="#FFFFFF" stroke-opacity=".55" stroke-width="3" stroke-linecap="round"/></g>
+<path d="M190 104V184M185 110l5-7 5 7M185 178l5 7 5-7" stroke="#0B3262" stroke-opacity=".35" stroke-width="1.5"/>
+</svg>

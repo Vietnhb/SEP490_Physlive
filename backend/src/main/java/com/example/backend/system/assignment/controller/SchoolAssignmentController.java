@@ -1,6 +1,7 @@
 package com.example.backend.system.assignment.controller;
 
 import com.example.backend.system.assignment.dto.AssignmentContracts.SchoolAssignment;
+import com.example.backend.system.assignment.dto.AssignmentContracts.SchoolAssignmentDetail;
 import com.example.backend.system.assignment.service.SchoolAssignmentService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -21,5 +22,10 @@ public class SchoolAssignmentController {
     public Page<SchoolAssignment> list(@PathVariable UUID schoolId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "30") int size) {
         return service.list(schoolId, page, size);
+    }
+
+    @GetMapping("/{assignmentId}")
+    public SchoolAssignmentDetail detail(@PathVariable UUID schoolId, @PathVariable UUID assignmentId) {
+        return service.detail(schoolId, assignmentId);
     }
 }

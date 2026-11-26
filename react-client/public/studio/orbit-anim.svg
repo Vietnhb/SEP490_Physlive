@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" fill="none">
+<style>
+.ox{animation:ox 3s cubic-bezier(.37,0,.63,1) infinite alternate}
+.oy{animation:oy 3s cubic-bezier(.37,0,.63,1) -1.5s infinite alternate}
+.ox2{animation:ox2 5s cubic-bezier(.37,0,.63,1) infinite alternate}
+.oy2{animation:oy2 5s cubic-bezier(.37,0,.63,1) -2.5s infinite alternate}
+@keyframes ox{from{transform:translateX(-122px)}to{transform:translateX(122px)}}
+@keyframes oy{from{transform:translateY(-44px)}to{transform:translateY(44px)}}
+@keyframes ox2{from{transform:translateX(82px)}to{transform:translateX(-82px)}}
+@keyframes oy2{from{transform:translateY(-28px)}to{transform:translateY(28px)}}
+@media (prefers-reduced-motion:reduce){.ox,.oy,.ox2,.oy2{animation:none}}
+</style>
+<g transform="rotate(-16 160 100)">
+<ellipse cx="160" cy="100" rx="122" ry="44" stroke="#0B3262" stroke-opacity=".28" stroke-width="1.5"/>
+<ellipse cx="160" cy="100" rx="82" ry="28" stroke="#23919A" stroke-opacity=".5" stroke-width="1.5" stroke-dasharray="2 6" stroke-linecap="round"/>
+<circle cx="160" cy="100" r="22" fill="#0B3262"/><circle cx="153" cy="93" r="6" fill="#FFFFFF" fill-opacity=".25"/>
+<g transform="translate(160 100)"><g class="ox"><g class="oy"><circle r="7" fill="#23919A"/></g></g><g class="ox2"><g class="oy2"><circle r="4" fill="#0B3262" fill-opacity=".55"/></g></g></g>
+</g>
+</svg>

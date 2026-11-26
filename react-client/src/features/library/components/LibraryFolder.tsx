@@ -2,6 +2,7 @@ import { memo, useState, type DragEvent } from "react";
 import type { LibraryFolder as LibraryFolderModel, LibraryItem } from "../../../shared/types/physlive";
 import Icon from "../../../shared/ui/LearningIcon";
 import LibraryItemRow, { LIBRARY_ITEM_DRAG_TYPE } from "./LibraryItem";
+import LibraryFolderMenu from "./LibraryFolderMenu";
 import { moveLibraryItem } from "../api/libraryApi";
 import { teacherLibraryStore } from "../hooks/useTeacherLibrary";
 import { getToken } from "../../../shared/lib/token";
@@ -28,6 +29,9 @@ const LibraryFolder = memo(function LibraryFolder({
   const title = folder?.name ?? "Chưa phân loại";
   // Dropping a library row on a real folder moves it there ("Chưa phân loại" is not a folder).
   const [dropState, setDropState] = useState<"" | "over" | "saving" | "error">("");
+  const [renaming, setRenaming] = useState(false);
+  // every simulation in the folder, not only the ones the search shows: an emptiness check must see them all
+  const total = teacherLibraryStore(state => folder ? state.items.filter(item => item.folderId === folder.id).length : 0);
   const accepts = (event: DragEvent) => !legacy && event.dataTransfer.types.includes(LIBRARY_ITEM_DRAG_TYPE);
   const drop = async (event: DragEvent) => {
     if (!folder || !accepts(event)) return;
@@ -55,8 +59,9 @@ const LibraryFolder = memo(function LibraryFolder({
       onDrop={event => void drop(event)}>
       <summary className="learn-library-folder-name">
         <Icon name="folder" />
-        <strong title={title}>{title}</strong>
-        <small>{items.length}</small>
+        {!renaming && <strong title={title}>{title}</strong>}
+        {!renaming && <small>{items.length}</small>}
+        {folder && <LibraryFolderMenu folder={folder} itemCount={total} onRenaming={setRenaming} />}
       </summary>
       <div className="learn-library-items">
         {items.map(item => (

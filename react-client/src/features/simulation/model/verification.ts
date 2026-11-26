@@ -19,3 +19,9 @@ const READINGS: Record<string, VerificationReading> = {
 
 export const readVerification = (status: string | undefined | null): VerificationReading =>
   (status && READINGS[status]) || { tone: "pending", badge: "Đang sẵn sàng", sentence: "Đang sẵn sàng" };
+
+/** Where the laws come from: the national physics programme (Chương trình GDPT 2018, issued with Thông tư 32/2018/TT-BGDĐT). */
+export const CURRICULUM_SOURCE = {
+  label: "Chương trình GDPT 2018 môn Vật lí — Thông tư 32/2018/TT-BGDĐT (Bộ GD&ĐT)",
+  url: "https://tulieuvankien.dangcongsan.vn/he-thong-van-ban/van-ban-quy-pham-phap-luat/thong-tu-so-322018tt-bgddt-ngay-26122018-cua-bo-giao-duc-va-dao-tao-ban-hanh-chuong-trinh-giao-duc-pho-thong-5083",
+};

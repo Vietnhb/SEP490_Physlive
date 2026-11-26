@@ -49,6 +49,8 @@ export function useSimulationWorkspace(libraryState: LibraryWorkspaceState) {
   const { folders, setFolders, setLibraryItems, libraryItems, libraryLoading, libraryError, retryLibrary } = libraryState;
   const [saveOpen, setSaveOpen] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  // stable, so the notice's five-second timer is not restarted by every frame of a playing simulation
+  const dismissSaved = useCallback(() => setSavedMessage(""), []);
   const [currentSimulationId, setCurrentSimulationId] = useState("");
   const [openingId, setOpeningId] = useState<string | null>(requestedSimulationId);
 
@@ -417,12 +419,14 @@ export function useSimulationWorkspace(libraryState: LibraryWorkspaceState) {
       sourceMode, setSourceMode, text, setText, sourceFile, previewUrl, busy, error, acceptImage, removeImage,
       recognition, correction, setCorrection, editingRecognition, setEditingRecognition, recognitionLowConfidence,
       intent, revision, setRevision, normalize, handleRecognition, handleRevision, generate, reset,
+      /** A saved simulation being opened from the library or the address, before it can be shown. */
+      opening: Boolean(openingId),
     },
     preview: { simulation, liveTimeline, presentation, runValues, sandboxKey, validation, renderError, setRenderError: reportRenderError, restartPreview, recomputing },
     experiment: { simulation, values, validation, updateParameter, resetParameters },
     explanation: { intent, revision, setRevision, handleRevision },
     save: {
-      busy, saveOpen, savedMessage, renderError, currentSimulationId, canManageLearningContent, folders,
+      busy, saveOpen, savedMessage, dismissSaved, renderError, currentSimulationId, canManageLearningContent, folders,
       onBusyChange: setBusy, onFolder, onSaved, onClose: () => setSaveOpen(false),
       onOpen: () => { setSavedMessage(""); setSaveOpen(true); },
     },

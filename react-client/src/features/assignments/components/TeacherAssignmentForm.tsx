@@ -1,69 +1,12 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Badge, Button, Callout, Checkbox, Heading, Select, Text, TextArea, TextField } from "@radix-ui/themes";
-import type { AssignmentActivityType, LibraryItem, Simulation, StudentOption, TeacherClassOption } from "../../../shared/types/physlive";
 import { useAssignmentClock } from "../hooks/useAssignmentClock";
 import { useTopicName } from "../../../shared/hooks/useTopicName";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import "../styles/assignment-studio.css";
-
-type TeacherAssignmentFormProps = {
-  workspaceLayout: boolean;
-  saved: LibraryItem[];
-  selectedLibrary: LibraryItem | undefined;
-  libraryItemId: string;
-  title: string;
-  description: string;
-  prompt: string;
-  activityType: AssignmentActivityType;
-  simulation: Simulation | null;
-  simulationOptionsLoading: boolean;
-  simulationOptionsError: boolean;
-  targetSeriesSource: string;
-  sampleTime: string;
-  measurementTolerance: string;
-  investigationParameter: string;
-  investigationOutcome: string;
-  maxScore: string;
-  dueAt: string;
-  allowLateSubmission: boolean;
-  onAllowLateSubmissionChange: (value: boolean) => void;
-  students: StudentOption[];
-  classes: TeacherClassOption[];
-  selectedClassId: string;
-  selectedStudents: number[];
-  submitting: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onLibraryChange: (id: string) => void;
-  onTitleChange: (value: string) => void;
-  onPromptChange: (value: string) => void;
-  onActivityTypeChange: (value: AssignmentActivityType) => void;
-  onTargetSeriesSourceChange: (value: string) => void;
-  onSampleTimeChange: (value: string) => void;
-  onMeasurementToleranceChange: (value: string) => void;
-  onInvestigationParameterChange: (value: string) => void;
-  onInvestigationOutcomeChange: (value: string) => void;
-  onMaxScoreChange: (value: string) => void;
-  onDueAtChange: (value: string) => void;
-  onDescriptionChange: (value: string) => void;
-  onToggleStudent: (id: number) => void;
-  onSelectAll: () => void;
-  onClassChange: (id: string) => void;
-};
-
-const ACTIVITIES: { value: AssignmentActivityType; label: string; help: string; icon: "bulb" | "chart" | "sliders" | "play"; prompt: string }[] = [
-  { value: "PREDICT_OBSERVE_EXPLAIN", label: "Dự đoán – giải thích", help: "Học sinh dự đoán trước, rồi mở mô phỏng để đối chiếu.", icon: "bulb", prompt: "Câu hỏi dự đoán" },
-  { value: "MEASUREMENT", label: "Đo đại lượng", help: "Học sinh đọc một đại lượng tại thời điểm thầy cô chọn.", icon: "chart", prompt: "Yêu cầu đo và giải thích" },
-  { value: "PARAMETER_INVESTIGATION", label: "Khảo sát tham số", help: "Học sinh thay đổi một tham số và tìm quy luật.", icon: "sliders", prompt: "Câu hỏi khảo sát" },
-  { value: "FREE_EXPLORATION", label: "Khám phá tự do", help: "Mô phỏng mở ngay, học sinh tự quan sát và kết luận.", icon: "play", prompt: "Nhiệm vụ khám phá" },
-];
-const STEPS = ["Nội dung bài", "Lớp & hạn nộp", "Xem lại & giao"];
-
-/** Value for a datetime-local `min`, in the viewer's own time zone. */
-function localDateTime(time: number) {
-  const date = new Date(time - new Date(time).getTimezoneOffset() * 60000);
-  return date.toISOString().slice(0, 16);
-}
+import { ACTIVITIES, STEPS, assignmentChecks, localDateTime, type TeacherAssignmentFormProps, measurableSeries, simulationEnd } from "./assignmentComposer";
+export type { TeacherAssignmentFormProps } from "./assignmentComposer";
 
 function Field({ label, htmlFor, hint, children, required = false }: Readonly<{ label: string; htmlFor?: string; hint?: ReactNode; children: ReactNode; required?: boolean }>) {
   return <div className="studio-field">
@@ -85,15 +28,10 @@ export function TeacherAssignmentForm({
   const [search, setSearch] = useState("");
   const now = useAssignmentClock();
   const topicName = useTopicName();
-  const series = simulation?.visualization?.series ?? [];
+  const series = measurableSeries(simulation);
   const controls = simulation?.visualization?.controls ?? [];
   const activity = ACTIVITIES.find(item => item.value === activityType) ?? ACTIVITIES[0];
-  const typeConfigValid = activityType === "MEASUREMENT"
-    ? Boolean(targetSeriesSource && sampleTime.trim() && Number.isFinite(Number(sampleTime)) && measurementTolerance.trim() && Number.isFinite(Number(measurementTolerance)) && Number(measurementTolerance) >= 0)
-    : activityType === "PARAMETER_INVESTIGATION" ? Boolean(investigationParameter) : true;
-  const contentValid = Boolean(selectedLibrary && simulation && title.trim() && title.trim().length <= 160 && prompt.trim()) && Number(maxScore) >= 0.001 && Number(maxScore) <= 99999.999 && Number.isFinite(Number(maxScore)) && typeConfigValid;
-  const dueInPast = Boolean(dueAt) && new Date(dueAt).getTime() <= now;
-  const recipientsValid = Boolean(selectedClassId) && selectedStudents.length > 0 && !dueInPast;
+  const { typeConfigValid, contentValid, dueInPast, recipientsValid } = assignmentChecks({ selectedLibrary, simulation, title, prompt, maxScore, activityType, targetSeriesSource, sampleTime, measurementTolerance, investigationParameter, dueAt, selectedClassId, selectedStudents }, now);
   const selectedClass = classes.find(item => item.id === selectedClassId);
   const shownStudents = students.filter(student => student.fullName.toLocaleLowerCase("vi").includes(search.toLocaleLowerCase("vi")));
   const wholeClass = students.length > 0 && selectedStudents.length === students.length;
@@ -168,8 +106,8 @@ export function TeacherAssignmentForm({
                     <Select.Content position="popper" className="studio-select-content">{series.map(item => <Select.Item key={item.source} value={item.source}>{item.label}{item.unit ? ` (${item.unit})` : ""}</Select.Item>)}</Select.Content>
                   </Select.Root>
                 </Field>
-                <Field label="Tại thời điểm (giây)" htmlFor="measurement-time" required hint={simulation ? `Từ ${simulation.time.at(0) ?? 0} đến ${simulation.time.at(-1) ?? 0} s` : undefined}>
-                  <TextField.Root id="measurement-time" size="3" type="number" min={simulation?.time.at(0) ?? 0} max={simulation?.time.at(-1) ?? 0} step="any" value={sampleTime} onChange={event => onSampleTimeChange(event.target.value)} />
+                <Field label="Tại thời điểm (giây)" htmlFor="measurement-time" required hint={simulation ? `Từ 0 đến ${simulationEnd(simulation).toLocaleString("vi-VN")} s` : undefined}>
+                  <TextField.Root id="measurement-time" size="3" type="number" min={0} max={simulationEnd(simulation)} step="any" value={sampleTime} onChange={event => onSampleTimeChange(event.target.value)} />
                 </Field>
                 <Field label="Sai số chấp nhận" htmlFor="measurement-tolerance" required hint="Cùng đơn vị với đại lượng đo.">
                   <TextField.Root id="measurement-tolerance" size="3" type="number" min="0" step="any" value={measurementTolerance} onChange={event => onMeasurementToleranceChange(event.target.value)} />

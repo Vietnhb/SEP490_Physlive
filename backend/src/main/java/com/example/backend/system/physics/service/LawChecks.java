@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,6 +79,48 @@ public final class LawChecks {
     public LawChecks impacts(Map<Double, Set<String>> impacts) { this.impacts = impacts; return this; }
 
     private double[] noiseOf(Symbol symbol, int count) { double[] own = noise.get(symbol.id()); return own == null ? new double[count] : own; }
+
+    /** How far apart the two sides of a law may drift, as a share of their size, before the law counts as broken. */
+    public static double tolerance() {
+        return RELATIVE;
+    }
+
+    /**
+     * Adds the evidence to law checks saved before runs carried it: the relation from the catalogue (looked up by the
+     * law's id) and, where each of the law's names has its own role, which of the run's quantities it stood for.
+     * Verdicts and deviations are left as they were saved.
+     */
+    public static void explain(JsonNode checks, JsonNode catalogue, JsonNode quantities) {
+        if (!checks.isArray()) return;
+        Map<String, JsonNode> laws = new HashMap<>();
+        catalogue.path("laws").forEach(law -> laws.putIfAbsent(law.path("id").asText(), law));
+        Map<String, JsonNode> byId = new HashMap<>();
+        quantities.forEach(quantity -> byId.put(quantity.path("id").asText(), quantity));
+        for (JsonNode node : checks) {
+            if (!(node instanceof ObjectNode check) || check.has("relation")) continue;
+            JsonNode law = laws.get(check.path("law").asText());
+            if (law == null) continue;
+            boolean equal = law.has("equal");
+            check.put("relationKind", equal ? "equal" : "atMost").set("relation", law.path(equal ? "equal" : "atMost").deepCopy());
+            if (!check.has("tolerance")) check.put("tolerance", RELATIVE);
+            // a quantity goes to the name whose role it plays; two names of one role cannot be told apart afterwards
+            Map<String, Integer> roles = new HashMap<>();
+            law.path("bind").forEach(variable -> roles.merge(variable.path("role").asText(), 1, Integer::sum));
+            ObjectNode stood = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+            law.path("bind").fields().forEachRemaining(variable -> {
+                String role = variable.getValue().path("role").asText();
+                if (roles.getOrDefault(role, 0) != 1) return;
+                ArrayNode named = stood.putArray(variable.getKey());
+                check.path("quantities").forEach(id -> {
+                    JsonNode quantity = byId.get(id.asText());
+                    if (quantity != null && role.equals(quantity.path("role").asText()))
+                        named.addObject().put("id", id.asText()).put("label", quantity.path("label").asText(null)).put("unit", quantity.path("unit").asText(null));
+                });
+                if (named.isEmpty()) stood.remove(variable.getKey());
+            });
+            if (!stood.isEmpty()) check.set("symbols", stood);
+        }
+    }
 
     /** The catalogues of several strands as one: their roles, kinds, attributes, constants and laws together. */
     public static ObjectNode merge(ObjectMapper json, Iterable<JsonNode> catalogues) {
@@ -256,7 +299,8 @@ public final class LawChecks {
     }
 
     /** The roles some law takes the rate of change of (a position, a velocity, a charge): what such a role names changes over a run. */
-    private static Set<String> evolvingRoles(JsonNode catalogue) {
+    /** The roles a law takes the rate of (a position, a velocity, a charge): what changes over a run, never a fixed setting. */
+    public static Set<String> evolvingRoles(JsonNode catalogue) {
         Set<String> roles = new LinkedHashSet<>();
         for (JsonNode law : catalogue.path("laws")) {
             Set<String> varied = new LinkedHashSet<>();
@@ -349,6 +393,14 @@ public final class LawChecks {
         bound.values().forEach(list -> list.forEach(symbol -> uses.add(symbol.id())));
         boolean equal = law.has("equal");
         JsonNode sides = law.path(equal ? "equal" : "atMost");
+        // the evidence behind the verdict, so a reader sees the relation that was tested and on which quantities,
+        // not only the law's name: the two sides as written in the catalogue and what each name stood for here
+        result.put("relationKind", equal ? "equal" : "atMost").set("relation", sides.deepCopy());
+        ObjectNode stood = result.putObject("symbols");
+        bound.forEach((name, list) -> {
+            ArrayNode named = stood.putArray(name);
+            list.forEach(symbol -> named.addObject().put("id", symbol.id()).put("label", symbol.label()).put("unit", symbol.unit()));
+        });
         Map<String, double[][]> single = new LinkedHashMap<>();
         double[][] leftSide = series(sides.get(0), bound, single, time);
         double[][] rightSide = series(sides.get(1), bound, single, time);
@@ -375,6 +427,7 @@ public final class LawChecks {
             if (by > worstBy) { worstBy = by; worst = i; }
         }
         if (counted == 0) return null;
+        result.put("samples", counted).put("tolerance", RELATIVE);
         boolean passed = off <= FRACTION * counted;
         // "the rate of X is Y" also says that X does not jump. Where several of the law's objects jump at one instant
         // (they act on each other there), X just after must be X just before; one object jumping alone met something

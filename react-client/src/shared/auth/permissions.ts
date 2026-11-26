@@ -69,6 +69,11 @@ export function isDepartmentHead(user: PermissionHolder | null | undefined): boo
   return hasPermission(user, 'DEPARTMENT_HEAD_PHYSICS');
 }
 
+/** Where the department pages live: inside the teacher area for a head who also teaches, on their own otherwise. */
+export function departmentBase(user: PermissionHolder | null | undefined): string {
+  return canTeach(user) ? '/lab/department' : '/department';
+}
+
 /** Landing page of an account; a STAFF account without TEACH works in the department workspace. */
 export function userHome(user: PermissionHolder | null | undefined): string {
   if (!user) return '/';

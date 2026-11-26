@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+<defs>
+<filter id="r" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="37"/><feDisplacementMap in="SourceGraphic" scale="2.6" xChannelSelector="R" yChannelSelector="G"/></filter>
+<filter id="w" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency=".02" numOctaves="3" seed="42"/><feDisplacementMap in="SourceGraphic" scale="26" xChannelSelector="R" yChannelSelector="G"/><feGaussianBlur stdDeviation="1.4"/></filter>
+<pattern id="g" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r=".9" fill="#0B3262" fill-opacity=".16"/></pattern>
+<radialGradient id="f"><stop offset=".55" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<mask id="m"><rect width="320" height="240" fill="url(#f)"/></mask>
+</defs>
+<rect width="320" height="240" fill="url(#g)" mask="url(#m)"/>
+<g filter="url(#w)" fill="#23919A" fill-opacity=".17"><ellipse cx="140" cy="150" rx="104" ry="58"/><circle cx="244" cy="70" r="40"/></g>
+<g stroke="#0B3262" stroke-opacity=".38" stroke-width="1.3" stroke-dasharray="3 5" stroke-linecap="round"><ellipse cx="244" cy="70" rx="54" ry="18" transform="rotate(-16 244 70)"/></g>
+<g filter="url(#r)" stroke="#0B3262" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M74 132L176 84L186 104L84 152Z"/><path d="M176 84L190 78L200 98L186 104"/><path d="M118 132L96 204M126 128L134 204M122 130L164 198"/><path d="M70 132L62 140"/></g>
+<g fill="#23919A"><circle cx="268" cy="54" r="8"/><circle cx="56" cy="50" r="2.5"/><circle cx="92" cy="34" r="2"/><circle cx="296" cy="120" r="2.5"/></g>
+<circle cx="244" cy="70" r="14" fill="#0B3262"/>
+</svg>

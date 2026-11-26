@@ -1,37 +1,55 @@
-import { readVerification } from "../model/verification";
+import { CURRICULUM_SOURCE, readVerification } from "../model/verification";
 import { useState, type Ref } from "react";
 import Icon from "../../../shared/ui/LearningIcon";
+import { PhysicsGlyph, type GlyphKind } from "./PhysicsGlyph";
+import LawCheckList from "./LawCheckList";
+import SavedToast from "./SavedToast";
+import { InspectorSkeleton } from "./BuildingProgress";
 import SaveSimulationPanel from "../../library/components/SaveSimulationPanel";
 import { FormulaReview, SimulationParameterControl } from "./SimulationReview";
 import type { SimulationWorkspaceModel } from "../hooks/useSimulationWorkspace";
 import type { SimulationParameter } from "../api/simulationUnderstandingApi";
 
 const QUICK_DESCRIPTIONS = [
-  { label: "Ba con lắc đơn", text: "3 con lắc đơn có chiều dài dây 1.5 m, vật nặng 0.5 kg được kéo lệch góc 30 độ so với phương thẳng đứng rồi thả nhẹ không vận tốc đầu." },
-  { label: "Ô tô hãm phanh", text: "Một ô tô đang chạy với vận tốc 15 m/s thì hãm phanh chuyển động chậm dần đều với gia tốc 2 m/s². Hãy mô phỏng chuyển động của xe cho đến khi dừng lại." },
-  { label: "Ném ngang", text: "Ném một vật từ độ cao 20 m theo phương ngang với vận tốc đầu 15 m/s. Lấy gia tốc trọng trường g = 9.8 m/s², bỏ qua sức cản không khí." },
-  { label: "Mạch điện nối tiếp và song song", text: "Một nguồn điện có suất điện động 12 V và điện trở trong 1 Ω được nối với mạch ngoài gồm điện trở R1 = 4 Ω mắc nối tiếp với cụm hai điện trở R2 = 6 Ω và R3 = 3 Ω mắc song song với nhau. Hãy mô phỏng cường độ dòng điện trong mạch chính và dòng điện qua từng điện trở R2, R3." },
-];
+  { label: "Ba con lắc đơn", glyph: "pendulum", text: "3 con lắc đơn có chiều dài dây 1.5 m, vật nặng 0.5 kg được kéo lệch góc 30 độ so với phương thẳng đứng rồi thả nhẹ không vận tốc đầu." },
+  { label: "Ô tô hãm phanh", glyph: "braking", text: "Một ô tô đang chạy với vận tốc 15 m/s thì hãm phanh chuyển động chậm dần đều với gia tốc 2 m/s². Hãy mô phỏng chuyển động của xe cho đến khi dừng lại." },
+  { label: "Ném ngang", glyph: "projectile", text: "Ném một vật từ độ cao 20 m theo phương ngang với vận tốc đầu 15 m/s. Lấy gia tốc trọng trường g = 9.8 m/s², bỏ qua sức cản không khí." },
+  { label: "Mạch điện nối tiếp và song song", glyph: "circuit", text: "Một nguồn điện có suất điện động 12 V và điện trở trong 1 Ω được nối với mạch ngoài gồm điện trở R1 = 4 Ω mắc nối tiếp với cụm hai điện trở R2 = 6 Ω và R3 = 3 Ω mắc song song với nhau. Hãy mô phỏng cường độ dòng điện trong mạch chính và dòng điện qua từng điện trở R2, R3." },
+] satisfies { label: string; glyph: GlyphKind; text: string }[];
+
+/** How a run was checked, in words; and a number too small to matter written as such, not as 4.44e-14. */
+const METHODS: Record<string, string> = {
+  CURRICULUM_LAWS: "Tính bằng phương pháp số (RK4), rồi đối chiếu từng thời điểm với định luật của chương trình",
+  ANALYTICAL: "So sánh nghiệm số với công thức giải tích", NUMERICAL: "Tính lại với bước nhỏ hơn và so sánh",
+};
+const tiny = (value: number | string) => {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value);
+  if (Math.abs(number) < 1e-9) return "≈ 0 (sai số làm tròn của máy tính)";
+  return Math.abs(number) < 1e-3 ? number.toExponential(2).replace("e", " × 10^") : number.toLocaleString("vi-VN", { maximumSignificantDigits: 4 });
+};
 
 const savedAt = (iso: string) => new Date(iso).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
 
 export default function SimulationInspector({ experiment, explanation, save, library, onSelectExample, readoutsRef }: Readonly<Pick<SimulationWorkspaceModel, "experiment" | "explanation" | "save" | "library"> & { onSelectExample: (description: string) => void; readoutsRef?: Ref<HTMLDivElement> }>) {
   const { simulation, values, validation, updateParameter, resetParameters } = experiment;
   const { intent, revision, setRevision, handleRevision } = explanation;
-  const { busy, saveOpen, savedMessage, renderError, currentSimulationId, canManageLearningContent,
+  const { busy, saveOpen, savedMessage, dismissSaved, renderError, currentSimulationId, canManageLearningContent,
     folders, onBusyChange, onFolder, onSaved, onClose, onOpen } = save;
   const [navigation, setNavigation] = useState({
     simulation,
     tab: "experiment" as "experiment" | "understand" | "details" | "readouts",
   });
-  const inspectorTab = navigation.simulation !== simulation && simulation ? "experiment" : navigation.tab;
+  // while a new simulation is still being described there is nothing to switch between: no tabs, only the examples
+  const hasTabs = Boolean(simulation || intent);
+  const inspectorTab = !hasTabs ? "experiment" : navigation.simulation !== simulation && simulation ? "experiment" : navigation.tab;
   if (navigation.simulation !== simulation) setNavigation({ simulation, tab: inspectorTab });
   const setInspectorTab = (tab: typeof navigation.tab) => setNavigation({ simulation, tab });
   const recentItems = [...library.items].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .filter((item, index, items) => items.findIndex(value => value.simulationId === item.simulationId) === index).slice(0, 5);
   return (
     <aside className="learn-inspector" aria-label="Thông số và giải thích">
-      <div className="learn-inspector-nav">
+      {hasTabs && <div className="learn-inspector-nav">
         <div className="learn-tabs" role="tablist">
           <button
             role="tab"
@@ -75,16 +93,14 @@ export default function SimulationInspector({ experiment, explanation, save, lib
             Lưu mô phỏng
           </button>
         )}
-      </div>
+      </div>}
 
       <div className="learn-inspector-body">
         <div id="simulation-readouts-panel" role="tabpanel" aria-labelledby="simulation-readouts-tab"
           hidden={!simulation || saveOpen || inspectorTab !== "readouts"}>
           <div ref={readoutsRef} />
         </div>
-        {canManageLearningContent && savedMessage && <div className="simulation-actions">
-          <span role="status">{savedMessage}</span>
-        </div>}
+        {canManageLearningContent && <SavedToast message={savedMessage} onClose={dismissSaved} />}
         {simulation && saveOpen && <SaveSimulationPanel simulation={{ ...simulation, formulas: intent?.formulas, explanation: intent?.explanation }} parameters={{ ...values }} folders={folders}
           onBusyChange={onBusyChange}
           onFolder={onFolder}
@@ -120,7 +136,7 @@ export default function SimulationInspector({ experiment, explanation, save, lib
                 {simulation
                   ? "Mô phỏng này không có biến số điều chỉnh."
                   : (
-                    <div>
+                    busy || library.openingId ? <InspectorSkeleton /> : <div>
                       <p>Mô tả một tình huống để xem và điều chỉnh các thông số mô phỏng tại đây.</p>
                     </div>
                   )}
@@ -134,11 +150,8 @@ export default function SimulationInspector({ experiment, explanation, save, lib
               {!!validation?.lawChecks?.length && (
                 <details>
                   <summary>Đã đối chiếu {validation.lawChecks.filter(check => check.status === "PASSED").length}/{validation.lawChecks.length} định luật</summary>
-                  <ul>
-                    {[...new Map(validation.lawChecks.map(check => [check.title, check])).values()].map(check => (
-                      <li key={check.law}>{check.status === "PASSED" ? "✓" : check.status === "AMBIGUOUS" ? "?" : "✗"} {check.title}{check.status === "AMBIGUOUS" && " (chưa xác định được đại lượng để đối chiếu)"}</li>
-                    ))}
-                  </ul>
+                  <LawCheckList checks={validation.lawChecks} labelOf={id => simulation?.simulationSpec?.model?.quantities.find(quantity => quantity.id === id)?.label} />
+                  <p className="simulation-validation__source">Nguồn: <a href={CURRICULUM_SOURCE.url} target="_blank" rel="noopener noreferrer">{CURRICULUM_SOURCE.label}</a></p>
                 </details>
               )}
               {!!validation?.uncheckedQuantities?.length && (
@@ -152,25 +165,26 @@ export default function SimulationInspector({ experiment, explanation, save, lib
                 <details className="simulation-validation__technical">
                   <summary>Chi tiết kiểm tra</summary>
                   {validation?.verificationScope && <p>Phạm vi: {validation.verificationScope}</p>}
-                  {validation?.verificationMethod && <p>Phương pháp: {validation.verificationMethod}</p>}
-                  {validation?.absoluteError != null && <p>Sai số lớn nhất: {validation.absoluteError} (tương đối {validation.relativeError ?? "—"})</p>}
+                  {validation?.verificationMethod && <p>Phương pháp: {METHODS[validation.verificationMethod] ?? validation.verificationMethod}</p>}
+                  {validation?.absoluteError != null && <p>Sai số số học lớn nhất: {tiny(validation.absoluteError)}{validation.relativeError != null && Math.abs(Number(validation.absoluteError)) >= 1e-9 && <> (tương đối {tiny(validation.relativeError)})</>}</p>}
                   {validation?.flags?.map((flag, index) => <p key={index}>{flag}</p>)}
                 </details>
               )}
             </div>
             </>}
-            <section className="simulation-shortcuts" aria-labelledby="simulation-examples-heading">
+            {!hasTabs && (busy || library.openingId) && <InspectorSkeleton />}
+            {!hasTabs && !busy && !library.openingId && <section className="simulation-shortcuts" aria-labelledby="simulation-examples-heading">
               <h3 id="simulation-examples-heading">Ví dụ mô tả nhanh</h3>
               <p className="simulation-muted">Chọn một ví dụ để điền sẵn mô tả, rồi chỉnh sửa theo ý bạn.</p>
               <div className="simulation-shortcut-list">
                 {QUICK_DESCRIPTIONS.map(example => <button key={example.label} type="button"
                   className="simulation-shortcut" disabled={busy || Boolean(library.openingId)}
                   onClick={() => onSelectExample(example.text)}>
-                  <Icon name="atom" /><span><strong>{example.label}</strong><small>{example.text}</small></span>
+                  <span className="simulation-shortcut-glyph"><PhysicsGlyph kind={example.glyph} /></span><span><strong>{example.label}</strong><small>{example.text}</small></span>
                 </button>)}
               </div>
-            </section>
-            {canManageLearningContent && <section className="simulation-shortcuts" aria-labelledby="simulation-recent-heading">
+            </section>}
+            {!hasTabs && !busy && !library.openingId && canManageLearningContent && <section className="simulation-shortcuts" aria-labelledby="simulation-recent-heading">
               <h3 id="simulation-recent-heading">Mô phỏng gần đây</h3>
               <p className="simulation-muted">Các mô phỏng bạn đã tạo và lưu gần nhất.</p>
               {library.loading ? <p role="status" className="simulation-muted">Đang tải mô phỏng…</p>

@@ -139,4 +139,16 @@ public final class AssignmentContracts {
     public record SchoolAssignment(UUID id, String title, UUID classId, String className, String schoolYear,
                                    Integer teacherId, String teacherName, int studentCount,
                                    String status, Instant assignedAt, Instant dueAt) { }
+
+    /** One student's progress on an assignment, as the department head sees it: no answers, only where they are. */
+    public record SchoolAssignmentStudent(Integer id, String fullName, String email, String avatarUrl,
+                                          Instant startedAt, Instant completedAt, String gradingStatus,
+                                          java.math.BigDecimal score, java.math.BigDecimal maxScore) { }
+
+    /** An assignment of the school opened by the department head: what was set, for whom, and how far the class got. */
+    public record SchoolAssignmentDetail(UUID id, String title, String description, UUID classId, String className,
+                                         String schoolYear, Integer teacherId, String teacherName, String teacherEmail,
+                                         String status, Instant assignedAt, Instant dueAt, boolean allowLateSubmission,
+                                         java.math.BigDecimal maxScore, int questionCount,
+                                         List<SchoolAssignmentStudent> students) { }
 }

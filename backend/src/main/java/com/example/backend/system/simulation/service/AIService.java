@@ -353,6 +353,10 @@ public class AIService {
     public ObjectNode openSaved(UUID id) {
         ObjectNode opened = storage.open(id);
         JsonNode spec = opened.path(SIMULATION_SPEC);
+        // runs saved before checks carried their formula get it from today's catalogue, so every saved run shows its evidence
+        JsonNode checks = opened.path(VALIDATION).path("lawChecks");
+        if (checks.isArray() && !checks.isEmpty() && !checks.get(0).has("relation"))
+            LawChecks.explain(checks, catalogue(), spec.path(MODEL).path("quantities"));
         if (spec.path(SOLVER_TIMELINE).path(FRAMES).isArray() && !spec.path(SOLVER_TIMELINE).path(FRAMES).isEmpty())
             opened.set(PRESENTATION, TeacherSimulationPresentation.create((ObjectNode) spec.path(SOLVER_TIMELINE), spec,
                     perMember(spec.path(SOLVER_FIELD_META)), opened.path("savedParameters").isObject() ? opened.path("savedParameters") : null));
@@ -627,6 +631,7 @@ public class AIService {
             reportIdleObjects(spec, problems);
             reportStillMotion(spec, computed, problems);
             reportUnevenKinds(spec, problems);
+            reportUncheckedChange(spec, computed, catalogue(), problems);
             return new Attempt(spec, computed, problems);
         } catch (ApiException error) {
             problems.add(String.valueOf(error.getMessage()));
@@ -709,6 +714,79 @@ public class AIService {
                     + most[0] + " thanh trượt, " + most[1] + " đại lượng). Còn thiếu ở: " + String.join("; ", less)
                     + ". Viết lại đầy đủ cho từng đối tượng, mỗi đại lượng tính từ thanh trượt của chính đối tượng đó.");
         }
+    }
+
+    /**
+     * A model the laws cannot reach is a model left unfinished, not a verified one: a position with no velocity beside
+     * it, a motion along one axis only, a starting value dressed up as a quantity. Two signs of it, both read from the
+     * catalogue and never from the kind of situation:
+     * a quantity with a role that no law could check, while the catalogue has laws for that role that need roles the
+     * model does not declare for the same object (the author is told which laws and which roles are missing); and a
+     * slider or constant carrying a role that laws take the rate of — it only sets where something starts, so a law
+     * bound to it checks a fixed number, which proves nothing.
+     */
+    private static void reportUncheckedChange(ObjectNode spec, ObjectNode computed, JsonNode catalogue, java.util.List<String> problems) {
+        JsonNode model = spec.path(MODEL);
+        java.util.Set<String> evolving = LawChecks.evolvingRoles(catalogue);
+        // the roles each object has, over sliders, constants and quantities alike
+        java.util.Map<String, java.util.Set<String>> rolesOf = new java.util.HashMap<>();
+        java.util.List<JsonNode> everything = new java.util.ArrayList<>();
+        spec.path(PARAMETERS).forEach(everything::add);
+        model.path("constants").forEach(everything::add);
+        model.path(QUANTITIES).forEach(everything::add);
+        for (JsonNode node : everything)
+            rolesOf.computeIfAbsent(node.path("of").asText(""), of -> new java.util.LinkedHashSet<>()).add(node.path("role").asText("other"));
+
+        java.util.List<String> settings = new java.util.ArrayList<>();
+        java.util.List<JsonNode> fixed = new java.util.ArrayList<>();
+        spec.path(PARAMETERS).forEach(fixed::add);
+        model.path("constants").forEach(fixed::add);
+        for (JsonNode node : fixed) {
+            String role = node.path("role").asText("");
+            if (!role.isEmpty() && evolving.contains(role))
+                settings.add(node.path("id").asText() + " (role " + role + ")");
+        }
+        if (!settings.isEmpty()) problems.add("Thanh trượt hoặc hằng số chỉ đặt giá trị ban đầu nhưng lại mang role của đại lượng thay đổi theo thời gian: "
+                + String.join(", ", settings) + ". Bỏ role của chúng; dùng chúng trong \"initial\" của đại lượng tương ứng (role đó, of và axis của vật), để định luật kiểm đại lượng thay đổi chứ không kiểm một con số cố định.");
+
+        // a law bound only to settings tested numbers that never change: it holds trivially and says nothing of the run
+        java.util.Set<String> computedIds = new java.util.HashSet<>();
+        model.path(QUANTITIES).forEach(quantity -> computedIds.add(quantity.path("id").asText()));
+        java.util.Set<String> idle = new java.util.LinkedHashSet<>();
+        for (JsonNode check : computed.path(VALIDATION).path("lawChecks")) {
+            boolean touchesRun = false;
+            java.util.List<String> used = new java.util.ArrayList<>();
+            for (JsonNode id : check.path(QUANTITIES)) { used.add(id.asText()); touchesRun |= computedIds.contains(id.asText()); }
+            if (!touchesRun && !used.isEmpty()) idle.add("«" + check.path("title").asText(check.path("law").asText()) + "» chỉ gắn với " + String.join(", ", used));
+        }
+        if (!idle.isEmpty()) problems.add("Có định luật chỉ được đối chiếu với thanh trượt hoặc hằng số cố định, nên phép kiểm không nói gì về chuyển động: "
+                + String.join("; ", idle) + ". Thanh trượt chỉ đặt giá trị ban đầu thì không mang role; đại lượng mà định luật nói tới phải là đại lượng tính theo thời gian trong quantities.");
+
+        java.util.Set<String> unchecked = new java.util.LinkedHashSet<>();
+        computed.path(VALIDATION).path("uncheckedQuantities").forEach(id -> unchecked.add(id.asText()));
+        java.util.List<String> hints = new java.util.ArrayList<>();
+        for (JsonNode quantity : model.path(QUANTITIES)) {
+            String id = quantity.path("id").asText();
+            String role = quantity.path("role").asText("other");
+            if (!unchecked.contains(id) || role.equals("other")) continue;
+            String of = quantity.path("of").asText("");
+            java.util.Set<String> present = rolesOf.getOrDefault(of, java.util.Set.of());
+            java.util.List<String> wanted = new java.util.ArrayList<>();
+            for (JsonNode law : catalogue.path("laws")) {
+                java.util.Set<String> needs = new java.util.LinkedHashSet<>();
+                law.path("bind").forEach(variable -> needs.add(variable.path("role").asText()));
+                if (!needs.contains(role)) continue;
+                needs.removeAll(present);
+                needs.remove("");
+                if (!needs.isEmpty() && wanted.size() < 3)
+                    wanted.add("«" + law.path("title").asText(law.path("id").asText()) + "» cần thêm " + String.join(", ", needs));
+            }
+            if (!wanted.isEmpty())
+                hints.add(id + " (" + quantity.path(LABEL).asText(id) + ", role " + role + (of.isEmpty() ? "" : ", of " + of) + "): " + String.join("; ", wanted));
+        }
+        if (!hints.isEmpty()) problems.add("Không định luật nào kiểm được các đại lượng sau vì mô hình thiếu các đại lượng mà định luật liên hệ với chúng — "
+                + String.join(" | ", hints) + ". Khai báo các đại lượng đó cho cùng vật (cùng of, cùng axis), tính từ mô tả, để định luật có đủ hai vế; "
+                + "với vật chuyển động, viết vị trí bằng initial + rate = vận tốc trên từng trục mà nó chuyển động, và vận tốc bằng initial + rate = gia tốc từ các lực.");
     }
 
     /** How many sliders and how many quantities are written as an object's own. */

@@ -15,9 +15,12 @@ type Props = {
   onOpen: (item: LibraryItem) => Promise<void>;
   onNewSimulation?: () => void;
   onRetry?: () => void;
+  /** The pane can fold to a narrow rail; its own buttons fold and unfold it. */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 };
 
-export default function TeacherLibraryPane({ folders, items, currentSimulationId, loading, error, openingId, onCreateFolder, onOpen, onNewSimulation, onRetry }: Readonly<Props>) {
+export default function TeacherLibraryPane({ folders, items, currentSimulationId, loading, error, openingId, onCreateFolder, onOpen, onNewSimulation, onRetry, collapsed = false, onToggleCollapsed }: Readonly<Props>) {
   const [creating, setCreating] = useState(false);
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [name, setName] = useState("");
@@ -48,8 +51,13 @@ export default function TeacherLibraryPane({ folders, items, currentSimulationId
   };
 
   return <aside className="learn-library-pane" aria-label="Thư mục mô phỏng cá nhân">
+    {collapsed && onToggleCollapsed && <div className="learn-library-rail">
+      <button type="button" className="learn-library-fold" aria-label="Mở thư viện" title="Mở thư viện" onClick={onToggleCollapsed}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg></button>
+      {onNewSimulation && <button type="button" className="learn-library-fold" aria-label="Mô phỏng mới" title="Mô phỏng mới" onClick={onNewSimulation}><Icon name="plus" /></button>}
+    </div>}
     <div className="learn-library-pane-header">
-      <div className="learn-library-heading"><div><span>Thư viện của tôi</span><strong>{loading ? "Đang tải…" : `${folders.length} thư mục · ${items.length} mô phỏng`}</strong></div></div>
+      <div className="learn-library-heading"><div><span>Thư viện của tôi</span><strong>{loading ? "Đang tải…" : `${folders.length} thư mục · ${items.length} mô phỏng`}</strong></div>
+        {onToggleCollapsed && <button type="button" className="learn-library-fold" aria-label="Thu gọn thư viện" title="Thu gọn thư viện" onClick={onToggleCollapsed}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button>}</div>
       <div className="learn-library-actions">
         {onNewSimulation && <button type="button" className="learn-new-simulation" onClick={onNewSimulation}><Icon name="plus" />Mô phỏng mới</button>}
         <button className="learn-new-folder-trigger" type="button" aria-label="Thư mục mới" title="Thư mục mới" aria-expanded={creatorOpen} aria-controls="new-library-folder-form" onClick={() => setCreatorOpen(value => !value)}><Icon name="folderPlus" /></button>

@@ -1,3 +1,5 @@
+import { ThrowIllustration } from "./PhysicsGlyph";
+import BuildingProgress, { type BuildPhase } from "./BuildingProgress";
 import { useState } from "react";
 import Icon from "../../../shared/ui/LearningIcon";
 import SimulationComplaintDialog from "../../support/components/SimulationComplaintDialog";
@@ -16,10 +18,13 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
   const {
     text, setText, sourceFile, previewUrl, busy, error, acceptImage, removeImage,
     recognition, correction, setCorrection, editingRecognition, setEditingRecognition, recognitionLowConfidence,
-    intent, revision, setRevision, normalize, handleRecognition, handleRevision, generate, reset,
+    intent, revision, setRevision, normalize, handleRecognition, handleRevision, generate, reset, opening,
   } = input;
   const { simulation, liveTimeline, presentation, runValues, sandboxKey, validation, renderError, setRenderError, restartPreview, recomputing } = preview;
   const currentStep = intent?.stage === "EXPLAIN" ? 3 : recognition || intent?.stage === "CLARIFY" ? 2 : 1;
+  // the step the server is working on while busy: reading the description, working out the physics, or building
+  const phase: BuildPhase = opening ? "open" : intent?.stage === "EXPLAIN" ? "build" : recognition || intent ? "analyse" : "read";
+  const waiting = busy || opening;
   // "Báo lỗi" and "Dựng lại" live in the authored player's toolbar.
   const stageActions = <>
     <SimulationExport preview={preview} />
@@ -87,7 +92,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
           </div>
         ) : (
           /* Layout giữa khi chưa có mô phỏng: mô tả, xác nhận, giải thích */
-          <div className="simulation-stage-input-container">
+          <div className={"simulation-stage-input-container" + (!recognition && !intent ? " is-entry" : "")}>
             <ol className="simulation-steps" aria-label="Tiến trình dựng mô phỏng">
               {[
                 { title: "Mô tả tình huống", detail: "Văn bản hoặc ảnh đề bài" },
@@ -106,7 +111,6 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
 
             {!recognition && !intent && (
               <section className="simulation-card simulation-entry" aria-labelledby="simulation-entry-title">
-                <span className="simulation-entry-icon" aria-hidden="true"><Icon name="atom" /></span>
                 <h2 id="simulation-entry-title">Tạo mô phỏng vật lý</h2>
                 <p className="simulation-entry-description" id="simulation-input-help">Mô tả một tình huống hoặc thêm ảnh đề bài để bắt đầu khám phá.</p>
 
@@ -154,6 +158,16 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
                   </div>
                 </form>
               </section>
+            )}
+
+            {/* the stage the simulation will take, waiting: the same frame as a built one, so nothing jumps when it arrives */}
+            {!recognition && !intent && waiting && <BuildingProgress key={phase} phase={phase} />}
+            {!recognition && !intent && !waiting && (
+              <div className="simulation-stage-empty" aria-hidden="true">
+                <ThrowIllustration />
+                <b>Mô phỏng sẽ hiện ở đây</b>
+                <span>Mô tả tình huống ở trên hoặc chọn một ví dụ. PhysLive đọc đề, hỏi lại nếu thiếu dữ kiện, rồi dựng mô phỏng và đối chiếu với định luật.</span>
+              </div>
             )}
 
             {recognition && (
@@ -288,6 +302,7 @@ export default function SimulationStage({ input, preview, complaint, readoutsTar
                 )}
               </section>
             )}
+            {busy && (recognition || intent) && <BuildingProgress key={phase} phase={phase} />}
           </div>
         )}
       </section>

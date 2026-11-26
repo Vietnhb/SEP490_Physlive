@@ -118,6 +118,31 @@ function CatalogNav({ catalog, selection, total, counts, onSelect }: Readonly<Ca
   </nav>;
 }
 
+type ViewerProps = Pick<Props, "selectedItem" | "simulation" | "generated" | "time" | "simulationLoading" | "simulationError" | "frame" | "playing" | "vectors"
+  | "onClose" | "onTogglePlaying" | "onReset" | "onFrameChange" | "onTimeChange" | "onPlaybackEnd" | "canClone"> & { grade?: string; returnFocus: React.RefObject<HTMLElement | null> };
+
+/** The open community simulation: the author's scene or the generic player, a copy to the viewer's library, and the discussion. */
+export function ResourceViewerDialog({ selectedItem, grade, simulation, generated = null, time, simulationLoading, simulationError, frame, playing, vectors, canClone = false, returnFocus, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd }: Readonly<ViewerProps>) {
+  const reducedMotion = useReducedMotion();
+  const transition = { duration: reducedMotion ? 0 : .18 };
+  const savedScene = generated ?? (hasSavedScene(simulation?.result) ? simulation.result : null);
+  return <>
+    <Dialog.Root open={Boolean(selectedItem)} onOpenChange={open => { if (!open) onClose(); }}><Dialog.Content className={styles.resourceDialog} maxWidth="980px" size="3" onCloseAutoFocus={event => { event.preventDefault(); returnFocus.current?.focus(); }}>
+      <div className={styles.dialogScroll}>
+      <div className={styles.dialogHeading}><div><Badge color="indigo" variant="soft">Vật lý{grade ? ` · ${grade}` : ""}</Badge><Dialog.Title mt="3" mb="2">{selectedItem?.title || "Mô phỏng"}</Dialog.Title><Dialog.Description size="2" color="gray">{selectedItem?.sharedByName || "Giáo viên"}{selectedItem?.schoolName ? ` · ${selectedItem.schoolName}` : ""}</Dialog.Description></div><Dialog.Close><IconButton size="2" variant="soft" color="gray" aria-label="Đóng mô phỏng"><Cross2Icon /></IconButton></Dialog.Close></div>
+      {simulationLoading && <div className={styles.playerState}><Spinner size="3" /> Đang mở mô phỏng…</div>}
+      {!simulationLoading && simulationError && <p className={`${styles.playerState} ${styles.error}`}>{simulationError}</p>}
+      {!simulationLoading && !simulationError && savedScene?.simulationSpec.solverTimeline && <div className={styles.savedScene}>
+        <SavedScene scene={savedScene} />
+      </div>}
+      {!simulationLoading && !simulationError && !savedScene && simulation && <motion.div initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={transition}><div className={styles.scene}><PhysicsScene simulation={simulation} index={frame} overlays={vectors} time={time} playing={playing} onTimeChange={onTimeChange} onPlaybackEnd={onPlaybackEnd} /></div><div className={styles.playback}><Button onClick={onTogglePlaying}>{playing ? <PauseIcon /> : <PlayIcon />}{playing ? "Tạm dừng" : "Chạy mô phỏng"}</Button><Button color="gray" variant="soft" onClick={onReset}><ResetIcon /> Về đầu</Button><input aria-label="Thời gian mô phỏng" type="range" min={0} max={Math.max(0, simulation.time.length - 1)} value={frame} onChange={event => onFrameChange(Number(event.target.value))} /><span>{time.toFixed(2)} s</span></div></motion.div>}
+      {selectedItem && canClone && <CloneToLibrary key={`clone-${selectedItem.id}`} item={selectedItem} />}
+      {selectedItem && <ResourceDiscussion key={selectedItem.id} resourceId={selectedItem.id} />}
+      </div>
+    </Dialog.Content></Dialog.Root>
+  </>;
+}
+
 export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = false, curriculum = null, generated = null, loading, selectedItem, simulation, time, simulationLoading, simulationError, frame, playing, vectors, onOpen, onClose, onTogglePlaying, onReset, onFrameChange, onTimeChange, onPlaybackEnd, error = "", onRetry, allowSchoolScope = true, canClone = false }: Readonly<Props>) {
   const [selection, setSelection] = useState<CatalogSelection>({});
   const [query, setQuery] = useState("");
@@ -149,7 +174,6 @@ export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = fa
   const selectedLesson = selectedModule?.lessons.find(lesson => lesson.id === selection.lessonId);
   const breadcrumb = [selectedGrade?.name, selectedModule?.name, selectedLesson?.name].filter(Boolean);
   const selectedPath = selectedItem ? paths.get(selectedItem.lessonId) : undefined;
-  const savedScene = generated ?? (hasSavedScene(simulation?.result) ? simulation.result : null);
   const filtered = Boolean(query.trim() || selection.subjectId || (allowSchoolScope && scope !== "ALL"));
   const resetFilters = () => { setQuery(""); setSelection({}); setScope("ALL"); };
 
@@ -192,18 +216,8 @@ export function ResourceDiscovery({ items, headingLevel = "h1", titleHidden = fa
         })}</AnimatePresence></motion.div>}
       </div>
     </div>
-    <Dialog.Root open={Boolean(selectedItem)} onOpenChange={open => { if (!open) onClose(); }}><Dialog.Content className={styles.resourceDialog} maxWidth="980px" size="3" onCloseAutoFocus={event => { event.preventDefault(); returnFocusRef.current?.focus(); }}>
-      <div className={styles.dialogScroll}>
-      <div className={styles.dialogHeading}><div><Badge color="indigo" variant="soft">Vật lý{selectedPath?.grade ? ` · ${selectedPath.grade}` : ""}</Badge><Dialog.Title mt="3" mb="2">{selectedItem?.title || "Mô phỏng"}</Dialog.Title><Dialog.Description size="2" color="gray">{selectedItem?.sharedByName || "Giáo viên"}{selectedItem?.schoolName ? ` · ${selectedItem.schoolName}` : ""}</Dialog.Description></div><Dialog.Close><IconButton size="2" variant="soft" color="gray" aria-label="Đóng mô phỏng"><Cross2Icon /></IconButton></Dialog.Close></div>
-      {simulationLoading && <div className={styles.playerState}><Spinner size="3" /> Đang mở mô phỏng…</div>}
-      {!simulationLoading && simulationError && <p className={`${styles.playerState} ${styles.error}`}>{simulationError}</p>}
-      {!simulationLoading && !simulationError && savedScene?.simulationSpec.solverTimeline && <div className={styles.savedScene}>
-        <SavedScene scene={savedScene} />
-      </div>}
-      {!simulationLoading && !simulationError && !savedScene && simulation && <motion.div initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={transition}><div className={styles.scene}><PhysicsScene simulation={simulation} index={frame} overlays={vectors} time={time} playing={playing} onTimeChange={onTimeChange} onPlaybackEnd={onPlaybackEnd} /></div><div className={styles.playback}><Button onClick={onTogglePlaying}>{playing ? <PauseIcon /> : <PlayIcon />}{playing ? "Tạm dừng" : "Chạy mô phỏng"}</Button><Button color="gray" variant="soft" onClick={onReset}><ResetIcon /> Về đầu</Button><input aria-label="Thời gian mô phỏng" type="range" min={0} max={Math.max(0, simulation.time.length - 1)} value={frame} onChange={event => onFrameChange(Number(event.target.value))} /><span>{time.toFixed(2)} s</span></div></motion.div>}
-      {selectedItem && canClone && <CloneToLibrary key={`clone-${selectedItem.id}`} item={selectedItem} />}
-      {selectedItem && <ResourceDiscussion key={selectedItem.id} resourceId={selectedItem.id} />}
-      </div>
-    </Dialog.Content></Dialog.Root>
+    <ResourceViewerDialog selectedItem={selectedItem} grade={selectedPath?.grade} simulation={simulation} generated={generated} time={time} simulationLoading={simulationLoading} simulationError={simulationError}
+      frame={frame} playing={playing} vectors={vectors} canClone={canClone} returnFocus={returnFocusRef} onClose={onClose} onTogglePlaying={onTogglePlaying} onReset={onReset}
+      onFrameChange={onFrameChange} onTimeChange={onTimeChange} onPlaybackEnd={onPlaybackEnd} />
   </motion.section></Theme>;
 }
