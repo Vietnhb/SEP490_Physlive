@@ -1,235 +1,54 @@
-.billing {
-  display: grid;
-  gap: 20px;
-  color: var(--admin-text);
-}
 
-.billing :global(.admin-panel) {
-  width: 100%;
-  margin: 0;
-  padding: 22px;
-  border: 1px solid var(--admin-border);
-  border-radius: 14px;
-  background: var(--admin-surface);
-  box-shadow: 0 1px 2px rgb(32 33 36 / 4%);
-}
+.billing.billing { display: grid; gap: 18px; min-width: 0; color: var(--admin-text); }
+.pageHeading { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.pageHeading h1 { display: block !important; margin: 0; font-size: 26px; letter-spacing: -.6px; font-weight: 650; color: var(--admin-heading); }
+.art { width: 160px; height: 84px; flex-shrink: 0; }
+.billing :global(.admin-panel) { box-sizing: border-box; width: 100%; margin: 0; padding: 20px; border: 1px solid var(--admin-border); border-radius: 16px; background: var(--admin-surface); box-shadow: 0 1px 2px var(--black-a2); min-width: 0; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.billing .sectionHeading h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--admin-heading); }
+.caption { color: var(--admin-muted); font-size: 12px; }
+.status { border-radius: 20px; font-size: 11px; }
+.currentSummary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 0; margin: 0; border: 1px solid var(--admin-border); border-radius: 10px; overflow: hidden; }
+.currentSummary > div { padding: 12px 14px; min-width: 0; }
+.currentSummary > div + div { border-left: 1px solid var(--admin-border); }
+.currentSummary dt { color: var(--admin-muted); font-size: 11px; margin-bottom: 6px; }
+.currentSummary dd { margin: 0; font-size: 14px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
+.planGuide { font-size: 12px; line-height: 1.6; color: var(--admin-muted); margin: 0 0 16px; }
+.notice { border: 1px solid var(--orange-6); border-radius: 8px; background: var(--orange-2); padding: 10px 12px; color: var(--orange-11); font-size: 12px; }
+.planOptions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+.planOption { display: flex; align-items: flex-start; gap: 12px; padding: 16px 14px; border: 1px solid var(--admin-border); border-radius: 10px; background: var(--admin-surface); cursor: pointer; min-width: 0; transition: border-color .15s ease, background .15s ease; }
+.planOption:hover:not(.disabledPlan) { background: var(--teal-2); border-color: var(--teal-7); }
+.planOption.selectedPlan { border-color: var(--teal-9); background: var(--teal-2); box-shadow: inset 0 0 0 1px var(--teal-9); }
+.planOption.disabledPlan, .planOption.disabledPlan * { cursor: not-allowed; }
+.planOption input[type="radio"] { appearance: auto; flex: 0 0 16px; width: 16px; height: 16px; padding: 0; min-height: 0; margin: 2px 0 0; accent-color: var(--teal-9); border: 0; box-shadow: none; }
+.planOption:has(input:focus-visible) { outline: 2px solid var(--teal-8); outline-offset: 3px; }
+.planCopy { min-width: 0; }
+.planName { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.planName strong { font-size: 13px; font-weight: 600; }
+.planName span { color: var(--teal-11); background: var(--teal-3); border-radius: 5px; padding: 2px 5px; font-size: 10px; }
+.planCopy p { font-size: 12px; line-height: 1.6; color: var(--admin-muted); margin: 3px 0 0; }
+.planPrice { font-size: 15px; font-weight: 600; margin-top: 8px; color: var(--admin-heading); }
+.planPrice small { font-size: 12px; font-weight: 400; }
+.planCopy .choiceNote { font-size: 11px; }
+.checkout { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--gray-2); border-radius: 10px; margin-top: 16px; padding: 12px 14px; }
+.quote { min-width: 0; flex: 1; }
+.quote p { margin: 0; font-size: 13px; }
+.quote small { display: block; font-size: 11px; color: var(--admin-muted); line-height: 1.6; margin-top: 4px; }
+.quoteHint { color: var(--admin-muted); }
+.checkoutActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.checkoutActions :global(.rt-Button) { border-radius: 8px; font-size: 12px; }
+.payButton:global(.rt-Button):not(:disabled) { background: var(--teal-9); color: white; }
+.payButton:global(.rt-Button):hover:not(:disabled) { background: var(--teal-10); }
+.checkoutActions button:disabled { cursor: not-allowed; }
+.tableScroll { max-height: 390px; overflow: auto; scrollbar-gutter: stable; scrollbar-width: thin; }
+.tableScroll :global(.rt-TableRoot) { min-width: 800px; width: 100%; }
+.tableScroll :global(.rt-TableCell) { vertical-align: middle; font-size: 12px; padding: 14px 12px; }
+.tableScroll :global(.rt-TableColumnHeaderCell) { background: var(--admin-surface); font-weight: 500; position: sticky; top: 0; z-index: 1; }
+.tableScroll :global(.rt-TableBody .rt-TableRow:hover) { background: var(--teal-2); }
+.amount { font-weight: 500; white-space: nowrap; }
+.emptyState { padding: 20px 0; color: var(--admin-muted); font-size: 13px; }
+@media (max-width: 1100px) { .currentSummary { grid-template-columns: repeat(2,minmax(0,1fr)); } .currentSummary > div:nth-child(3) { border-left: 0; } .currentSummary > div:nth-child(n+3) { border-top: 1px solid var(--admin-border); } .planOptions { gap: 10px; } }
+@media (max-width: 700px) { .planOptions { grid-template-columns: 1fr; } .billing :global(.admin-panel) { padding: 16px; } .art { width: 110px; height: 66px; } .pageHeading h1 { font-size: 23px; } .checkout { align-items: stretch; flex-direction: column; } .checkoutActions { flex-direction: column; align-items: stretch; } .checkoutActions button { width: 100%; height: auto; min-height: 36px; white-space: normal; } }
+@media (prefers-reduced-motion: reduce) { .planOption { transition: none; } }
 
-.billing :global(.admin-panel:hover) {
-  border-color: var(--admin-border-strong);
-}
-
-.planPanel {
-  min-width: 0;
-}
-
-.planHeading {
-  align-items: flex-start !important;
-  margin-bottom: 20px !important;
-}
-
-.billing :global(.admin-panel) h2 {
-  margin: 0;
-  color: var(--admin-heading);
-  font-size: 20px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
-  line-height: 1.25;
-}
-
-.planHeading p {
-  max-width: 660px;
-  margin: 6px 0 0 !important;
-  color: var(--admin-muted) !important;
-  font-size: 13px !important;
-  line-height: 1.55;
-}
-
-.billing :global(.school-signup-billing) {
-  flex: 0 0 auto;
-  padding: 6px 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.billing :global(.admin-error-banner) {
-  margin: 0;
-}
-
-.notice {
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: var(--success-soft);
-  color: var(--success);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.billing :global(.school-license-unavailable) {
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border: 1px solid var(--warning-line);
-  border-radius: 10px;
-  background: var(--warning-soft);
-  color: var(--warning);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.billing :global(.school-billing-plans) {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin: 0;
-}
-
-.billing :global(.school-billing-plan-actions) {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.billing :global(.admin-primary-button),
-.billing :global(.admin-secondary-button) {
-  border-radius: 6px;
-  box-shadow: none;
-}
-
-.billing :global(.admin-billing-quote) {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px 24px;
-  margin-top: 20px;
-  padding: 18px 0 0;
-  border-top: 1px solid var(--admin-border);
-}
-
-.quote h3 {
-  margin: 0 0 7px;
-  color: var(--admin-heading) !important;
-  font-size: 16px !important;
-  letter-spacing: -0.01em;
-}
-
-.quote p {
-  margin: 5px 0;
-  color: var(--admin-muted);
-  font-size: 13px;
-}
-
-.quote strong {
-  color: var(--admin-heading);
-}
-
-.quote :global(.admin-primary-button) {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.quote :global(.admin-primary-button:hover:not(:disabled)) {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.emptyState {
-  margin: 0;
-  color: var(--admin-muted);
-}
-
-.currentPanel,
-.historyPanel {
-  min-width: 0;
-}
-
-.currentPanel :global(.admin-panel-heading),
-.historyPanel :global(.admin-panel-heading) {
-  margin-bottom: 18px;
-}
-
-.currentPanel :global(.admin-panel-heading h2),
-.historyPanel :global(.admin-panel-heading h2) {
-  font-size: 18px;
-}
-
-.currentPanel :global(.admin-panel-description) {
-  margin-top: 6px;
-  color: var(--admin-muted);
-  font-size: 12px;
-}
-
-.currentPanel :global(.admin-stats-grid) {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 0;
-}
-
-.currentPanel :global(.admin-stat-card) {
-  min-height: 112px;
-}
-
-.currentPanel > p:last-child {
-  margin: 18px 0 0;
-  padding: 11px 13px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.historyPanel :global(.admin-table-scroll) {
-  overflow-x: auto;
-}
-
-.historyPanel :global(.admin-table) {
-  min-width: 720px;
-}
-
-.historyPanel :global(.admin-table a) {
-  color: var(--admin-accent);
-  font-weight: 600;
-}
-
-.billing :is(button, a, input):focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
-}
-
-@media (max-width: 1100px) {
-  .billing :global(.school-billing-plans) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .billing :global(.school-billing-plans) {
-    grid-template-columns: 1fr;
-  }
-
-  .billing :global(.school-billing-plan-actions) {
-    align-items: stretch;
-    flex-direction: column-reverse;
-  }
-
-  .billing :global(.admin-billing-quote) {
-    grid-template-columns: 1fr;
-  }
-
-  .quote :global(.admin-primary-button) {
-    width: 100%;
-  }
-
-  .currentPanel :global(.admin-stats-grid) {
-    grid-template-columns: 1fr;
-  }
-}
+.currentPanel, .historyPanel, .planPanel { min-width: 0; }

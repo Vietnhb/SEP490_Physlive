@@ -502,3 +502,77 @@ button.profileName:active {
 }
 button.profileName:hover:not(:disabled) { color: var(--accent-11); text-decoration: underline; text-decoration-color: var(--accent-7); text-underline-offset: 4px; }
 button.profileName:focus-visible { outline: 2px solid var(--accent-8); outline-offset: 3px; }
+
+/* Class directory, scoped to avoid changing the member editor. */
+.managementPage { display: grid; gap: 18px; min-width: 0; }
+.feature { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 28px; border: 1px solid var(--admin-border); border-radius: 16px; background: linear-gradient(105deg, var(--admin-surface) 52%, var(--teal-2)); overflow: hidden; }
+.featureCopy { min-width: 0; }
+.eyebrow { color: var(--teal-11); font-size: 10px; font-weight: 600; letter-spacing: 1.2px; }
+.feature h1 { margin: 7px 0; color: var(--admin-heading); font-size: 26px; font-weight: 650; letter-spacing: -.6px; }
+.feature p { margin: 0; color: var(--admin-muted); font-size: 13px; line-height: 1.6; }
+.featureActions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; }
+.featureActions > span { color: var(--admin-muted); font-size: 12px; }
+.featureActions :global(.rt-Button) { border-radius: 8px; }
+.featureArt { flex: 0 0 280px; width: 280px; height: 140px; }
+.listPanel { min-width: 0; padding: 20px !important; border-radius: 16px; }
+.listHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.listHeading h2 { margin: 0; font-size: 15px; color: var(--admin-heading); }
+.listHeading > span { font-size: 12px; color: var(--admin-muted); }
+.managementPage .classFilters { grid-template-columns: minmax(200px, 1fr) 140px 160px 170px; padding: 12px; background: var(--admin-surface-muted); border: 1px solid var(--admin-border); border-radius: 10px; gap: 10px; }
+.classFilters > * { min-width: 0; width: 100%; }
+.classTable { max-height: 560px; overflow: auto; border: 1px solid var(--admin-border); border-radius: 11px; }
+.classTable :global(.rt-TableRoot) { min-width: 950px; width: 100%; }
+.classTable :global(.rt-TableCell) { vertical-align: middle; padding: 14px 12px; font-size: 13px; }
+.classTable :global(.rt-TableHeader) { background: var(--admin-surface-muted); }
+.classTable :global(.rt-TableBody .rt-TableRow:hover) { background: var(--teal-2); }
+.classIdentity { display: flex; align-items: center; gap: 10px; font-weight: 400; white-space: nowrap; }
+.classSymbol { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 9px; background: var(--teal-3); color: var(--teal-11); font-size: 12px; font-weight: 600; }
+.pageSize { display: flex; align-items: center; gap: 8px; }
+.pageSize select { padding: 5px 8px; border: 1px solid var(--admin-border); border-radius: 6px; background: var(--admin-surface); color: var(--admin-heading); }
+@media (max-width: 1100px) { .managementPage .classFilters { grid-template-columns: minmax(180px, 1fr) 140px; } }
+@media (max-width: 640px) { .feature { padding: 20px; } .featureArt { display: none; } .feature h1 { font-size: 23px; } .listPanel { padding: 14px !important; } .listHeading { align-items: flex-start; flex-direction: column; gap: 5px; } .managementPage .classFilters { grid-template-columns: 1fr; } .pagination { flex-wrap: wrap; } .pagination > div { flex-wrap: wrap; } }
+
+.statistics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.statCard { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; gap: 10px; padding: 20px; min-height: 136px; box-sizing: border-box; border: 1px solid var(--gray-5); border-radius: 16px; background: var(--indigo-2); }
+.statCard:first-child { background: var(--teal-3); }
+.statCard::after { content: ""; position: absolute; z-index: -1; width: 150px; height: 150px; right: -65px; bottom: -90px; border: 28px solid var(--white-a5); border-radius: 50%; pointer-events: none; }
+.statCard > span:not(.statIcon) { padding-right: 34px; font-size: 13px; color: var(--gray-12); }
+.statCard > strong { font-size: 30px; line-height: 1.15; color: var(--gray-12); font-weight: 600; }
+.statCard > small { color: var(--gray-11); font-size: 12px; line-height: 1.5; }
+.statIcon { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--color-panel-solid); color: var(--blue-10); }
+.statCard:nth-child(2) .statIcon { color: var(--orange-10); }
+.directoryLayout { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 16px; align-items: start; min-width: 0; }
+.directoryLayout > * { min-width: 0; }
+.directoryLayout .classFilters { grid-template-columns: minmax(160px,1fr) 120px; }
+.insights { display: grid; gap: 16px; }
+.insightCard { padding: 20px; border: 1px solid var(--admin-border); border-radius: 16px; background: var(--admin-surface); }
+.insightCard h2 { margin: 0; font-size: 15px; color: var(--admin-heading); }
+.insightCard p { font-size: 12px; color: var(--admin-muted); margin: 6px 0 18px; }
+.gradeSize { margin-top: 18px; }
+.gradeSize > div:first-child { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--admin-muted); margin-bottom: 8px; }
+.gradeSize strong { color: var(--admin-heading); font-weight: 500; }
+.barTrack { height: 6px; background: var(--gray-3); border-radius: 8px; overflow: hidden; }
+.barTrack > span { display: block; height: 100%; border-radius: inherit; background: var(--indigo-8); }
+.gradeSize:first-of-type .barTrack > span { background: var(--teal-9); }
+.attentionItem { display: flex; align-items: center; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--admin-border); }
+.attentionItem:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.gradeTag { display: grid; place-items: center; width: 28px; height: 30px; flex: 0 0 28px; border-radius: 9px; background: var(--gray-3); font-size: 11px; }
+.attentionItem > div { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.attentionItem strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.attentionItem span, .attentionItem small { font-size: 11px; color: var(--admin-muted); }
+.attentionItem button { flex-shrink: 0; border-radius: 20px; font-size: 11px; }
+.insightEmpty { display: flex; gap: 8px; padding-top: 18px; color: var(--admin-muted); font-size: 12px; line-height: 1.6; }
+.insightEmpty svg { flex-shrink: 0; margin-top: 2px; color: var(--teal-10); }
+@media (max-width: 1150px) { .directoryLayout { grid-template-columns: minmax(0,1fr); } .insights { grid-template-columns: 1fr 1fr; } .statistics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 640px) { .statistics { gap: 10px; } .statCard { padding: 16px; } .statIcon { width: 27px; height: 27px; top: 12px; right: 12px; } .statCard > strong { font-size: 26px; } .insights { grid-template-columns: 1fr; } .directoryLayout .classFilters { grid-template-columns: 1fr; } }
+
+/* Keep section spacing even when the shared page shell overrides display/gap. */
+.managementPage.managementPage { gap: 0; }
+.managementPage.managementPage > * + * { margin-top: 20px; }
+@media (max-width: 640px) {
+  .managementPage.managementPage > * + * { margin-top: 16px; }
+}
+.directoryLayout .classFilters { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.directoryLayout .classFilters > :first-child { grid-column: 1 / -1; }
+.pageSize { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 640px) { .directoryLayout .classFilters { grid-template-columns: 1fr; } }

@@ -14,3 +14,52 @@
   .tabs button { min-height: 52px; padding-inline: 14px; }
   .panel { padding: 18px; }
 }
+
+.page.page { gap: 18px; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; }
+.heading h1 { margin: 0 0 7px; font-size: 26px; color: var(--gray-12); letter-spacing: -.5px; }
+.heading p { margin: 0; color: var(--gray-11); font-size: 13px; line-height: 1.6; }
+.art { width: 160px; height: 96px; flex: 0 0 160px; }
+.layout { display: grid; grid-template-columns: minmax(0,1fr) 300px; align-items: start; gap: 18px; }
+.main { min-width: 0; }
+.card.card { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+.tabs { padding-inline: 0; }
+.tabs button { font-weight: 500; min-height: 44px; padding-inline: 12px; font-size: 13px; }
+.tabs button:first-child { padding-left: 2px; }
+.tabs button::after { left: 0; right: 0; }
+.tabs .activeTab { color: var(--teal-11); }
+.tabs .activeTab::after { background: var(--teal-9); }
+.tabs button:disabled { cursor: not-allowed; opacity: .6; }
+.panel { padding: 16px 0 0; }
+.sidebar { display: grid; gap: 16px; min-width: 0; }
+.sideCard { border: 1px solid var(--gray-6); border-radius: 16px; padding: 20px; background: var(--color-panel-solid); box-shadow: 0 1px 2px var(--black-a2); }
+.sideCard h2 { margin: 0; font-size: 15px; color: var(--gray-12); }
+.sideCard > p { margin: 6px 0 16px; font-size: 12px; line-height: 1.6; color: var(--gray-11); }
+.emptyHistory { display: flex; align-items: center; gap: 10px; padding: 14px 0; font-size: 12px; line-height: 1.6; color: var(--gray-11); }
+.emptyHistory svg { flex-shrink: 0; width: 24px; height: 24px; color: var(--teal-10); }
+.history article { display: flex; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--gray-5); }
+.history article:last-child { border-bottom: 0; padding-bottom: 0; }
+.history article > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.history strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; }
+.history small { font-size: 11px; color: var(--gray-11); }
+.fileIcon { display: grid; place-items: center; width: 30px; height: 34px; flex-shrink: 0; border: 1px solid var(--gray-6); border-radius: 8px; background: var(--gray-2); color: var(--teal-11); }
+.success { flex-shrink: 0; border: 1px solid var(--green-6); border-radius: 20px; padding: 3px 6px; color: var(--green-11); background: var(--green-2); font-size: 10px; }
+.importOrder { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.importOrder li { position: relative; min-width: 0; }
+.importOrder li:not(:last-child)::after { content: ""; position: absolute; left: 25px; bottom: -16px; width: 2px; height: 16px; background: var(--teal-5); }
+.importOrder button { display: flex; width: 100%; align-items: center; gap: 10px; text-align: left; padding: 10px; border: 1px solid var(--gray-6); border-radius: 10px; background: var(--color-panel-solid); font: inherit; cursor: pointer; color: var(--gray-12); }
+.importOrder button:hover { background: var(--teal-2); }
+.importOrder button:focus-visible { outline: 2px solid var(--teal-8); outline-offset: 2px; }
+.importOrder button:disabled { cursor: not-allowed; }
+.importOrder button.currentOrder { border-color: var(--teal-9); box-shadow: 0 0 0 2px var(--teal-3); }
+.importOrder button > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.importOrder strong { font-size: 12px; font-weight: 500; }
+.importOrder small { font-size: 11px; color: var(--gray-11); line-height: 1.5; }
+.orderIcon, .completedIcon { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: var(--gray-3); color: var(--gray-11); font-size: 12px; }
+.currentOrder .orderIcon { background: var(--teal-3); color: var(--teal-11); }
+.completedIcon { background: var(--green-2); color: var(--green-11); }
+@media (max-width: 1100px) { .layout { grid-template-columns: minmax(0,1fr); } .sidebar { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .art { width: 100px; height: 75px; flex-basis: 100px; } .heading { gap: 12px; } .heading h1 { font-size: 23px; } .sidebar { grid-template-columns: 1fr; } .tabs { padding-inline: 0; } .panel { padding: 14px 0 0; } }
+
+.importOrder button { justify-content: flex-start; height: auto; min-height: 58px; white-space: normal; }
+.importOrder small { white-space: normal; overflow-wrap: anywhere; }

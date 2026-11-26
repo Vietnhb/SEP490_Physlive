@@ -51,6 +51,23 @@ function AiQuotaNotice({ used, quota, month }: Readonly<{ used: number; quota: n
   </section>;
 }
 
+type MonthlyTokenRow = { month: string; tokens: number };
+const compactTokens = (value: number) => new Intl.NumberFormat("vi-VN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+
+function MonthlyTokenChart({ rows, currentMonth, quota, loading, error, retry }: Readonly<{ rows: MonthlyTokenRow[]; currentMonth: string; quota: number | null; loading: boolean; error: string | undefined; retry: () => void }>) {
+  const ceiling = Math.max(1, quota ?? 0, ...rows.map(row => row.tokens));
+  return <section data-panel className={s.panel} aria-labelledby="school-monthly-tokens-title">
+    <div className={s.tokenChartHeading}><h2 id="school-monthly-tokens-title">Token AI theo tháng</h2><span>{quota == null ? "Không giới hạn" : "Hạn mức " + number(quota) + "/tháng"}</span></div>
+    {error ? <div className={s.tokenChartMessage} role="alert">Không thể tải dữ liệu token.<Button variant="ghost" onClick={retry}>Thử lại</Button></div> : loading && rows.length === 0 ? <div className={s.tokenChartMessage} role="status">Đang tải dữ liệu token…</div> : <div className={s.tokenBars} role="img" aria-label={"Token AI 6 tháng gần đây: " + rows.map(row => monthLabel(row.month) + ": " + number(row.tokens)).join("; ")}>
+      {rows.map(row => <div className={s.tokenBarColumn} key={row.month} title={monthLabel(row.month) + ": " + number(row.tokens) + " token"}>
+        <span className={s.tokenBarValue}>{compactTokens(row.tokens)}</span>
+        <span className={s.tokenBar + (row.month.slice(0, 7) === currentMonth.slice(0, 7) ? " " + s.tokenBarCurrent : "")} style={{ height: Math.max(2, row.tokens / ceiling * 118) }} />
+        <span className={s.tokenBarLabel}>{"T" + Number(row.month.slice(5, 7))}</span>
+      </div>)}
+    </div>}
+  </section>;
+}
+
 const shortcuts = [
   { to: "/school/users", icon: "users", title: "Tài khoản", detail: "Giáo viên và học sinh" },
   { to: "/school/import", icon: "upload", title: "Nhập dữ liệu", detail: "Người dùng, lớp và xếp lớp" },
@@ -65,11 +82,12 @@ export default function SchoolDashboard() {
   const report = useResource<SchoolReportSummary>("/schools/" + schoolId + "/reports/summary", Boolean(schoolId));
   const roster = useResource<DataPage<SchoolClassSummary>>("/schools/" + schoolId + "/classes/page?page=0&size=5&status=ACTIVE", Boolean(schoolId));
   const entitlement = useResource<LicenseStatus>("/user/me/license", Boolean(schoolId));
+  const tokenTrend = useResource<MonthlyTokenRow[]>("/schools/" + schoolId + "/reports/tokens/monthly", Boolean(schoolId));
   const summary = report.data;
   const classes = roster.data?.items ?? [];
   const license = entitlement.data;
-  const refreshing = report.refreshing || roster.refreshing || entitlement.refreshing;
-  const load = () => Promise.all([report.refresh(), roster.refresh(), entitlement.refresh()]);
+  const refreshing = report.refreshing || roster.refreshing || entitlement.refreshing || tokenTrend.refreshing;
+  const load = () => Promise.all([report.refresh(), roster.refresh(), entitlement.refresh(), tokenTrend.refresh()]);
 
   const dashboardActions = <RefreshButton disabled={refreshing} onClick={() => void load()} />;
   return <div className="admin-content"><div className={s.dashboard} data-testid="school-dashboard" data-analytics="dashboard" data-dashboard-role="school">
@@ -96,7 +114,7 @@ export default function SchoolDashboard() {
               })}</tbody></table></div>}
             {!roster.loading && !roster.error && classes.length > 0 && <p className={s.tableFootnote}>Đang hiển thị {Math.min(5, classes.length)} / {number(roster.data?.totalElements ?? summary.activeClasses)} lớp đang hoạt động</p>}
           </section>
-      {!roster.loading && !roster.error && <div className="analytics-chart-grid"><ReportChart title="Quy mô lớp học gần đây" description="Số học sinh của tối đa 5 lớp đang hoạt động gần đây." unit="học sinh" items={classes.map(item => ({ label: item.name, value: item.studentCount }))} /><ReportChart title="Tài khoản giảng dạy và học tập" description="Số tài khoản giáo viên và học sinh trong trường." variant="donut" unit="tài khoản" items={[{ label: "Học sinh", value: summary.students }, { label: "Giáo viên", value: summary.teachers }]} /></div>}
+      {!roster.loading && !roster.error && <div className="analytics-chart-grid"><ReportChart title="Quy mô lớp học gần đây" description="Số học sinh của tối đa 5 lớp đang hoạt động gần đây." unit="học sinh" items={classes.map(item => ({ label: item.name, value: item.studentCount }))} /><MonthlyTokenChart rows={tokenTrend.data ?? []} currentMonth={summary.usageMonth} quota={summary.tokenQuota} loading={tokenTrend.loading} error={tokenTrend.error} retry={() => void tokenTrend.refresh()} /></div>}
           <section data-panel className={s.panel} aria-labelledby="school-shortcuts-title"><div className={s.panelHeading}><div><h2 id="school-shortcuts-title">Truy cập nhanh</h2><p>Các công việc thường dùng trong trường.</p></div></div><div className={s.shortcuts}>{shortcuts.map(item => <Link key={item.to} to={item.to} className={s.shortcut}><span className={s.shortcutIcon}><LearningIcon name={item.icon} /></span><span><strong>{item.title}</strong><small>{item.detail}</small></span><LearningIcon name="chevronRight" /></Link>)}</div></section>
         </div>
         <aside className={s.aside} aria-label="Gói sử dụng và hạn mức">
