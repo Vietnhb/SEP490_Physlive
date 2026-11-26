@@ -113,4 +113,30 @@ class SchoolReportServiceTest {
         var result = service.filteredClasses(schoolId, 10, "2026-2027", "10a");
         assertEquals(1, result.size()); assertEquals(a.getId(), result.getFirst().id());
     }
+
+    @Test
+    void monthlyTokensFillsMissingMonthsAcrossYearsAndUsesCurrentQuotaCounter() {
+        School school = new School(); school.setId(schoolId);
+        when(schools.findById(schoolId)).thenReturn(Optional.of(school));
+        when(quota.currentMonth()).thenReturn(LocalDate.of(2026, 2, 1));
+        when(quota.usedThisMonth(school)).thenReturn(95000L);
+        TokenUsageAuditRepository.MonthlyTokens aggregate = mock(TokenUsageAuditRepository.MonthlyTokens.class);
+        when(aggregate.getMonth()).thenReturn(LocalDate.of(2025, 12, 1));
+        when(aggregate.getTokens()).thenReturn(640000L);
+        when(audits.monthlyTokens(schoolId, LocalDate.of(2025, 9, 1), LocalDate.of(2026, 2, 1))).thenReturn(List.of(aggregate));
+        var rows = service.monthlyTokens(schoolId);
+        assertEquals(6, rows.size());
+        assertEquals(LocalDate.of(2025, 9, 1), rows.getFirst().month());
+        assertEquals(0L, rows.getFirst().tokens());
+        assertEquals(640000L, rows.get(3).tokens());
+        assertEquals(95000L, rows.getLast().tokens());
+        verify(audits, never()).findTop200BySchoolIdOrderByRecordedAtDesc(any());
+    }
+
+    @Test
+    void monthlyTokensRejectsOtherSchoolsBeforeReadingUsage() {
+        when(roles.canManageSchool(actor, schoolId)).thenReturn(false);
+        assertThrows(ApiException.class, () -> service.monthlyTokens(schoolId));
+        verifyNoInteractions(audits, schools, quota);
+    }
 }

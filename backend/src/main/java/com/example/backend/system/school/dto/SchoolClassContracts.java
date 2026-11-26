@@ -33,6 +33,11 @@ public final class SchoolClassContracts {
     public record Person(Integer id, String fullName, String email, String avatarUrl) { }
     public record ClassSummary(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
                                boolean active, long teacherCount, long studentCount, List<String> teacherNames) { }
+    public record GradeSize(int gradeLevel, long classCount, double averageSize) { }
+    public record UnassignedClass(UUID id, String name, int gradeLevel, long studentCount) { }
+    public record ClassStatistics(long activeClasses, long unassignedClasses, double averageSize,
+            long minimumSize, long maximumSize, long enrolledStudents, long multiClassStudents,
+            List<GradeSize> grades, List<UnassignedClass> needsAttention) { }
     public record ClassOverview(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,
                                 boolean active, List<Person> teachers, long studentCount) { }
     public record ClassDetail(UUID id, String name, Integer gradeLevel, String schoolYear, String subject,

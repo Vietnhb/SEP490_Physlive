@@ -106,6 +106,49 @@ public class SupportInboxService {
                 appeals.viewsByIds(appealIds), total, pages, effective);
     }
 
+    public record AppealMonth(java.time.LocalDate month, long count) { }
+    public record SchoolAppealStatistics(long pending, Double oldestPendingDays, long approved30Days,
+            long rejected30Days, Double averageResolutionDays, List<AppealMonth> months) { }
+
+    /** Same school/role visibility as the inbox; aggregate before any directory pagination. */
+    public SchoolAppealStatistics schoolStatistics() { return schoolStatistics(java.time.Instant.now()); }
+
+    SchoolAppealStatistics schoolStatistics(java.time.Instant now) {
+        Handler asking = handler();
+        if (asking.manager()) throw ApiException.forbidden("Chỉ nhà trường được xem thống kê yêu cầu mở khóa của trường.");
+        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        var today = now.atZone(zone).toLocalDate();
+        var recent = today.minusDays(29).atStartOfDay(zone).toInstant();
+        String scope = " from account_appeals a join users u on u.id = a.user_id join roles r on r.id = u.role_id "
+                + "where a.school_id = :school and r.name in ('STAFF','STUDENT') and a.created_at <= :now";
+        var aggregate = entityManager.createNativeQuery("select count(*) filter (where a.status = 'PENDING'), "
+                + "min(extract(epoch from a.created_at)) filter (where a.status = 'PENDING'), "
+                + "count(*) filter (where a.status = 'APPROVED' and a.resolved_at >= :recent and a.resolved_at <= :now), "
+                + "count(*) filter (where a.status = 'REJECTED' and a.resolved_at >= :recent and a.resolved_at <= :now), "
+                + "avg(extract(epoch from (a.resolved_at - a.created_at)) / 86400.0) filter "
+                + "(where a.status in ('APPROVED','REJECTED') and a.resolved_at >= :recent and a.resolved_at <= :now and a.resolved_at >= a.created_at)" + scope);
+        aggregate.setParameter("school", asking.school()); aggregate.setParameter("now", now); aggregate.setParameter("recent", recent);
+        Object[] row = (Object[]) aggregate.getSingleResult();
+        var firstMonth = today.withDayOfMonth(1).minusMonths(5);
+        var monthly = entityManager.createNativeQuery("select cast(date_trunc('month', a.created_at at time zone 'Asia/Ho_Chi_Minh') as date), count(*)"
+                + scope + " and a.created_at >= :firstMonth group by 1 order by 1");
+        monthly.setParameter("school", asking.school()); monthly.setParameter("now", now);
+        monthly.setParameter("firstMonth", firstMonth.atStartOfDay(zone).toInstant());
+        Map<java.time.LocalDate, Long> counts = new HashMap<>();
+        for (Object raw : monthly.getResultList()) {
+            Object[] month = (Object[]) raw;
+            counts.put(java.time.LocalDate.parse(month[0].toString()), ((Number) month[1]).longValue());
+        }
+        var months = java.util.stream.IntStream.range(0, 6).mapToObj(index -> {
+            var month = firstMonth.plusMonths(index);
+            return new AppealMonth(month, counts.getOrDefault(month, 0L));
+        }).toList();
+        Double oldestDays = row[1] == null ? null : Math.max(0, (now.getEpochSecond() - ((Number) row[1]).doubleValue()) / 86400.0);
+        return new SchoolAppealStatistics(((Number) row[0]).longValue(), oldestDays,
+                ((Number) row[2]).longValue(), ((Number) row[3]).longValue(),
+                row[4] == null ? null : ((Number) row[4]).doubleValue(), months);
+    }
+
     public long pendingCount() {
         Handler asking = handler(); // exactly the same handler access as the inbox
         var appealsQuery = entityManager.createNativeQuery(asking.manager() ? PENDING_SYSTEM : PENDING_SCHOOL)

@@ -13,4 +13,10 @@ public interface TokenUsageAuditRepository extends JpaRepository<TokenUsageAudit
 
     @org.springframework.data.jpa.repository.Query("select distinct a.usageMonth from TokenUsageAudit a where a.school.id = :schoolId order by a.usageMonth desc")
     List<java.time.LocalDate> months(@org.springframework.data.repository.query.Param("schoolId") UUID schoolId);
+    interface MonthlyTokens { java.time.LocalDate getMonth(); Long getTokens(); }
+
+    @org.springframework.data.jpa.repository.Query("select a.usageMonth as month, sum(a.tokens) as tokens from TokenUsageAudit a where a.school.id = :schoolId and a.usageMonth >= :start and a.usageMonth <= :end group by a.usageMonth order by a.usageMonth")
+    List<MonthlyTokens> monthlyTokens(@org.springframework.data.repository.query.Param("schoolId") UUID schoolId,
+            @org.springframework.data.repository.query.Param("start") java.time.LocalDate start,
+            @org.springframework.data.repository.query.Param("end") java.time.LocalDate end);
 }

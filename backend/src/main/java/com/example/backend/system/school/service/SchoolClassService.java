@@ -113,6 +113,34 @@ public class SchoolClassService {
         return new ClassPage(summaries(result.getContent()), result.getTotalElements(), result.getTotalPages(), result.getNumber(), size, classes.schoolYears(schoolId), total, active);
     }
 
+    /** Whole-school statistics, independent of directory filters and pagination. */
+    @Transactional(readOnly = true)
+    public com.example.backend.system.school.dto.SchoolClassContracts.ClassStatistics statistics(UUID schoolId) {
+        requireSchoolAccess(schoolId);
+        var rows = classes.activeStatisticsClasses(schoolId);
+        if (rows.isEmpty()) return new com.example.backend.system.school.dto.SchoolClassContracts.ClassStatistics(
+                0, 0, 0, 0, 0, 0, 0, List.of(), List.of());
+        var ids = rows.stream().map(SchoolClassRepository.ProfileClass::getId).toList();
+        var sizes = enrollments.countActiveByClasses(ids).stream().collect(java.util.stream.Collectors.toMap(
+                ClassEnrollmentRepository.ClassCount::getClassId, ClassEnrollmentRepository.ClassCount::getTotal));
+        var assigned = teacherAssignments.countActiveByClasses(ids).stream().filter(row -> row.getTotal() > 0)
+                .map(ClassTeacherAssignmentRepository.ClassCount::getClassId).collect(java.util.stream.Collectors.toSet());
+        var students = enrollments.activeClassCountsPerStudent(schoolId);
+        var sizeStats = rows.stream().mapToLong(row -> sizes.getOrDefault(row.getId(), 0L)).summaryStatistics();
+        var grades = rows.stream().map(SchoolClassRepository.ProfileClass::getGradeLevel).distinct().sorted()
+                .map(grade -> {
+                    var group = rows.stream().filter(row -> row.getGradeLevel() == grade).toList();
+                    return new com.example.backend.system.school.dto.SchoolClassContracts.GradeSize(grade, group.size(),
+                            group.stream().mapToLong(row -> sizes.getOrDefault(row.getId(), 0L)).average().orElse(0));
+                }).toList();
+        var missing = rows.stream().filter(row -> !assigned.contains(row.getId())).toList();
+        var attention = missing.stream().limit(5).map(row -> new com.example.backend.system.school.dto.SchoolClassContracts.UnassignedClass(
+                row.getId(), row.getName(), row.getGradeLevel(), sizes.getOrDefault(row.getId(), 0L))).toList();
+        return new com.example.backend.system.school.dto.SchoolClassContracts.ClassStatistics(rows.size(), missing.size(),
+                sizeStats.getAverage(), sizeStats.getMin(), sizeStats.getMax(), students.size(),
+                students.stream().filter(row -> row.getTotal() > 1).count(), grades, attention);
+    }
+
     private List<ClassSummary> summaries(List<SchoolClass> rows) {
         if (rows.isEmpty()) return List.of();
         var ids = rows.stream().map(SchoolClass::getId).toList();

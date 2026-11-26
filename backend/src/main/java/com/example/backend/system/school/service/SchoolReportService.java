@@ -70,6 +70,21 @@ public class SchoolReportService {
                 teachers.getOrDefault(item.getId(), 0L), students.getOrDefault(item.getId(), 0L))).toList();
     }
 
+    public List<com.example.backend.system.school.dto.SchoolReportContracts.MonthlyTokenRow> monthlyTokens(UUID schoolId) {
+        requireAccess(schoolId);
+        School school = school(schoolId);
+        LocalDate end = aiQuota.currentMonth();
+        LocalDate start = end.minusMonths(5);
+        var totals = tokenAudits.monthlyTokens(schoolId, start, end).stream().collect(java.util.stream.Collectors.toMap(
+                TokenUsageAuditRepository.MonthlyTokens::getMonth, row -> row.getTokens() == null ? 0L : row.getTokens()));
+        // The current month uses the same quota counter as the dashboard summary.
+        totals.put(end, aiQuota.usedThisMonth(school));
+        return java.util.stream.IntStream.range(0, 6).mapToObj(offset -> {
+            LocalDate month = start.plusMonths(offset);
+            return new com.example.backend.system.school.dto.SchoolReportContracts.MonthlyTokenRow(month, totals.getOrDefault(month, 0L));
+        }).toList();
+    }
+
     public List<TokenRow> tokenAudit(UUID schoolId) {
         requireAccess(schoolId);
         return tokenAudits.findTop200BySchoolIdOrderByRecordedAtDesc(schoolId).stream()
