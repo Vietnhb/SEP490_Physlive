@@ -26,3 +26,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/player/player.html
+    - assets/brand/logo.png
+    - assets/illustrations/

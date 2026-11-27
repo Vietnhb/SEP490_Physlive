@@ -29,6 +29,7 @@ public interface SchemaVersionRepository extends JpaRepository<SchemaVersion, UU
             String schemaId, LifecycleStatus lifecycleStatus);
     Optional<SchemaVersion> findTopBySchemaIdIgnoreCaseOrderByCreatedAtDesc(String schemaId);
     boolean existsBySchemaIdAndVersion(String schemaId, String version);
+    List<SchemaVersion> findBySchemaIdInAndLifecycleStatus(java.util.Collection<String> schemaIds, LifecycleStatus lifecycleStatus);
     List<SchemaVersion> findAllByLifecycleStatusOrderByTopicAscSchemaIdAscCreatedAtDesc(LifecycleStatus lifecycleStatus);
     List<SchemaVersion> findAllByOrderByTopicAscNameAscVersionAsc();
 

@@ -206,20 +206,8 @@ public class SchemaService {
         if (auditRepository == null) {
             return List.of();
         }
-        return auditRepository.findTop200ByOrderByCreatedAtDesc().stream()
-                .map(row -> new SchemaContracts.FamilyAudit(
-                        row.getId(),
-                        row.getSchemaVersion().getId(),
-                        row.getSchemaVersion().getSchemaId(),
-                        row.getSchemaVersion().getName(),
-                        row.getSchemaVersion().getVersion(),
-                        row.getActor() == null ? null : row.getActor().getFullName(),
-                        row.getActor() == null ? null : row.getActor().getEmail(),
-                        row.getAction(),
-                        row.getFromStatus(),
-                        row.getToStatus(),
-                        row.getNote(),
-                        row.getCreatedAt()))
+        return auditRepository.recentHistory(org.springframework.data.domain.PageRequest.of(0, 200)).stream()
+                .map(SchemaService::familyAudit)
                 .toList();
     }
 
@@ -228,21 +216,15 @@ public class SchemaService {
         if (auditRepository == null || schemaId == null || schemaId.isBlank()) {
             return List.of();
         }
-        return auditRepository.findTop100BySchemaVersionSchemaIdIgnoreCaseOrderByCreatedAtDesc(schemaId.trim()).stream()
-                .map(row -> new SchemaContracts.FamilyAudit(
-                        row.getId(),
-                        row.getSchemaVersion().getId(),
-                        row.getSchemaVersion().getSchemaId(),
-                        row.getSchemaVersion().getName(),
-                        row.getSchemaVersion().getVersion(),
-                        row.getActor() == null ? null : row.getActor().getFullName(),
-                        row.getActor() == null ? null : row.getActor().getEmail(),
-                        row.getAction(),
-                        row.getFromStatus(),
-                        row.getToStatus(),
-                        row.getNote(),
-                        row.getCreatedAt()))
+        return auditRepository.familyHistory(schemaId.trim(), org.springframework.data.domain.PageRequest.of(0, 100)).stream()
+                .map(SchemaService::familyAudit)
                 .toList();
+    }
+
+    private static SchemaContracts.FamilyAudit familyAudit(SchemaVersionAuditRepository.HistoryRow row) {
+        return new SchemaContracts.FamilyAudit(row.getId(), row.getVersionId(), row.getSchemaId(), row.getName(),
+                row.getVersion(), row.getActorName(), row.getActorEmail(), row.getAction(), row.getFromStatus(),
+                row.getToStatus(), row.getNote(), row.getCreatedAt());
     }
 
     private static String actorDisplayName(SchemaVersionAudit audit) {

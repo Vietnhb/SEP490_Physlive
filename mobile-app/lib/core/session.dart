@@ -16,6 +16,7 @@ class Session extends ChangeNotifier {
   }
 
   static const _tokenKey = 'physlive.token';
+  static const _emailKey = 'physlive.rememberedEmail';
 
   final AppConfig config;
   final ApiClient api;
@@ -46,7 +47,12 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> signIn(String email, String password) async {
+  /// The email saved by "Ghi nhớ đăng nhập", to fill the sign-in form; null when nothing is remembered.
+  Future<String?> rememberedEmail() async => (await SharedPreferences.getInstance()).getString(_emailKey);
+
+  /// Signs in. With [remember] the session survives closing the app and the email is kept for next time;
+  /// without it the token lives only in memory and nothing is left on the device.
+  Future<void> signIn(String email, String password, {bool remember = true}) async {
     final data = asJson(await api.post('/auth/login', {'email': email.trim(), 'password': password},
         const Duration(seconds: 60)));
     final token = asString(data['token']);
@@ -55,7 +61,13 @@ class Session extends ChangeNotifier {
     _user = User(asJson(data['user']));
     notice = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    if (remember) {
+      await prefs.setString(_tokenKey, token);
+      await prefs.setString(_emailKey, email.trim());
+    } else {
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_emailKey);
+    }
     notifyListeners();
   }
 

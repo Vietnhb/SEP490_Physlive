@@ -30,9 +30,10 @@ class SchoolOverviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tổng quan trường')),
+      appBar: HeroBar(title: 'Tổng quan', subtitle: SessionScope.of(context).user!.schoolName ?? 'Trường', art: Art.school),
       body: Loader<(Json, String?, int)>(
         load: () => _load(context),
+        skeleton: const SkeletonList(withStats: true, count: 3),
         builder: (context, data, reload) {
           final p = context.palette;
           final (s, planName, pending) = data;
@@ -45,16 +46,13 @@ class SchoolOverviewScreen extends StatelessWidget {
           final studentQuota = asInt(s['studentQuota']);
           return RefreshIndicator(
             onRefresh: reload,
-            child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-              Text(asString(s['schoolName']) ?? 'Trường', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              Row(children: [
-                Expanded(child: _Stat(label: 'Học sinh', value: '$students',
-                    detail: '${asInt(s['enrolledStudents']) ?? 0} đã xếp lớp')),
-                const SizedBox(width: 12),
-                Expanded(child: _Stat(label: 'Giáo viên', value: '${asInt(s['teachers']) ?? 0}',
-                    detail: '${asInt(s['activeClasses']) ?? 0} lớp đang hoạt động')),
-              ]),
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 28), children: [
+              Pair(
+                StatTile(label: 'Học sinh', value: groupDigits(students), icon: Icons.school_rounded, tint: p.blue,
+                    detail: '${asInt(s['enrolledStudents']) ?? 0} đã xếp lớp'),
+                StatTile(label: 'Giáo viên', value: '${asInt(s['teachers']) ?? 0}', icon: Icons.co_present_rounded, tint: p.teal,
+                    detail: '${asInt(s['activeClasses']) ?? 0} lớp đang học'),
+              ),
               const SizedBox(height: 12),
               Section(
                 title: 'Bản quyền',
@@ -78,6 +76,8 @@ class SchoolOverviewScreen extends StatelessWidget {
                   if (quota != null && quota > 0) ...[
                     const SizedBox(height: 8),
                     LinearProgressIndicator(
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(99),
                       value: (used / quota).clamp(0, 1).toDouble(),
                       color: used >= quota ? p.danger : (used >= quota * 0.8 ? p.warning : p.accent),
                       backgroundColor: p.surface2,
@@ -96,7 +96,7 @@ class SchoolOverviewScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 16),
-              Text('Quản lý tài khoản, lớp học, nhập dữ liệu và gia hạn gói trên bản web.',
+              Text('Thêm tài khoản, xếp lớp, nhập dữ liệu và gia hạn gói trên bản web.',
                   textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12)),
             ]),
           );
@@ -119,28 +119,6 @@ String _two(int value) => value.toString().padLeft(2, '0');
 String _date(DateTime? value) => value == null ? '—' : '${_two(value.day)}/${_two(value.month)}/${value.year}';
 String _month(DateTime? value) => value == null ? 'tháng này' : 'tháng ${value.month}/${value.year}';
 String _number(int value) => formatVnd(value).replaceAll(' ₫', '');
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value, required this.detail});
-  final String label, value, detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: TextStyle(color: p.muted, fontSize: 13)),
-          const SizedBox(height: 4),
-          Text(value, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 2),
-          Text(detail, style: TextStyle(color: p.muted, fontSize: 12)),
-        ]),
-      ),
-    );
-  }
-}
 
 class _Row extends StatelessWidget {
   const _Row({required this.label, required this.value});

@@ -60,11 +60,11 @@ public class PhysicsCatalogInitializer implements CommandLineRunner {
         java.util.Set<String> superseded = new java.util.HashSet<>();
         defaults.path("supersededSchemaIds").forEach(id -> superseded.add(id.asText()));
         superseded.removeAll(active);
-        for (SchemaVersion schema : schemaRepository.findByLifecycleStatus(LifecycleStatus.APPROVED)) {
-            if (superseded.contains(schema.getSchemaId())) {
-                schema.setLifecycleStatus(LifecycleStatus.RETIRED);
-                schemaRepository.save(schema);
-            }
+        if (superseded.isEmpty()) return;
+        // only the superseded ids are read: their definitions are large and this runs on every start
+        for (SchemaVersion schema : schemaRepository.findBySchemaIdInAndLifecycleStatus(superseded, LifecycleStatus.APPROVED)) {
+            schema.setLifecycleStatus(LifecycleStatus.RETIRED);
+            schemaRepository.save(schema);
         }
     }
 
@@ -79,8 +79,8 @@ public class PhysicsCatalogInitializer implements CommandLineRunner {
         schemaDefinitions.validateDefinition(definition, id, version, entry.path(TOPIC).asText());
         String checksum = schemaDefinitions.compiledChecksum(definition);
 
-        var published = schemaRepository.findFirstBySchemaIdAndVersion(id, version);
-        if (published.isPresent()) return;
+        // an existence check, not a load: the stored definition is hundreds of kilobytes and this runs on every start
+        if (schemaRepository.existsBySchemaIdAndVersion(id, version)) return;
         SchemaVersion schema = new SchemaVersion();
         schema.setSchemaId(id); schema.setName(entry.path("name").asText()); schema.setTopic(entry.path(TOPIC).asText());
         schema.setVersion(version); schema.setDefinition(definition); schema.setDefinitionChecksum(checksum);

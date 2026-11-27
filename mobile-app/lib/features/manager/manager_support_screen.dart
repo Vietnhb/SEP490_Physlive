@@ -18,6 +18,7 @@ class _ManagerSupportScreenState extends State<ManagerSupportScreen> {
   int _reload = 0;
   /// 0 = to handle, 1 = done, 2 = simulation complaints (reviewers handle them; read-only here).
   int _view = 0;
+  String _query = '';
 
   Future<List<SupportItem>> _load() async =>
       asJsonList(await SessionScope.api(context).get('/support/admin')).map(SupportItem.new).toList();
@@ -31,7 +32,7 @@ class _ManagerSupportScreenState extends State<ManagerSupportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Yêu cầu hỗ trợ')),
+      appBar: const HeroBar(title: 'Hỗ trợ', subtitle: 'Yêu cầu từ người dùng', art: Art.complaint),
       body: Loader<List<SupportItem>>(
         load: _load,
         reloadKey: _reload,
@@ -40,19 +41,19 @@ class _ManagerSupportScreenState extends State<ManagerSupportScreen> {
           final todo = requests.where((item) => !item.resolved).toList();
           final done = requests.where((item) => item.resolved).toList();
           final complaints = items.where((item) => item.isComplaint).toList();
-          final shown = [todo, done, complaints][_view];
+          final query = _query.toLowerCase();
+          final shown = [todo, done, complaints][_view]
+              .where((i) => query.isEmpty || '${i.subject} ${i.senderName} ${i.senderEmail} ${i.content}'.toLowerCase().contains(query))
+              .toList();
           return RefreshIndicator(
             onRefresh: reload,
-            child: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-              SegmentedButton<int>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(value: 0, label: Text('Cần xử lý (${todo.length})')),
-                  ButtonSegment(value: 1, label: Text('Đã xong (${done.length})')),
-                  ButtonSegment(value: 2, label: Text('Báo lỗi (${complaints.length})')),
-                ],
-                selected: {_view},
-                onSelectionChanged: (value) => setState(() => _view = value.first),
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 28), children: [
+              SearchBox(hint: 'Tìm theo tiêu đề, người gửi, nội dung', onChanged: (v) => setState(() => _query = v)),
+              const SizedBox(height: 10),
+              ChoiceRow<int>(
+                selected: _view,
+                onSelected: (v) => setState(() => _view = v),
+                options: [(0, 'Cần xử lý', todo.length), (1, 'Đã xong', done.length), (2, 'Báo lỗi mô phỏng', complaints.length)],
               ),
               if (_view == 2)
                 Padding(
@@ -65,8 +66,10 @@ class _ManagerSupportScreenState extends State<ManagerSupportScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 40),
                   child: EmptyState(
-                    icon: Icons.inbox_outlined,
-                    title: const ['Không còn yêu cầu nào cần xử lý', 'Chưa có yêu cầu nào đã xong', 'Chưa có báo lỗi mô phỏng'][_view],
+                    art: _view == 0 && query.isEmpty ? Art.success : Art.empty,
+                    title: query.isNotEmpty
+                        ? 'Không có yêu cầu nào khớp "$_query"'
+                        : const ['Không còn yêu cầu nào cần xử lý', 'Chưa có yêu cầu nào đã xong', 'Chưa có báo lỗi mô phỏng'][_view],
                   ),
                 )
               else
@@ -97,33 +100,16 @@ class _SupportCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: Text(item.subject,
-                    maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
-              ),
-              const SizedBox(width: 8),
-              Pill(item.statusLabel, tone: _statusTone(item)),
-            ]),
-            const SizedBox(height: 4),
-            Text('${item.kindLabel} · ${item.senderName}', style: TextStyle(color: p.muted, fontSize: 13)),
-            const SizedBox(height: 8),
-            Row(children: [
-              Icon(Icons.schedule_rounded, size: 16, color: p.muted),
-              const SizedBox(width: 6),
-              Text(formatDateTime(item.createdAt), style: TextStyle(color: p.muted, fontSize: 13)),
-              const Spacer(),
-              Icon(Icons.chevron_right_rounded, color: p.muted),
-            ]),
-          ]),
-        ),
+    return ListCard(
+      onTap: onTap,
+      leading: Avatar(name: item.senderName, size: 40),
+      title: item.subject,
+      subtitle: '${item.kindLabel} · ${item.senderName}',
+      trailing: Pill(item.statusLabel, tone: _statusTone(item)),
+      footer: MetaLine(
+        icon: Icons.schedule_rounded,
+        text: formatDateTime(item.createdAt),
+        trailing: Icon(Icons.chevron_right_rounded, color: p.muted, size: 20),
       ),
     );
   }

@@ -12,6 +12,7 @@ import 'ui/theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  await appTheme.load();
   runApp(PhysLiveApp(config: await AppConfig.load()));
 }
 
@@ -43,17 +44,21 @@ class _PhysLiveAppState extends State<PhysLiveApp> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
-    final app = MaterialApp(
-      key: ValueKey(_generation),
-      title: 'PhysLive',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
-      locale: const Locale('vi'),
-      builder: (context, child) => AppRestartScope(restart: _open, child: child!),
-      home: session == null
-          ? ServerScreen(firstRun: true, onSaved: _open)
-          : const _Gate(),
+    final app = ValueListenableBuilder<ThemeMode>(
+      valueListenable: appTheme,
+      builder: (context, mode, _) => MaterialApp(
+        key: ValueKey(_generation),
+        title: 'PhysLive',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        themeMode: mode,
+        locale: const Locale('vi'),
+        builder: (context, child) => AppRestartScope(restart: _open, child: child!),
+        home: session == null
+            ? ServerScreen(firstRun: true, onSaved: _open)
+            : const _Gate(),
+      ),
     );
     // above the navigator, so every screen pushed later reaches the session too
     return session == null ? app : SessionScope(session: session, child: app);

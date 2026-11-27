@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { LOGIN_TIMEOUT_SECONDS, login } from "../api/authApi";
-import { setToken } from "../../../shared/lib/token";
+import { getRememberedEmail, setRememberedEmail, setToken } from "../../../shared/lib/token";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
 import LearningIcon from "../../../shared/ui/LearningIcon";
 import { isAccountSuspended, userHome } from "../../../shared/auth/permissions";
@@ -21,7 +21,8 @@ export default function Login() {
   const navigate = useNavigate();
   const theme = useEffectiveTheme();
   const setUser = useSessionStore((state) => state.setUser);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(getRememberedEmail);
+  const [remember, setRemember] = useState(true);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
@@ -50,7 +51,8 @@ export default function Login() {
     try {
       const response = await login(email.trim(), password, controller.signal);
       if (controller.signal.aborted || requestRef.current !== controller) return;
-      setToken(response.token);
+      setToken(response.token, remember);
+      setRememberedEmail(remember ? email.trim() : null);
       setUser(response.user);
       navigate(!isAccountSuspended(response.user) && response.user.mustChangePassword ? "/change-password" : userHome(response.user), { replace: true });
     }
@@ -76,7 +78,7 @@ export default function Login() {
     <section className="account-auth-form">
       <div className="account-heading">
         <h1>Chào mừng trở lại</h1>
-        <p>Đăng nhập bằng tài khoản do nhà trường hoặc PhysLive cấp.</p>
+        <p>Dùng tài khoản do nhà trường hoặc PhysLive cấp.</p>
       </div>
       <form onSubmit={handleLogin} className="account-form">
         <label htmlFor="login-email">
@@ -91,13 +93,17 @@ export default function Login() {
           <span className="account-field account-password">
             <svg className="account-field__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></svg>
             <input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)}
-              onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} autoComplete="current-password" required disabled={loading} />
+              onKeyUp={(event) => setCapsLock(event.getModifierState("CapsLock"))} onBlur={() => setCapsLock(false)} placeholder="Nhập mật khẩu của bạn" autoComplete="current-password" required disabled={loading} />
             <button type="button" className="account-password-toggle" onClick={() => setShowPassword((value) => !value)} aria-pressed={showPassword}
               aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" /><circle cx="12" cy="12" r="2.8" />{showPassword && <path d="m4 4 16 16" />}</svg>
             </button>
           </span>
           {capsLock && <span className="account-caps" role="status">Caps Lock đang bật</span>}
+        </label>
+        <label className="account-remember" htmlFor="login-remember">
+          <input id="login-remember" type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} disabled={loading} />
+          <span>Ghi nhớ đăng nhập</span>
         </label>
         {error && <div className="account-error" role="alert"><LearningIcon name="close" /><span>{error}</span></div>}
         <button type="submit" className="account-submit" disabled={loading} aria-busy={loading}>

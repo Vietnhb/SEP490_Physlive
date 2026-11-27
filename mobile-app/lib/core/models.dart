@@ -31,9 +31,11 @@ class User {
   bool get isTeacher => role == 'STAFF' && permissions.contains('TEACH');
   bool get isManager => role == 'MANAGER';
   bool get isSchool => role == 'SCHOOL';
+  bool get isAdmin => role == 'ADMIN';
+  bool get isReviewer => role == 'REVIEWER';
 
-  /// The accounts the app is made for; everyone else manages from the web.
-  bool get usesApp => isStudent || isTeacher || isManager || isSchool;
+  /// The accounts the app is made for; staff who only run a department work from the web.
+  bool get usesApp => isStudent || isTeacher || isManager || isSchool || isAdmin || isReviewer;
 
   String get roleLabel => switch (role) {
         'STUDENT' => 'Học sinh',
@@ -186,4 +188,77 @@ class SupportItem {
         'RESOLVED' => 'Đã xong',
         _ => status,
       };
+}
+
+/// An account as the operations team and administrators see it.
+class ManagedUser {
+  ManagedUser(this.json);
+  final Json json;
+
+  int get id => asInt(json['id']) ?? 0;
+  String get email => asString(json['email']) ?? '';
+  String get fullName => (asString(json['fullName']) ?? '').trim().isEmpty ? email : json['fullName'].toString().trim();
+  String get role => asString(json['role']) ?? '';
+  String? get schoolName => asString(json['schoolName']);
+  String? get avatarUrl => asString(json['avatarUrl']);
+  String? get institutionId => asString(json['institutionId']);
+  DateTime? get lastLogin => asDate(json['lastLogin']);
+  String? get suspensionReason => asString(json['suspensionReason']);
+  bool get suspended => json['active'] == false || json['accountStatus'] == 'SUSPENDED_READ_ONLY';
+  bool get warned => json['accountStatus'] == 'WARNED';
+}
+
+/// A school customer: its licence, plan and use.
+class SchoolAccount {
+  SchoolAccount(this.json);
+  final Json json;
+
+  String get id => asString(json['id']) ?? '';
+  String get name => asString(json['name']) ?? 'Trường';
+  String? get code => asString(json['code']);
+  String? get province => asString(json['provinceCity']);
+  String? get address => asString(json['address']);
+  String? get phone => asString(json['phoneNumber']);
+  String? get email => asString(json['contactEmail']);
+  String? get planCode => asString(json['planCode']);
+  DateTime? get licenseStart => asDate(json['licenseStart']);
+  DateTime? get licenseEnd => asDate(json['licenseEnd']);
+  bool get active => json['active'] != false;
+  bool get licenseActive => asBool(json['licenseActive']);
+  String get subscriptionStatus => asString(json['subscriptionStatus']) ?? '';
+  int? get studentQuota => asInt(json['studentQuota']);
+  int? get tokenQuota => asInt(json['monthlyTokenQuota']);
+  int get usedTokens => asInt(json['usedTokens']) ?? 0;
+  int? get annualPrice => asInt(json['annualPriceVnd']);
+}
+
+/// A payment a school made (or tried to make) for a plan.
+class Payment {
+  Payment(this.json);
+  final Json json;
+
+  String get id => asString(json['id']) ?? '';
+  String get schoolName => asString(json['schoolName']) ?? 'Trường';
+  String? get managerEmail => asString(json['managerEmail']);
+  String get planCode => asString(json['planCode']) ?? '';
+  String? get purpose => asString(json['purpose']);
+  int get amount => asInt(json['amountVnd']) ?? 0;
+  String get status => (asString(json['status']) ?? 'PENDING').toUpperCase();
+  DateTime? get createdAt => asDate(json['createdAt']);
+  DateTime? get paidAt => asDate(json['paidAt']);
+  bool get paid => status == 'PAID';
+  bool get failed => status == 'FAILED';
+}
+
+/// A class a teacher teaches, with its students.
+class TeacherClass {
+  TeacherClass(this.json);
+  final Json json;
+
+  String get id => asString(json['id']) ?? '';
+  String get name => asString(json['name']) ?? 'Lớp';
+  int? get gradeLevel => asInt(json['gradeLevel']);
+  String? get schoolYear => asString(json['schoolYear']);
+  String? get subject => asString(json['subject']);
+  List<Json> get students => asJsonList(json['students']);
 }

@@ -28,6 +28,10 @@ public class SchemaDefinitionService {
     private final SchemaVersionRepository schemas;
     private final TopicRepository topics;
     private final ObjectMapper json;
+    /** The approved schemas as of a change mark; reloaded only when the mark moves (their definitions are large). */
+    private final java.util.concurrent.atomic.AtomicReference<Approved> approved = new java.util.concurrent.atomic.AtomicReference<>();
+
+    private record Approved(String mark, List<SchemaVersion> schemas) { }
 
     public SchemaDefinitionService(SchemaVersionRepository schemas, TopicRepository topics, ObjectMapper json) {
         this.schemas = schemas;
@@ -46,7 +50,17 @@ public class SchemaDefinitionService {
         return (s == null ? "-" : s.getCount() + "@" + s.getUpdated()) + "|" + (t == null ? "-" : t.getCount() + "@" + t.getUpdated());
     }
 
+    /** The current approved version of each enabled topic's schemas, kept between calls until the change mark moves. */
     public List<SchemaVersion> approvedSchemas() {
+        String mark = approvedFingerprint();
+        Approved now = approved.get();
+        if (now != null && now.mark().equals(mark)) return now.schemas();
+        List<SchemaVersion> loaded = loadApprovedSchemas();
+        approved.set(new Approved(mark, loaded));
+        return loaded;
+    }
+
+    private List<SchemaVersion> loadApprovedSchemas() {
         List<String> enabledTopics = topics.findByEnabledTrueOrderBySortOrderAsc().stream().map(Topic::getCode).toList();
         if (enabledTopics.isEmpty()) return List.of();
         Map<String, SchemaVersion> latest = schemas
@@ -54,16 +68,19 @@ public class SchemaDefinitionService {
                         LifecycleStatus.APPROVED, enabledTopics).stream()
                 .collect(java.util.stream.Collectors.toMap(s -> s.getSchemaId().toLowerCase(), s -> s,
                         SchemaVersionOrdering::newer));
-        return new java.util.TreeMap<>(latest).values().stream().toList();
+        return List.copyOf(new java.util.TreeMap<>(latest).values());
     }
 
     @Transactional(readOnly = true)
     public SchemaVersion requireCurrentApproved(String schemaId, String version) {
-        SchemaVersion schema = schemas.findFirstBySchemaIdAndVersion(schemaId, version)
-                .filter(s -> s.getLifecycleStatus() == LifecycleStatus.APPROVED)
-                .orElseThrow(() -> ApiException.conflict("Mô hình đã chọn không còn được phê duyệt: " + schemaId + "@" + version));
-        if (approvedSchemas().stream().noneMatch(s -> s.getSchemaId().equalsIgnoreCase(schemaId)
-                && s.getVersion().equals(version))) {
+        // the current approved versions are already held; only a version outside them needs a (light) look at the table
+        SchemaVersion schema = approvedSchemas().stream()
+                .filter(s -> s.getSchemaId().equalsIgnoreCase(schemaId) && s.getVersion().equals(version))
+                .findFirst()
+                .orElse(null);
+        if (schema == null) {
+            if (!schemas.existsBySchemaIdAndVersion(schemaId, version))
+                throw ApiException.conflict("Mô hình đã chọn không còn được phê duyệt: " + schemaId + "@" + version);
             throw ApiException.conflict("Phiên bản mô hình đã chọn không còn hiện hành hoặc đã bị vô hiệu hóa");
         }
         validateDefinition(schema.getDefinition(), schema.getSchemaId(), schema.getVersion(), schema.getTopic());

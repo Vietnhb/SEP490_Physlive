@@ -28,75 +28,122 @@ class AccountScreen extends StatelessWidget {
     final session = SessionScope.of(context);
     final user = session.user!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tài khoản')),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: p.accentSoft,
-                child: Text(user.initials, style: TextStyle(color: p.accent, fontWeight: FontWeight.w700, fontSize: 18)),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(user.fullName, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(user.email, style: TextStyle(color: p.muted, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Wrap(spacing: 6, runSpacing: 6, children: [
-                    Pill(user.roleLabel, tone: Tone.accent),
-                    if (user.schoolName != null) Pill(user.schoolName!),
-                  ]),
-                ]),
-              ),
-            ]),
+      appBar: const HeroBar(title: 'Tài khoản', subtitle: 'Hồ sơ và cài đặt', art: Art.users),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 28), children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [p.teal.bg, p.violet.bg]),
           ),
+          child: Row(children: [
+            Container(
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: p.surface, width: 3)),
+              child: Avatar(name: user.fullName, url: user.avatarUrl, size: 64, tint: roleTint(context, user.role)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(user.fullName, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 2),
+                Text(user.email, style: TextStyle(color: p.muted, fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  Pill(user.roleLabel, tone: Tone.accent),
+                  if (user.schoolName != null) Pill(user.schoolName!, icon: Icons.apartment_rounded),
+                ]),
+              ]),
+            ),
+          ]),
         ),
         if (user.suspended) ...[
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: p.warningSoft, borderRadius: BorderRadius.circular(12)),
-            child: Text('Tài khoản đang bị tạm khoá ở chế độ chỉ xem.', style: TextStyle(color: p.warning)),
+            child: Row(children: [
+              Icon(Icons.lock_clock_rounded, color: p.warning),
+              const SizedBox(width: 10),
+              Expanded(child: Text('Tài khoản đang bị tạm khoá ở chế độ chỉ xem.', style: TextStyle(color: p.warning))),
+            ]),
           ),
         ],
-        const SizedBox(height: 16),
+        const GroupLabel('Giao diện'),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: ValueListenableBuilder<ThemeMode>(
+              valueListenable: appTheme,
+              builder: (context, mode, _) => SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_rounded), label: Text('Sáng')),
+                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_rounded), label: Text('Tối')),
+                  ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.phone_android_rounded), label: Text('Theo máy')),
+                ],
+                selected: {mode},
+                onSelectionChanged: (value) => appTheme.set(value.first),
+              ),
+            ),
+          ),
+        ),
+        const GroupLabel('Bảo mật'),
         Card(
           clipBehavior: Clip.antiAlias,
           child: Column(children: [
             ListTile(
-              leading: const Icon(Icons.lock_reset_rounded),
+              leading: _IconBox(icon: Icons.lock_reset_rounded, tint: p.blue),
               title: const Text('Đổi mật khẩu'),
               trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
             ),
-            const Divider(indent: 16, endIndent: 16),
+            const Divider(indent: 64),
             ListTile(
-              leading: Icon(Icons.logout_rounded, color: p.danger),
-              title: Text('Đăng xuất', style: TextStyle(color: p.danger)),
+              leading: _IconBox(icon: Icons.dns_rounded, tint: p.teal),
+              title: const Text('Máy chủ'),
+              subtitle: Text(session.config.apiUrl.host, style: TextStyle(color: p.muted, fontSize: 12)),
+            ),
+            const Divider(indent: 64),
+            ListTile(
+              leading: _IconBox(icon: Icons.logout_rounded, tint: p.rose),
+              title: Text('Đăng xuất', style: TextStyle(color: p.danger, fontWeight: FontWeight.w600)),
               onTap: () => _signOut(context),
             ),
           ]),
         ),
         const SizedBox(height: 20),
+        Center(child: Image.asset('assets/brand/logo.png', width: 44, height: 44)),
+        const SizedBox(height: 6),
         Text(
-          user.isManager
-              ? 'Quản lý trường, tài khoản, gói, thanh toán và chương trình học trên bản web.'
+          user.isReviewer
+              ? 'Biên soạn chủ đề và định luật, trả lời khiếu nại chi tiết trên bản web.'
+              : user.isManager || user.isAdmin
+              ? 'Gói dịch vụ, chương trình học và kiểm định chi tiết dùng trên bản web.'
               : user.isSchool
-                  ? 'Quản lý tài khoản, lớp học, nhập dữ liệu và gia hạn gói trên bản web.'
+                  ? 'Thêm tài khoản, nhập dữ liệu và gia hạn gói trên bản web.'
                   : user.isTeacher
                       ? 'Tạo mô phỏng bằng AI, giao bài mới và báo cáo dùng trên bản web.'
-                      : 'Một số chức năng chỉ có trên bản web.',
+                      : 'PhysLive · Vật lý, nhìn thấy được.',
           textAlign: TextAlign.center,
           style: TextStyle(color: p.muted, fontSize: 12),
         ),
       ]),
     );
   }
+}
+
+class _IconBox extends StatelessWidget {
+  const _IconBox({required this.icon, required this.tint});
+  final IconData icon;
+  final Tint tint;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(color: tint.bg, borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: tint.fg, size: 20),
+      );
 }
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -209,10 +256,10 @@ class WebOnlyScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: EmptyState(
-          icon: Icons.desktop_windows_outlined,
+          art: Art.web,
           title: 'Tài khoản ${user.roleLabel.toLowerCase()} dùng trên bản web',
-          message: 'Ứng dụng di động dành cho học sinh và giáo viên. '
-              'Hãy mở PhysLive trên trình duyệt máy tính để quản lý.',
+          message: 'Công cụ của vai trò này cần màn hình lớn. '
+              'Hãy mở PhysLive trên trình duyệt máy tính.',
           action: OutlinedButton(onPressed: session.signOut, child: const Text('Đăng xuất')),
         ),
       ),
