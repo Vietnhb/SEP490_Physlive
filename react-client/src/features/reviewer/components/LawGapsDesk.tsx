@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import api from "../../../shared/api/client";
 import { apiKey, queryClient } from "../../../shared/api/queryClient";
+import { useSessionStore } from "../../../shared/auth/sessionStore";
 import { useResource } from "../../../shared/hooks/operationsData";
 import { useTopicName } from "../../../shared/hooks/useTopicName";
 import { CardLoadingSkeleton } from "../../../shared/ui/LoadingSkeleton";
-import { matches } from "../model/reviewerUtils";
+import { formatDate, matches, timeAgo } from "../model/reviewerUtils";
 import { LawGapsArt } from "./LawGapsArt";
+import ts from "./TopicsWorkspace.module.css";
 import s from "./LawGapsDesk.module.css";
 
 type Gap = {
@@ -25,36 +27,86 @@ type Gap = {
   note?: string;
   decidedByName?: string | null;
   decidedAt?: string | null;
+  assignedToId?: number | null;
+  assignedToName?: string | null;
+  assignedAt?: string | null;
   sourceComplaintId?: string | null;
   updatedAt: string;
 };
+type GapAudit = {
+  id: string;
+  lawGapId: string;
+  kind: Gap["kind"];
+  schemaId?: string | null;
+  topic?: string | null;
+  label?: string | null;
+  role?: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  action: string;
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  note?: string | null;
+  createdAt: string;
+};
 type Filter = "OPEN" | "RESOLVED" | "DISMISSED";
+type ClaimFilter = "ALL" | "MINE" | "UNASSIGNED";
 type KindFilter = "ALL" | Gap["kind"];
+type HistoryActionFilter = "ALL" | "CLAIM" | "RESOLVE" | "DISMISS" | "REOPEN";
 type GapCounts = Partial<Record<Filter, number>>;
+
+const GAP_STATUS_LABEL: Record<string, string> = {
+  OPEN: "Cần xử lý",
+  RESOLVED: "Đã bổ sung",
+  DISMISSED: "Không cần bổ sung",
+};
+
+const GAP_AUDIT_META: Record<string, { label: string; actorRole: string; pill: "draft" | "approved" | "retired" }> = {
+  CLAIM: { label: "Nhận xử lý", actorRole: "Người nhận xử lý", pill: "draft" },
+  RELEASE: { label: "Bỏ nhận xử lý", actorRole: "Người thực hiện", pill: "retired" },
+  RESOLVE: { label: "Đã bổ sung định luật", actorRole: "Người sửa & hoàn tất", pill: "approved" },
+  DISMISS: { label: "Không cần bổ sung", actorRole: "Người đánh giá", pill: "retired" },
+  REOPEN: { label: "Mở lại rà soát", actorRole: "Người mở lại", pill: "draft" },
+  AUTO_REOPEN: { label: "Tự động mở lại", actorRole: "Hệ thống", pill: "draft" },
+};
+
+const formatDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "short" });
+};
+
+function matchesGapHistoryFilter(action: string, filter: HistoryActionFilter) {
+  if (filter === "ALL") return true;
+  if (filter === "CLAIM") return action === "CLAIM" || action === "RELEASE";
+  if (filter === "RESOLVE") return action === "RESOLVE";
+  if (filter === "DISMISS") return action === "DISMISS";
+  return action === "REOPEN" || action === "AUTO_REOPEN";
+}
 
 const KIND: Record<Gap["kind"], { short: string; title: string; todo: string }> = {
   UNCHECKED: {
-    short: "Vai trò chưa có định luật",
-    title: "Vai trò chưa có định luật kiểm",
-    todo: "Thêm một định luật dùng vai trò này vào chủ đề liên quan.",
+    short: "Đại lượng chưa có định luật kiểm chứng",
+    title: "Đại lượng chưa có định luật kiểm chứng",
+    todo: "Thêm định luật kiểm chứng cho đại lượng này vào chủ đề liên quan.",
   },
   NO_ROLE: {
-    short: "Đại lượng chưa có vai trò",
-    title: "Đại lượng chưa có vai trò phù hợp",
-    todo: "Thêm vai trò mới cho loại đại lượng này, rồi thêm định luật dùng vai trò đó.",
+    short: "Đại lượng chưa có trong danh mục",
+    title: "Đại lượng chưa có trong danh mục chuẩn",
+    todo: "Bổ sung đại lượng này vào danh mục của chủ đề, rồi thêm định luật kiểm chứng tương ứng.",
   },
   AMBIGUOUS: {
-    short: "Không xác định được đại lượng",
-    title: "Định luật không xác định được đại lượng",
-    todo: "Bổ sung điều kiện áp dụng và phạm vi cho định luật để nó chọn đúng một đại lượng.",
+    short: "Chưa phân biệt được đại lượng áp dụng",
+    title: "Công thức chưa phân biệt được đại lượng áp dụng",
+    todo: "Bổ sung điều kiện áp dụng và phạm vi cho định luật để hệ thống chọn đúng một đại lượng.",
   },
   VIOLATION: {
-    short: "Định luật bác bỏ kết quả",
-    title: "Định luật bác bỏ kết quả mô phỏng",
-    todo: "Xem mô hình AI viết sai hay định luật đang quá hẹp, rồi sửa định luật nếu cần.",
+    short: "Kết quả không thỏa mãn định luật",
+    title: "Kết quả mô phỏng không thỏa mãn định luật",
+    todo: "Kiểm tra xem mô hình AI tính sai hay định luật đang viết quá chặt, rồi điều chỉnh nếu cần.",
   },
   COMPLAINT: {
-    short: "Từ khiếu nại",
+    short: "Chuyển từ khiếu nại mô phỏng",
     title: "Chuyển từ khiếu nại mô phỏng của giáo viên",
     todo: "Kiểm tra lại định luật và dữ liệu chuẩn của chủ đề liên quan; nếu mô phỏng đúng thì đánh dấu Không cần bổ sung.",
   },
@@ -71,43 +123,46 @@ function topicLinkOf(gap: Gap) {
   return "/reviewer/topics";
 }
 
-function isoWeekNumber(ms: number): number {
-  const d = new Date(ms);
-  const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = utc.getUTCDay() || 7;
-  utc.setUTCDate(utc.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-  return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
-}
-
 /** What teachers' simulations computed that no law could check, most frequent first. */
 export function LawGapsDesk() {
+  const me = useSessionStore(state => state.user);
   const topicName = useTopicName();
-  const [nowMs] = useState(() => Date.now());
+  const [viewMode, setViewMode] = useState<"list" | "history">("list");
   const [filter, setFilter] = useState<Filter>("OPEN");
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>("ALL");
   const [kindFilter, setKindFilter] = useState<KindFilter>("ALL");
   const [topicFilter, setTopicFilter] = useState("ALL");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [historyFilter, setHistoryFilter] = useState<HistoryActionFilter>("ALL");
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(15);
   const [actionError, setError] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
+  const [highlightedGapId, setHighlightedGapId] = useState("");
 
   const countsResource = useResource<GapCounts>("/reviewer/law-gaps/counts");
   const resource = useResource<Gap[]>("/reviewer/law-gaps?status=" + filter);
   const openResource = useResource<Gap[]>("/reviewer/law-gaps?status=OPEN");
-  const resolvedResource = useResource<Gap[]>("/reviewer/law-gaps?status=RESOLVED");
+  const historyResource = useResource<GapAudit[]>("/reviewer/law-gaps/history", viewMode === "history");
 
   const items = useMemo(() => resource.data ?? [], [resource.data]);
   const openItems = useMemo(() => openResource.data ?? [], [openResource.data]);
-  const resolvedItems = useMemo(() => resolvedResource.data ?? [], [resolvedResource.data]);
+  const historyItems = useMemo(() => historyResource.data ?? [], [historyResource.data]);
   const loading = resource.loading;
   const error = actionError || resource.error || "";
 
   const load = () => {
     setError("");
-    return Promise.all([countsResource.refresh(), resource.refresh(), openResource.refresh(), resolvedResource.refresh()]);
+    return Promise.all([
+      countsResource.refresh(),
+      resource.refresh(),
+      openResource.refresh(),
+      ...(viewMode === "history" ? [historyResource.refresh()] : []),
+    ]);
   };
 
   const topics = useMemo(() => {
@@ -118,48 +173,111 @@ export function LawGapsDesk() {
 
   const activeTopic = topicFilter !== "ALL" && topics.includes(topicFilter) ? topicFilter : "ALL";
 
-  const rows = useMemo(() => items.filter(gap =>
-    (kindFilter === "ALL" || gap.kind === kindFilter)
+  const isClaimedByMe = (gap: Gap) => Boolean(gap.assignedToId && me?.id && Number(gap.assignedToId) === Number(me.id));
+  const isClaimedByOther = (gap: Gap) => Boolean(gap.assignedToId && !isClaimedByMe(gap));
+
+  const visibleStatusItems = useMemo(
+    () => (filter === "OPEN" ? items.filter(gap => !isClaimedByOther(gap)) : items),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, filter, me?.id],
+  );
+
+  const myClaimedCount = useMemo(
+    () => (filter === "OPEN" ? visibleStatusItems.filter(isClaimedByMe).length : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleStatusItems, filter, me?.id],
+  );
+  const unassignedCount = useMemo(
+    () => (filter === "OPEN" ? visibleStatusItems.filter(gap => !gap.assignedToId).length : 0),
+    [visibleStatusItems, filter],
+  );
+
+  const rows = useMemo(() => visibleStatusItems.filter(gap =>
+    (filter !== "OPEN" || claimFilter === "ALL" || (claimFilter === "MINE" ? isClaimedByMe(gap) : !gap.assignedToId))
+    && (kindFilter === "ALL" || gap.kind === kindFilter)
     && (activeTopic === "ALL" || gap.topic === activeTopic)
     && matches(query, gap.role, gap.label, gap.unit, gap.topic, gap.topic ? topicName(gap.topic) : "", gap.schemaId, gap.exampleDescription, gap.exampleFormula, KIND[gap.kind].title)
-  ), [items, kindFilter, activeTopic, query, topicName]);
+  ), // eslint-disable-next-line react-hooks/exhaustive-deps
+  [visibleStatusItems, filter, claimFilter, kindFilter, activeTopic, query, topicName, me?.id]);
 
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
   const currentPage = Math.min(page, totalPages);
   const visibleRows = pageSize > 0 ? rows.slice((currentPage - 1) * pageSize, currentPage * pageSize) : rows;
 
-  // Insight 1: Open gaps grouped by kind (sum of occurrences)
+  const jumpToGap = (entry: GapAudit) => {
+    const targetStatus: Filter = entry.toStatus === "RESOLVED"
+      ? "RESOLVED"
+      : entry.toStatus === "DISMISSED"
+        ? "DISMISSED"
+        : "OPEN";
+    setFilter(targetStatus);
+    setKindFilter("ALL");
+    setTopicFilter("ALL");
+    setQuery("");
+    setPage(1);
+    setHighlightedGapId(entry.lawGapId);
+    setViewMode("list");
+  };
+
+  useEffect(() => {
+    if (viewMode !== "list" || !highlightedGapId || rows.length === 0) return;
+    const idx = rows.findIndex(g => g.id === highlightedGapId);
+    if (idx < 0) return;
+    const targetPage = pageSize > 0 ? Math.floor(idx / pageSize) + 1 : 1;
+    if (targetPage !== page) {
+      setPage(targetPage);
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById(`gap-card-${highlightedGapId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => setHighlightedGapId(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [viewMode, highlightedGapId, rows, page, pageSize]);
+
+  // Insight 1: Open gaps grouped by kind (sum of occurrences & item count)
   const byKind = useMemo(() => {
     const kinds = (Object.keys(KIND) as Gap["kind"][]).map(kind => {
-      const occ = openItems.filter(g => g.kind === kind).reduce((sum, g) => sum + g.occurrences, 0);
-      return { kind, label: KIND[kind].short, occ };
-    }).filter(k => k.occ > 0).sort((a, b) => b.occ - a.occ);
+      const matched = openItems.filter(g => g.kind === kind);
+      const occ = matched.reduce((sum, g) => sum + g.occurrences, 0);
+      return { kind, label: KIND[kind].short, count: matched.length, occ };
+    }).filter(k => k.count > 0).sort((a, b) => b.occ - a.occ);
     const max = Math.max(1, ...kinds.map(k => k.occ));
     return kinds.map(k => ({ ...k, pct: Math.round((k.occ / max) * 100) }));
   }, [openItems]);
 
-  // Insight 2: Resolved gaps in the last 5 ISO weeks
-  const weeklyResolved = useMemo(() => {
-    const weekMs = 7 * 86_400_000;
-    const buckets = Array.from({ length: 5 }, (_, idx) => {
-      const targetMs = nowMs - (4 - idx) * weekMs;
-      const wk = isoWeekNumber(targetMs);
-      return { week: wk, label: `T${wk}`, count: 0, isCurrent: idx === 4 };
+  // Insight 2: Open gaps grouped by physics topic (actionable triage: click to filter)
+  const byTopic = useMemo(() => {
+    const map = new Map<string, { topic: string; label: string; count: number; occ: number }>();
+    openItems.forEach(gap => {
+      const key = gap.topic || "__UNASSIGNED__";
+      const label = gap.topic ? topicName(gap.topic) : "Chưa gắn chủ đề";
+      const entry = map.get(key) ?? { topic: key, label, count: 0, occ: 0 };
+      entry.count += 1;
+      entry.occ += gap.occurrences;
+      map.set(key, entry);
     });
-    const byWeek = new Map(buckets.map(b => [b.week, b]));
-    resolvedItems.forEach(item => {
-      const ts = Date.parse(item.decidedAt || item.updatedAt);
-      if (!Number.isFinite(ts)) return;
-      const wk = isoWeekNumber(ts);
-      const bucket = byWeek.get(wk);
-      if (bucket) bucket.count += 1;
-    });
-    const max = Math.max(1, ...buckets.map(b => b.count));
-    return buckets.map(b => ({
-      ...b,
-      heightPx: b.count > 0 ? Math.max(14, Math.round((b.count / max) * 86)) : 6,
-    }));
-  }, [resolvedItems, nowMs]);
+    const list = [...map.values()].sort((a, b) => b.count - a.count || b.occ - a.occ);
+    const max = Math.max(1, ...list.map(t => t.occ));
+    return list.map(t => ({ ...t, pct: Math.round((t.occ / max) * 100) }));
+  }, [openItems, topicName]);
+
+  const claim = async (gap: Gap, release: boolean, force = false) => {
+    setBusy(gap.id);
+    setError("");
+    try {
+      const response = await api.post<Gap>(`/reviewer/law-gaps/${gap.id}/claim`, null, { params: { release, force } });
+      const updated = response.data;
+      resource.setData(current => current.map(item => item.id === updated.id ? updated : item));
+      openResource.setData(current => current.map(item => item.id === updated.id ? updated : item));
+      void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps/history") });
+    } catch (cause) {
+      const message = axios.isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
+      setError(message || "Chưa cập nhật được trạng thái nhận xử lý.");
+    } finally {
+      setBusy("");
+    }
+  };
 
   const decide = async (gap: Gap, status: Filter) => {
     setBusy(gap.id);
@@ -175,7 +293,7 @@ export function LawGapsDesk() {
       void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps/counts") });
       void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps?status=" + status) });
       void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps?status=OPEN") });
-      void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps?status=RESOLVED") });
+      void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/law-gaps/history") });
     } catch (cause) {
       const message = axios.isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
       setError(message || "Chưa lưu được. Vui lòng thử lại.");
@@ -184,9 +302,30 @@ export function LawGapsDesk() {
     }
   };
 
+  const filteredHistory = useMemo(() => historyItems.filter(entry =>
+    matchesGapHistoryFilter(entry.action, historyFilter)
+    && matches(
+      historyQuery,
+      entry.label,
+      entry.role,
+      entry.schemaId,
+      entry.topic ? topicName(entry.topic) : "",
+      entry.actorName,
+      entry.actorEmail,
+      entry.note,
+      KIND[entry.kind]?.short,
+      GAP_AUDIT_META[entry.action]?.label,
+    ),
+  ), [historyItems, historyFilter, historyQuery, topicName]);
+  const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / historyPageSize));
+  const historyCurrentPage = Math.min(historyPage, historyTotalPages);
+  const visibleHistory = filteredHistory.slice((historyCurrentPage - 1) * historyPageSize, historyCurrentPage * historyPageSize);
+  const countHistory = (f: HistoryActionFilter) => historyItems.filter(e => matchesGapHistoryFilter(e.action, f)).length;
+
   const countOf = (status: Filter) => countsResource.data?.[status];
-  const hasFilters = Boolean(query.trim()) || kindFilter !== "ALL" || activeTopic !== "ALL";
-  const refreshing = countsResource.refreshing || resource.refreshing;
+  const hasFilters = Boolean(query.trim()) || kindFilter !== "ALL" || activeTopic !== "ALL" || (filter === "OPEN" && claimFilter !== "ALL");
+  const clearFilters = () => { setQuery(""); setKindFilter("ALL"); setTopicFilter("ALL"); setClaimFilter("ALL"); setPage(1); };
+  const refreshing = countsResource.refreshing || resource.refreshing || historyResource.refreshing;
 
   return (
     <div className={s.page}>
@@ -195,10 +334,28 @@ export function LawGapsDesk() {
         <div className={s.headingCopy}>
           <h1 className={s.title}>Định luật cần rà soát</h1>
           <p className={s.sub}>
-            Các trường hợp định luật chưa kiểm được mô phỏng, gộp theo loại. Đánh dấu khi đã xử lý; gặp lại thì mục sẽ mở lại.
+            Các trường hợp định luật chưa kiểm được mô phỏng, gộp theo loại. Mục “Đã bổ sung” sẽ tự mở lại nếu lỗi tái diễn; mục “Không cần bổ sung” sẽ không tự mở lại.
           </p>
         </div>
         <div className={s.headingRight}>
+          <div className={ts.seg} role="group" aria-label="Chế độ xem rà soát định luật">
+            <button
+              type="button"
+              className={ts.segItem}
+              aria-pressed={viewMode === "list"}
+              onClick={() => setViewMode("list")}
+            >
+              Danh sách rà soát
+            </button>
+            <button
+              type="button"
+              className={ts.segItem}
+              aria-pressed={viewMode === "history"}
+              onClick={() => setViewMode("history")}
+            >
+              Lịch sử xử lý
+            </button>
+          </div>
           <button type="button" className={s.surfaceBtn} onClick={() => void load()} disabled={refreshing}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? s.spin : undefined} aria-hidden="true">
               <path d="M21 12a9 9 0 1 1-2.64-6.36" /><polyline points="21 3 21 9 15 9" />
@@ -209,7 +366,170 @@ export function LawGapsDesk() {
         </div>
       </header>
 
-      <div className={s.split}>
+      {viewMode === "history" ? (
+        <section className={ts.card} aria-label="Lịch sử nhận và xử lý định luật">
+          <div className={ts.toolbar}>
+            <div className={ts.seg} role="group" aria-label="Lọc theo hành động">
+              <button type="button" className={ts.segItem} aria-pressed={historyFilter === "ALL"} onClick={() => { setHistoryFilter("ALL"); setHistoryPage(1); }}>
+                Tất cả ({historyItems.length})
+              </button>
+              <button type="button" className={ts.segItem} aria-pressed={historyFilter === "CLAIM"} onClick={() => { setHistoryFilter("CLAIM"); setHistoryPage(1); }}>
+                Nhận xử lý ({countHistory("CLAIM")})
+              </button>
+              <button type="button" className={ts.segItem} aria-pressed={historyFilter === "RESOLVE"} onClick={() => { setHistoryFilter("RESOLVE"); setHistoryPage(1); }}>
+                Đã bổ sung ({countHistory("RESOLVE")})
+              </button>
+              <button type="button" className={ts.segItem} aria-pressed={historyFilter === "DISMISS"} onClick={() => { setHistoryFilter("DISMISS"); setHistoryPage(1); }}>
+                Không cần bổ sung ({countHistory("DISMISS")})
+              </button>
+              <button type="button" className={ts.segItem} aria-pressed={historyFilter === "REOPEN"} onClick={() => { setHistoryFilter("REOPEN"); setHistoryPage(1); }}>
+                Mở lại ({countHistory("REOPEN")})
+              </button>
+            </div>
+            <div className={ts.searchWrap}>
+              <svg className={ts.searchIcon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="search"
+                className={ts.searchInput}
+                aria-label="Tìm trong lịch sử xử lý định luật"
+                placeholder="Tìm chủ đề, đại lượng, người nhận / người sửa…"
+                value={historyQuery}
+                onChange={event => { setHistoryQuery(event.target.value); setHistoryPage(1); }}
+              />
+            </div>
+          </div>
+
+          {historyResource.error && <div className={s.errorBanner} style={{ margin: 16 }} role="alert">{historyResource.error}</div>}
+          {historyResource.loading && historyItems.length === 0 ? (
+            <div style={{ padding: 16 }}><CardLoadingSkeleton cards={3} label="Đang tải lịch sử xử lý…" /></div>
+          ) : (
+            <>
+              <div className={ts.scroll}>
+                <table className={ts.table}>
+                  <thead>
+                    <tr>
+                      <th>Thời gian</th>
+                      <th>Mục định luật &amp; Chủ đề</th>
+                      <th>Hành động</th>
+                      <th>Người thực hiện</th>
+                      <th>Trạng thái / Ghi chú</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleHistory.map(entry => {
+                      const meta = GAP_AUDIT_META[entry.action] ?? { label: entry.action, actorRole: "Người thực hiện", pill: "retired" as const };
+                      const pillClass = meta.pill === "approved" ? ts.stApproved : meta.pill === "draft" ? ts.stDraft : ts.stRetired;
+                      const actor = entry.actorName || entry.actorEmail || "Hệ thống";
+                      const isClaimByOther = entry.action === "CLAIM"
+                        && entry.toStatus === "OPEN"
+                        && Boolean(entry.actorEmail && me?.email && entry.actorEmail.toLowerCase() !== me.email.toLowerCase());
+                      const targetStatusLabel = entry.toStatus === "RESOLVED"
+                        ? "Đã bổ sung"
+                        : entry.toStatus === "DISMISSED"
+                          ? "Không cần bổ sung"
+                          : "Cần xử lý";
+                      return (
+                        <tr key={entry.id}>
+                          <td style={{ whiteSpace: "nowrap" }}>
+                            <span className={ts.verMono} title={formatDateTime(entry.createdAt)}>
+                              {formatDateTime(entry.createdAt)}
+                            </span>
+                            <span className={ts.dateSmall}>{timeAgo(entry.createdAt) || formatDate(entry.createdAt)}</span>
+                          </td>
+                          <td>
+                            {isClaimByOther ? (
+                              <div style={{ fontWeight: 600, fontSize: 13.5 }}>
+                                {KIND[entry.kind]?.short ?? entry.kind}
+                                {(entry.role || entry.label) && <span className={s.roleCode}>{entry.role || entry.label}</span>}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className={ts.topicLink}
+                                onClick={() => jumpToGap(entry)}
+                                title={`Nhấn để tới mục này trong tab ${targetStatusLabel}`}
+                              >
+                                {KIND[entry.kind]?.short ?? entry.kind}
+                                {(entry.role || entry.label) && <span className={s.roleCode}>{entry.role || entry.label}</span>}
+                              </button>
+                            )}
+                            <span className={ts.codeMono}>{entry.topic ? topicName(entry.topic) : entry.schemaId || "Chưa gắn chủ đề"}</span>
+                          </td>
+                          <td>
+                            <span className={`${ts.statusPill} ${pillClass}`}>{meta.label}</span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{actor}</div>
+                            <span className={ts.dateSmall}>
+                              {entry.actorEmail || "Tự động bởi hệ thống"}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: 12.5, color: "var(--gray-11)" }}>
+                              {entry.fromStatus ? `${GAP_STATUS_LABEL[entry.fromStatus] ?? entry.fromStatus} → ` : ""}
+                              {entry.toStatus ? (GAP_STATUS_LABEL[entry.toStatus] ?? entry.toStatus) : "—"}
+                            </div>
+                            {entry.note && <span className={ts.dateSmall}>{entry.note}</span>}
+                          </td>
+                          <td className={ts.actionsCell}>
+                            {isClaimByOther ? (
+                              <span className={s.tagOther}>Đang do {actor} xử lý</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className={ts.surfaceBtn}
+                                onClick={() => jumpToGap(entry)}
+                              >
+                                Xem ở {targetStatusLabel} →
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {!historyResource.error && filteredHistory.length === 0 && (
+                  <p className={ts.empty}>
+                    {historyQuery || historyFilter !== "ALL"
+                      ? "Không có mục lịch sử nào khớp bộ lọc."
+                      : "Chưa có lịch sử nhận hoặc xử lý định luật nào được ghi nhận."}
+                  </p>
+                )}
+              </div>
+
+              {filteredHistory.length > 0 && (
+                <footer className={ts.pager}>
+                  <span>
+                    Hiển thị {(historyCurrentPage - 1) * historyPageSize + 1}–{Math.min(historyCurrentPage * historyPageSize, filteredHistory.length)} / {filteredHistory.length} thao tác
+                  </span>
+                  <div className={ts.pagerActions}>
+                    <select
+                      className={ts.selectSm}
+                      aria-label="Số dòng mỗi trang"
+                      value={String(historyPageSize)}
+                      onChange={event => { setHistoryPageSize(Number(event.target.value)); setHistoryPage(1); }}
+                    >
+                      {[10, 15, 30, 50].map(val => <option key={val} value={val}>Số dòng mỗi trang {val}</option>)}
+                    </select>
+                    <button type="button" className={ts.surfaceBtn} disabled={historyCurrentPage <= 1} onClick={() => setHistoryPage(p => Math.max(1, p - 1))}>
+                      ← Trước
+                    </button>
+                    <span>Trang {historyCurrentPage}/{historyTotalPages}</span>
+                    <button type="button" className={ts.surfaceBtn} disabled={historyCurrentPage >= historyTotalPages} onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}>
+                      Sau →
+                    </button>
+                  </div>
+                </footer>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <div className={s.split}>
         {/* Left Main Column */}
         <div className={s.mainCol}>
           <div className={s.tabs} role="tablist" aria-label="Trạng thái rà soát">
@@ -245,45 +565,85 @@ export function LawGapsDesk() {
             </button>
           </div>
 
-          <div className={s.filterRow}>
-            <div className={s.searchWrap}>
-              <svg className={s.searchIcon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                type="search"
-                className={s.searchInput}
-                aria-label="Tìm mục cần rà soát"
-                placeholder="Tìm vai trò, đại lượng, công thức, mô tả…"
-                value={query}
-                onChange={event => { setQuery(event.target.value); setPage(1); }}
-              />
-            </div>
+          <div className={s.filterCard}>
+            <div className={s.filterRow}>
+              <div className={s.searchWrap}>
+                <svg className={s.searchIcon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  type="search"
+                  className={s.searchInput}
+                  aria-label="Tìm mục cần rà soát"
+                  placeholder="Tìm đại lượng, công thức, mô tả…"
+                  value={query}
+                  onChange={event => { setQuery(event.target.value); setPage(1); }}
+                />
+              </div>
 
-            <select
-              className={s.filterSelect}
-              aria-label="Lọc theo loại"
-              value={kindFilter}
-              onChange={event => { setKindFilter(event.target.value as KindFilter); setPage(1); }}
-            >
-              <option value="ALL">Tất cả loại</option>
-              {(Object.keys(KIND) as Gap["kind"][]).map(kind => (
-                <option key={kind} value={kind}>{KIND[kind].short}</option>
-              ))}
-            </select>
-
-            {topics.length > 0 && (
               <select
                 className={s.filterSelect}
-                aria-label="Lọc theo chủ đề"
-                value={activeTopic}
-                onChange={event => { setTopicFilter(event.target.value); setPage(1); }}
+                aria-label="Lọc theo loại"
+                value={kindFilter}
+                onChange={event => { setKindFilter(event.target.value as KindFilter); setPage(1); }}
               >
-                <option value="ALL">Tất cả chủ đề</option>
-                {topics.map(topic => (
-                  <option key={topic} value={topic}>{topicName(topic)}</option>
+                <option value="ALL">Tất cả loại</option>
+                {(Object.keys(KIND) as Gap["kind"][]).map(kind => (
+                  <option key={kind} value={kind}>{KIND[kind].short}</option>
                 ))}
               </select>
+
+              {topics.length > 0 && (
+                <select
+                  className={s.filterSelect}
+                  aria-label="Lọc theo chủ đề"
+                  value={activeTopic}
+                  onChange={event => { setTopicFilter(event.target.value); setPage(1); }}
+                >
+                  <option value="ALL">Tất cả chủ đề</option>
+                  {topics.map(topic => (
+                    <option key={topic} value={topic}>{topicName(topic)}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {(filter === "OPEN" || hasFilters) && (
+              <div className={s.filterSubRow}>
+                {filter === "OPEN" && (
+                  <div className={ts.seg} role="group" aria-label="Lọc theo người nhận xử lý">
+                    <button
+                      type="button"
+                      className={ts.segItem}
+                      aria-pressed={claimFilter === "ALL"}
+                      onClick={() => { setClaimFilter("ALL"); setPage(1); }}
+                    >
+                      Tất cả ({visibleStatusItems.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={ts.segItem}
+                      aria-pressed={claimFilter === "MINE"}
+                      onClick={() => { setClaimFilter("MINE"); setPage(1); }}
+                    >
+                      Tôi đã nhận ({myClaimedCount})
+                    </button>
+                    <button
+                      type="button"
+                      className={ts.segItem}
+                      aria-pressed={claimFilter === "UNASSIGNED"}
+                      onClick={() => { setClaimFilter("UNASSIGNED"); setPage(1); }}
+                    >
+                      Chưa ai nhận ({unassignedCount})
+                    </button>
+                  </div>
+                )}
+                {hasFilters && (
+                  <button type="button" className={s.ghostBtn} style={{ marginLeft: "auto" }} onClick={clearFilters}>
+                    Xoá bộ lọc
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -305,9 +665,14 @@ export function LawGapsDesk() {
               ? [gap.role, gap.unit ? `(${gap.unit})` : ""].filter(Boolean).join(" ")
               : [gap.label, gap.unit ? `(${gap.unit})` : ""].filter(Boolean).join(" ");
             const lead = gap.kind === "COMPLAINT" ? "Nội dung khiếu nại:" : "Mô tả của giáo viên (ví dụ gần nhất):";
+            const claimedByMe = isClaimedByMe(gap);
 
             return (
-              <article key={gap.id} className={s.card}>
+              <article
+                key={gap.id}
+                id={`gap-card-${gap.id}`}
+                className={`${s.card}${highlightedGapId === gap.id ? ` ${s.cardHighlight}` : ""}`}
+              >
                 <div className={s.cardHead}>
                   <div style={{ minWidth: 0 }}>
                     <h2 className={s.cardTitle}>
@@ -317,11 +682,18 @@ export function LawGapsDesk() {
                     <p className={s.cardSub}>
                       {gap.topic ? topicName(gap.topic) : "Chưa gắn chủ đề"} · cập nhật {lastSeen(gap.updatedAt)}
                     </p>
-                    {gap.sourceComplaintId && (
-                      <div className={s.chips}>
-                        <span className={s.tagLaw}>Từ khiếu nại {complaintCode(gap.sourceComplaintId)}</span>
-                      </div>
-                    )}
+                    <div className={s.chips}>
+                      {gap.status === "OPEN" && (
+                        claimedByMe ? (
+                          <span className={s.tagMe}>Bạn đang nhận xử lý</span>
+                        ) : (
+                          <span className={s.tagNone}>Chưa ai nhận xử lý</span>
+                        )
+                      )}
+                      {gap.sourceComplaintId && (
+                        <span className={s.tagLaw}>Chuyển từ khiếu nại {complaintCode(gap.sourceComplaintId)}</span>
+                      )}
+                    </div>
                   </div>
                   <span className={s.occBadge}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -368,18 +740,23 @@ export function LawGapsDesk() {
                   </p>
 
                   {gap.status === "OPEN" ? (
-                    <label className={s.field}>
-                      <span className={s.fieldLabel}>
-                        Ghi chú xử lý <span className={s.fieldHint}>(không bắt buộc)</span>
-                      </span>
-                      <input
-                        type="text"
-                        className={s.noteInput}
-                        placeholder="Đã thêm định luật … vào chủ đề …"
-                        value={notes[gap.id] ?? ""}
-                        onChange={event => setNotes(current => ({ ...current, [gap.id]: event.target.value }))}
-                      />
-                    </label>
+                    <>
+                      {gap.note && (
+                        <p className={s.reopenNote}><b>Lịch sử trước đó:</b> {gap.note}</p>
+                      )}
+                      <label className={s.field}>
+                        <span className={s.fieldLabel}>
+                          Ghi chú xử lý <span className={s.fieldHint}>(không bắt buộc)</span>
+                        </span>
+                        <input
+                          type="text"
+                          className={s.noteInput}
+                          placeholder="Đã thêm định luật … vào chủ đề …"
+                          value={notes[gap.id] ?? ""}
+                          onChange={event => setNotes(current => ({ ...current, [gap.id]: event.target.value }))}
+                        />
+                      </label>
+                    </>
                   ) : (
                     <>
                       {(gap.decidedByName || gap.decidedAt) && (
@@ -398,6 +775,16 @@ export function LawGapsDesk() {
                 <div className={s.cardFoot}>
                   {gap.status === "OPEN" ? (
                     <>
+                      <div style={{ marginRight: "auto", display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className={s.surfaceBtn}
+                          disabled={busy === gap.id}
+                          onClick={() => void claim(gap, claimedByMe)}
+                        >
+                          {claimedByMe ? "Bỏ nhận" : "Nhận xử lý"}
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className={s.ghostBtn}
@@ -467,20 +854,33 @@ export function LawGapsDesk() {
             <div className={s.cardBody}>
               {byKind.length > 0 ? (
                 <div className={s.hbars}>
-                  {byKind.map((row, idx) => (
-                    <div key={row.kind} className={s.hrow}>
-                      <div className={s.hrowTop}>
-                        <span>{row.label}</span>
-                        <b>{number(row.occ)} lần</b>
-                      </div>
-                      <div className={s.barTrack}>
-                        <i
-                          className={`${s.barFill} ${idx === 0 ? s.barFillFirst : ""}`}
-                          style={{ width: `${Math.max(6, row.pct)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                  {byKind.map((row, idx) => {
+                    const active = filter === "OPEN" && kindFilter === row.kind;
+                    return (
+                      <button
+                        key={row.kind}
+                        type="button"
+                        className={`${s.hrowBtn}${active ? ` ${s.hrowBtnActive}` : ""}`}
+                        onClick={() => {
+                          setFilter("OPEN");
+                          setKindFilter(prev => prev === row.kind ? "ALL" : row.kind);
+                          setPage(1);
+                        }}
+                        title="Nhấn để lọc danh sách theo loại lỗi này"
+                      >
+                        <div className={s.hrowTop}>
+                          <span>{row.label}</span>
+                          <b>{number(row.count)} mục · {number(row.occ)} lần</b>
+                        </div>
+                        <div className={s.barTrack}>
+                          <i
+                            className={`${s.barFill} ${idx === 0 ? s.barFillFirst : ""}`}
+                            style={{ width: `${Math.max(6, row.pct)}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className={s.decidedMeta}>Hiện chưa có mục cần xử lý.</p>
@@ -490,26 +890,51 @@ export function LawGapsDesk() {
 
           <section className={s.card}>
             <div className={s.cardHead}>
-              <h2 className={s.cardTitle}>Đã bổ sung mỗi tuần</h2>
-              <span className={s.cardMuted}>5 tuần gần nhất</span>
+              <h2 className={s.cardTitle}>Theo chủ đề</h2>
+              <span className={s.cardMuted}>Cần xử lý</span>
             </div>
             <div className={s.cardBody}>
-              <div className={s.vbars} role="img" aria-label="Số định luật đã bổ sung mỗi tuần">
-                {weeklyResolved.map(bar => (
-                  <div key={bar.label} className={s.vbarCol} title={`${bar.label}: ${bar.count}`}>
-                    <span className={s.vbarVal}>{bar.count}</span>
-                    <span
-                      className={`${s.vbarFill} ${bar.isCurrent ? s.vbarFillHl : ""}`}
-                      style={{ height: `${bar.heightPx}px` }}
-                    />
-                    <span className={s.vbarLabel}>{bar.label}</span>
-                  </div>
-                ))}
-              </div>
+              {byTopic.length > 0 ? (
+                <div className={s.hbars}>
+                  {byTopic.map((row, idx) => {
+                    const selectable = row.topic !== "__UNASSIGNED__";
+                    const active = selectable && filter === "OPEN" && activeTopic === row.topic;
+                    return (
+                      <button
+                        key={row.topic}
+                        type="button"
+                        disabled={!selectable}
+                        className={`${s.hrowBtn}${active ? ` ${s.hrowBtnActive}` : ""}`}
+                        onClick={() => {
+                          if (!selectable) return;
+                          setFilter("OPEN");
+                          setTopicFilter(prev => prev === row.topic ? "ALL" : row.topic);
+                          setPage(1);
+                        }}
+                        title={selectable ? "Nhấn để lọc các mục thuộc chủ đề này" : undefined}
+                      >
+                        <div className={s.hrowTop}>
+                          <span>{row.label}</span>
+                          <b>{number(row.count)} mục · {number(row.occ)} lần</b>
+                        </div>
+                        <div className={s.barTrack}>
+                          <i
+                            className={`${s.barFill} ${idx === 0 ? s.barFillFirst : ""}`}
+                            style={{ width: `${Math.max(6, row.pct)}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className={s.decidedMeta}>Hiện chưa có chủ đề nào tồn đọng mục cần xử lý.</p>
+              )}
             </div>
           </section>
         </aside>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,6 +32,17 @@ const formatDateShort = (value: string) =>
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "short" });
 const number = (value: number) => value.toLocaleString("vi-VN");
+const formatAvgDuration = (hours: number) => {
+  if (hours < 1) {
+    const minutes = Math.max(1, Math.round(hours * 60));
+    return `${minutes} phút`;
+  }
+  const rounded = Math.round(hours);
+  if (rounded < 24) return `${rounded} giờ`;
+  const days = Math.floor(rounded / 24);
+  const remHours = rounded % 24;
+  return remHours > 0 ? `${days} ngày ${remHours} giờ` : `${days} ngày`;
+};
 const contentOf = (value: string) => {
   const at = value.indexOf("\n— Đề bài —");
   return at < 0
@@ -209,7 +220,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       .map(item => (Date.parse(item.respondedAt!) - Date.parse(item.createdAt)) / 3_600_000)
       .filter(hours => Number.isFinite(hours) && hours >= 0);
     if (!durations.length) return null;
-    return Math.max(1, Math.round(durations.reduce((sum, h) => sum + h, 0) / durations.length));
+    return durations.reduce((sum, h) => sum + h, 0) / durations.length;
   }, [sampleItems]);
 
   const simBugCount = useMemo(() => {
@@ -263,7 +274,6 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       setConfirmTakeover(false);
       const message = release ? "Đã bỏ nhận xử lý khiếu nại." : force ? "Đã tiếp nhận lại khiếu nại này." : "Đã nhận xử lý khiếu nại này.";
       setDialogNotice(message);
-      setNotice(message);
     } catch (error) { setActionError(apiMessage(error, "Không cập nhật được trạng thái nhận xử lý.")); }
     finally { lock.current = false; setBusy(false); }
   };
@@ -285,7 +295,6 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       setEscalateNote("");
       const message = "Đã chuyển khiếu nại sang mục Định luật cần rà soát để bộ phận biên soạn xử lý.";
       setDialogNotice(message);
-      setNotice(message);
     } catch (error) { setActionError(apiMessage(error, "Chưa chuyển được sang rà soát định luật. Vui lòng thử lại.")); }
     finally { lock.current = false; setBusy(false); }
   };
@@ -305,8 +314,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       void resource.refresh();
       setDrafts(previous => ({ ...previous, [updated.id]: "" }));
       const message = nextStatus === "RESOLVED" ? "Đã giải quyết khiếu nại và gửi kết quả cho giáo viên." : "Đã gửi phản hồi. Khiếu nại tiếp tục được xem xét.";
-      setNotice(message);
-      if (nextStatus === "RESOLVED") { setDialogNotice(""); setSelectedId(""); }
+      if (nextStatus === "RESOLVED") { setNotice(message); setDialogNotice(""); setSelectedId(""); }
       else setDialogNotice(message);
     } catch (error) { setActionError(apiMessage(error, "Chưa lưu được phản hồi. Vui lòng thử lại.")); }
     finally { lock.current = false; setBusy(false); }
@@ -314,7 +322,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
 
   const claimedByMe = Boolean(selected?.assignedToId && me?.id && Number(selected.assignedToId) === Number(me.id));
   const claimedByOther = Boolean(selected?.assignedToId && !claimedByMe);
-  const canEscalate = Boolean(!canEdit && selected && selected.status !== "RESOLVED" && !selected.lawGapId);
+  const canEscalate = Boolean(selected && selected.status !== "RESOLVED" && !selected.lawGapId);
   const effectiveMode: ActionMode = canEscalate ? actionMode : "reply";
   const templates = useMemo(() => (canEdit ? COMPLAINT_TEMPLATES.filter(t => t.id !== "referred") : COMPLAINT_TEMPLATES), [canEdit]);
 
@@ -343,7 +351,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
               aria-pressed={filter === "todo"}
               onClick={() => { setFilter("todo"); setStatus("ALL"); setQuickFilter("ALL"); setPage(1); }}
             >
-              Cần xử lý{todoCount !== undefined ? ` · ${todoCount}` : ""}
+              Cần xử lý
             </button>
             <button
               type="button"
@@ -351,7 +359,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
               aria-pressed={filter === "done"}
               onClick={() => { setFilter("done"); setStatus("ALL"); setQuickFilter("ALL"); setPage(1); }}
             >
-              Đã giải quyết{doneCount !== undefined ? ` · ${doneCount}` : ""}
+              Đã giải quyết
             </button>
           </div>
           <ComplaintsArt />
@@ -359,7 +367,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       </header>
 
       {resource.error && !invalidDates && <p role="alert" className={styles.error}>{resource.error}</p>}
-      {notice && <p role="status" className={styles.success}>{notice}</p>}
+      {notice && !selected && <p role="status" className={styles.success}>{notice}</p>}
 
       {/* 4 Tinted KPI Cards */}
       <section className={styles.stats} aria-label="Chỉ số khiếu nại">
@@ -394,8 +402,10 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
             </svg>
           </span>
           <span className={styles.statLabel}>Xử lý trung bình</span>
-          <strong className={styles.statVal}>{avgHours !== null ? `${avgHours} giờ` : "—"}</strong>
-          <span className={styles.statHint}>{avgHours !== null ? "Từ lúc tiếp nhận đến phản hồi" : "Chưa có dữ liệu phản hồi"}</span>
+          <strong className={styles.statVal} title={avgHours !== null ? `Khoảng ${Math.round(avgHours)} giờ` : undefined}>
+            {avgHours !== null ? formatAvgDuration(avgHours) : "—"}
+          </strong>
+          <span className={styles.statHint}>{avgHours !== null ? "Từ lúc gửi đến khi phản hồi" : "Chưa có dữ liệu phản hồi"}</span>
           <svg className={styles.spark} viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="compSparkGrad" x1="0" y1="0" x2="0" y2="1">
@@ -424,7 +434,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
       <div className={styles.insights}>
         <section className={styles.card}>
           <div className={styles.cardHead}>
-            <h2 className={styles.cardTitle}>Tuổi khiếu nại chưa xong</h2>
+            <h2 className={styles.cardTitle}>Số lượng khiếu nại chưa được xử lý</h2>
             <span className={styles.cardMuted}>{number(todoCount ?? 0)} khiếu nại</span>
           </div>
           <div className={styles.cardBody}>
@@ -620,7 +630,7 @@ export function ComplaintsDesk({ canEdit = false }: Readonly<{ canEdit?: boolean
                           <span>{item.subject}</span>
                           <span className={styles.codeMono}>{code(item.id)}</span>
                         </span>
-                        {excerpt && <span className={styles.excerpt}>{excerpt}</span>}
+                        {excerpt && <span className={styles.excerpt} title={excerpt}>{excerpt}</span>}
                         {(hasSim || item.lawGapId) && (
                           <div className={styles.chips}>
                             {hasSim && <span className={`${styles.tagPill} ${styles.tagNone}`}>Có bản chụp mô phỏng</span>}

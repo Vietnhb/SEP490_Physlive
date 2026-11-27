@@ -156,7 +156,7 @@ export function VersionEditorModal({ initial, clone, sharedCatalogue, onClose, o
     {dryRunResult && <div ref={dryRunRef} className={dryRunResult.valid ? "reviewer-diff" : "reviewer-note reviewer-note-danger"} role="status">
       <Text as="div" size="2" weight="bold">
         {dryRunResult.valid ? "Kiểm thử bản nháp hợp lệ" : "Bản nháp có lỗi định nghĩa"}
-        {dryRunResult.openGapsTotal > 0 ? ` · Phủ ${dryRunResult.coveredCount}/${dryRunResult.openGapsTotal} lỗ hổng định luật đang mở` : ""}
+        {dryRunResult.openGapsTotal > 0 ? ` · Đã xử lý ${dryRunResult.coveredCount}/${dryRunResult.openGapsTotal} mục định luật đang mở` : ""}
       </Text>
       {dryRunResult.errors.length > 0 && <ul>{dryRunResult.errors.map(err => <li key={err}>{err}</li>)}</ul>}
       {dryRunResult.gaps.length > 0 && <div className="reviewer-chips" style={{ marginTop: 8 }}>

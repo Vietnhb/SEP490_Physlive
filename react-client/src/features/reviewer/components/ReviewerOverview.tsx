@@ -18,11 +18,11 @@ type OpenGap = { kind: "UNCHECKED" | "NO_ROLE" | "AMBIGUOUS" | "VIOLATION" | "CO
 type Task = { id: string; view: ReviewerView; icon: ReviewerIconName; count?: number; oldest?: string; title: string; detail: string; empty: string; action: string; tone: "primary" | "secondary" | "success" | "neutral"; loading: boolean; error?: string };
 
 const GAP_KIND_LABEL: Record<OpenGap["kind"], string> = {
-  UNCHECKED: "Chưa có định luật",
-  NO_ROLE: "Thiếu vai trò",
-  AMBIGUOUS: "Định luật mơ hồ",
-  VIOLATION: "Định luật bác bỏ",
-  COMPLAINT: "Từ khiếu nại",
+  UNCHECKED: "Đại lượng chưa có định luật kiểm chứng",
+  NO_ROLE: "Đại lượng chưa có trong danh mục",
+  AMBIGUOUS: "Chưa phân biệt được đại lượng áp dụng",
+  VIOLATION: "Kết quả không thỏa mãn định luật",
+  COMPLAINT: "Chuyển từ khiếu nại mô phỏng",
 };
 
 const number = (value: number) => value.toLocaleString("vi-VN");
@@ -227,11 +227,11 @@ export function ReviewerOverview({ access, onOpen }: Readonly<{ access: Reviewer
             <span><i style={{ background: "#15803d" }} />Đã giải quyết: <strong>{number(complaintResolved)}</strong></span>
           </div>
           <div className={s.subBlock}>
-            <h3>Tuổi hàng đợi khiếu nại chưa giải quyết</h3>
+            <h3>Số lượng khiếu nại chưa được xử lý</h3>
             <ul className={s.hBars}>
-              <li><span>Dưới 24 giờ</span><div className={s.barTrack}><i style={{ width: `${(slaUnder24 / slaMax) * 100}%`, background: "#2563eb" }} /></div><strong>{number(slaUnder24)}</strong></li>
-              <li><span>24 – 48 giờ</span><div className={s.barTrack}><i style={{ width: `${(sla24to48 / slaMax) * 100}%`, background: "#d97706" }} /></div><strong>{number(sla24to48)}</strong></li>
-              <li><span>Quá 48 giờ (cần gấp)</span><div className={s.barTrack}><i style={{ width: `${(slaOver48 / slaMax) * 100}%`, background: "#dc2626" }} /></div><strong>{number(slaOver48)}</strong></li>
+              <li><span title="Dưới 24 giờ">Dưới 24 giờ</span><div className={s.barTrack}><i style={{ width: `${(slaUnder24 / slaMax) * 100}%`, background: "#2563eb" }} /></div><strong>{number(slaUnder24)}</strong></li>
+              <li><span title="24 – 48 giờ">24 – 48 giờ</span><div className={s.barTrack}><i style={{ width: `${(sla24to48 / slaMax) * 100}%`, background: "#d97706" }} /></div><strong>{number(sla24to48)}</strong></li>
+              <li><span title="Quá 48 giờ (cần gấp)">Quá 48 giờ (cần gấp)</span><div className={s.barTrack}><i style={{ width: `${(slaOver48 / slaMax) * 100}%`, background: "#dc2626" }} /></div><strong>{number(slaOver48)}</strong></li>
             </ul>
           </div>
         </article>}
@@ -239,16 +239,18 @@ export function ReviewerOverview({ access, onOpen }: Readonly<{ access: Reviewer
         {access.canEdit && <article className={s.panel} aria-labelledby="rev-chart-gaps">
           <div className={s.panelHeading}>
             <div>
-              <h2 id="rev-chart-gaps">Lỗ hổng định luật theo tác động</h2>
-              <p>{gapTotalAll > 0 ? `Đã rà soát ${gapResolutionRate}% (${number((gapCounts?.RESOLVED ?? 0) + (gapCounts?.DISMISSED ?? 0))}/${number(gapTotalAll)} mục).` : "Tổng hợp số lần mô phỏng gặp đại lượng chưa có định luật kiểm."}</p>
+              <h2 id="rev-chart-gaps">Định luật cần rà soát theo loại</h2>
+              <p>{gapTotalAll > 0 ? `Đã rà soát ${gapResolutionRate}% (${number((gapCounts?.RESOLVED ?? 0) + (gapCounts?.DISMISSED ?? 0))}/${number(gapTotalAll)} mục).` : "Tổng hợp số lần mô phỏng gặp đại lượng chưa có định luật kiểm chứng."}</p>
             </div>
             <Button variant="ghost" onClick={() => onOpen("gaps")}>Rà soát<ReviewerIcon name="arrow" size={16} /></Button>
           </div>
-          <ul className={s.hBars}>
+          <ul className={s.hBarsStacked}>
             {gapByKind.map(row => <li key={row.kind}>
-              <span>{row.label} <small>({number(row.items)} mục)</small></span>
+              <div className={s.hBarsStackedTop}>
+                <span title={`${row.label} (${number(row.items)} mục)`}>{row.label} <small>({number(row.items)} mục)</small></span>
+                <strong>{number(row.occurrences)} lần</strong>
+              </div>
               <div className={s.barTrack}><i style={{ width: `${row.occurrences > 0 ? Math.max(6, (row.occurrences / maxGapOcc) * 100) : 0}%`, background: row.kind === "VIOLATION" ? "#dc2626" : row.kind === "AMBIGUOUS" ? "#d97706" : "#315da8" }} /></div>
-              <strong>{number(row.occurrences)} lần</strong>
             </li>)}
           </ul>
           {topGapTopics.length > 0 && <div className={s.subBlock}>
@@ -275,9 +277,9 @@ export function ReviewerOverview({ access, onOpen }: Readonly<{ access: Reviewer
             </> : <span style={{ width: "100%", background: "var(--m3-surface-container)" }} />}
           </div>
           <ul className={s.hBars} style={{ marginTop: 14 }}>
-            <li><span>Đang dùng (đã phát hành)</span><div className={s.barTrack}><i style={{ width: `${pct(schemaApproved, schemas.length)}%`, background: "#15803d" }} /></div><strong>{number(schemaApproved)}</strong></li>
-            <li><span>Bản nháp chờ phê duyệt</span><div className={s.barTrack}><i style={{ width: `${pct(schemaDraft, schemas.length)}%`, background: "#d97706" }} /></div><strong>{number(schemaDraft)}</strong></li>
-            <li><span>Phiên bản ngừng dùng</span><div className={s.barTrack}><i style={{ width: `${pct(schemaRetired, schemas.length)}%`, background: "#64748b" }} /></div><strong>{number(schemaRetired)}</strong></li>
+            <li><span title="Đang dùng (đã phát hành)">Đang dùng (đã phát hành)</span><div className={s.barTrack}><i style={{ width: `${pct(schemaApproved, schemas.length)}%`, background: "#15803d" }} /></div><strong>{number(schemaApproved)}</strong></li>
+            <li><span title="Bản nháp chờ phê duyệt">Bản nháp chờ phê duyệt</span><div className={s.barTrack}><i style={{ width: `${pct(schemaDraft, schemas.length)}%`, background: "#d97706" }} /></div><strong>{number(schemaDraft)}</strong></li>
+            <li><span title="Phiên bản ngừng dùng">Phiên bản ngừng dùng</span><div className={s.barTrack}><i style={{ width: `${pct(schemaRetired, schemas.length)}%`, background: "#64748b" }} /></div><strong>{number(schemaRetired)}</strong></li>
           </ul>
         </article>}
       </section>

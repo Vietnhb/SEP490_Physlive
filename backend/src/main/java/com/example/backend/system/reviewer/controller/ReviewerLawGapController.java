@@ -7,6 +7,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,13 +26,25 @@ public class ReviewerLawGapController {
         return service.counts();
     }
 
+    @GetMapping("/history")
+    public List<Audit> history() {
+        return service.history();
+    }
+
     @GetMapping
     public List<Item> list(@RequestParam(defaultValue = "OPEN") String status) {
-        return service.list(status).stream().map(Item::from).toList();
+        return service.listItems(status);
+    }
+
+    @PostMapping("/{id}/claim")
+    public Item claim(@PathVariable UUID id,
+                      @RequestParam(defaultValue = "false") boolean release,
+                      @RequestParam(defaultValue = "false") boolean force) {
+        return service.claimItem(id, release, force);
     }
 
     @PutMapping("/{id}")
     public Item decide(@PathVariable UUID id, @RequestBody Decision decision) {
-        return Item.from(service.decide(id, decision.status(), decision.note()));
+        return service.decideItem(id, decision.status(), decision.note());
     }
 }

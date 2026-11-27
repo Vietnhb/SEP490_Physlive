@@ -203,6 +203,7 @@ export default function AppRoutes({ authReady }: { authReady: boolean }) {
             <Route path="moderation" element={<ReviewerModeration />} />
             <Route path="topics/:section?" element={<ReviewerTopics />} />
             <Route path="gaps" element={<ReviewerGaps />} />
+            <Route path="history" element={<Navigate to="/reviewer/topics?mode=history" replace />} />
             <Route path="complaints" element={<ReviewerComplaints />} />
             <Route path="*" element={<NotFoundPage home="/reviewer" />} />
           </Route>

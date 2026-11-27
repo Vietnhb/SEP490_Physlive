@@ -14,24 +14,16 @@ import { ReviewStatus } from "./ReviewerKit";
 import { objectRows } from "../model/jsonRows";
 import { LawBook } from "./LawCatalogueEditor";
 import { TopicsArt } from "./TopicsArt";
+import { VersionHistoryDesk } from "./VersionHistoryDesk";
 import s from "./TopicsWorkspace.module.css";
 
 type Lifecycle = "DRAFT" | "APPROVED" | "RETIRED";
-type OpenGap = { id?: string; kind: "UNCHECKED" | "NO_ROLE" | "AMBIGUOUS" | "VIOLATION" | "COMPLAINT"; topic?: string; schemaId?: string; role?: string; occurrences: number };
 
 const ORDER = ["DRAFT", "APPROVED", "RETIRED"];
 const number = (value: number) => value.toLocaleString("vi-VN");
 const gradeOf = (version: Version) => {
   const grade = (version.definition as { grade?: unknown } | undefined)?.grade;
   return grade ? `Lớp ${String(grade)}` : "";
-};
-
-const GAP_KIND_LABEL: Record<OpenGap["kind"], string> = {
-  UNCHECKED: "Vai trò chưa có định luật kiểm",
-  NO_ROLE: "Đại lượng chưa có vai trò",
-  AMBIGUOUS: "Không xác định được đại lượng",
-  VIOLATION: "Định luật bác bỏ mô phỏng",
-  COMPLAINT: "Báo lỗi từ khiếu nại giáo viên",
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -81,8 +73,8 @@ function LifecyclePill({ status }: Readonly<{ status: string }>) {
 export function VersionsTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const resource = useResource<Version[]>("/reviewer/schemas");
-  const gapsResource = useResource<OpenGap[]>("/reviewer/law-gaps?status=OPEN");
   const action = useAction();
+  const [viewMode, setViewMode] = useState<"topics" | "history">(() => searchParams.get("mode") === "history" ? "history" : "topics");
   const [filter, setFilter] = useState<"ALL" | Lifecycle>("APPROVED");
   const [query, setQuery] = useState(() => searchParams.get("topic") ?? "");
   const [page, setPage] = useState(1);
@@ -92,25 +84,31 @@ export function VersionsTab() {
   const [decision, setDecision] = useState<{ version: Version; status: "APPROVED" | "RETIRED" | "DELETE" } | null>(null);
 
   const all = useMemo(() => resource.data ?? [], [resource.data]);
-  const openGaps = useMemo(() => gapsResource.data ?? [], [gapsResource.data]);
 
+  const deepVersionId = searchParams.get("versionId");
   const deepSchemaId = searchParams.get("schemaId");
   const deepTarget = useMemo(() => {
-    if (!deepSchemaId || all.length === 0) return null;
+    if (all.length === 0) return null;
+    if (deepVersionId) {
+      const exact = all.find(item => item.id === deepVersionId);
+      if (exact) return exact;
+    }
+    if (!deepSchemaId) return null;
     const candidates = all.filter(item => item.schemaId.toLowerCase() === deepSchemaId.toLowerCase());
     return candidates.find(item => item.lifecycleStatus === "APPROVED")
       ?? candidates.find(item => item.lifecycleStatus === "DRAFT")
       ?? candidates[0]
       ?? null;
-  }, [deepSchemaId, all]);
+  }, [deepVersionId, deepSchemaId, all]);
   const activeSelected = selected ?? deepTarget;
 
   const clearSelection = () => {
     setSelected(null);
-    if (searchParams.has("schemaId") || searchParams.has("topic")) {
+    if (searchParams.has("schemaId") || searchParams.has("topic") || searchParams.has("versionId")) {
       const next = new URLSearchParams(searchParams);
       next.delete("schemaId");
       next.delete("topic");
+      next.delete("versionId");
       setSearchParams(next, { replace: true });
     }
   };
@@ -152,31 +150,6 @@ export function VersionsTab() {
     const max = Math.max(1, ...items.map(i => i.score));
     return items.map(item => ({ ...item, pct: Math.round((item.score / max) * 100) }));
   }, [approvedVersions]);
-
-  // Spotlight draft (or latest approved topic) for "Kiểm thử bản nháp" & "Lịch sử phiên bản"
-  const spotlight = draftVersions[0] ?? approvedVersions[0] ?? all[0];
-  const spotlightFamily = useMemo(() => {
-    if (!spotlight) return [];
-    return all
-      .filter(v => v.schemaId.toLowerCase() === spotlight.schemaId.toLowerCase())
-      .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""));
-  }, [all, spotlight]);
-
-  const spotlightGaps = useMemo(() => {
-    if (!spotlight) return [];
-    const matched = openGaps.filter(g =>
-      (g.schemaId && g.schemaId.toLowerCase() === spotlight.schemaId.toLowerCase())
-      || (g.topic && spotlight.topic && g.topic.toLowerCase() === spotlight.topic.toLowerCase()),
-    );
-    const list = (matched.length > 0 ? matched : openGaps).slice(0, 3);
-    const draftRoles = new Set(Object.keys(asRecord(asRecord(asRecord(spotlight.definition).lawCatalogue).roles)).map(k => k.toLowerCase()));
-    return list.map((g, idx) => ({
-      key: g.id ?? `${g.kind}-${idx}`,
-      label: GAP_KIND_LABEL[g.kind] ?? g.kind,
-      occurrences: g.occurrences,
-      covered: Boolean(g.role && draftRoles.has(g.role.toLowerCase())),
-    }));
-  }, [spotlight, openGaps]);
 
   const rows = useMemo(
     () => all
@@ -231,6 +204,7 @@ export function VersionsTab() {
       }
       setDecision(null);
       void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/schemas/summary") });
+      void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/schemas/history") });
       void queryClient.invalidateQueries({ queryKey: apiKey(`/reviewer/schema-versions/${targetId}/history`) });
       void resource.refresh();
     }
@@ -250,6 +224,7 @@ export function VersionsTab() {
     }
     setEditor(null);
     void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/schemas/summary") });
+    void queryClient.invalidateQueries({ queryKey: apiKey("/reviewer/schemas/history") });
     if (outcome?.saved?.id) {
       void queryClient.invalidateQueries({ queryKey: apiKey(`/reviewer/schema-versions/${outcome.saved.id}/history`) });
     }
@@ -261,11 +236,16 @@ export function VersionsTab() {
   }
 
   if (activeSelected) {
+    const selectedFamily = all
+      .filter(v => v.schemaId.toLowerCase() === activeSelected.schemaId.toLowerCase())
+      .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""));
     return (
       <>
         <VersionDetail
           version={activeSelected}
+          familyVersions={selectedFamily}
           sharedCatalogue={sharedCatalogue}
+          onSelectVersion={ver => setSelected(ver)}
           onClose={clearSelection}
           onEdit={() => { setEditor({ version: activeSelected, clone: activeSelected.lifecycleStatus !== "DRAFT" }); clearSelection(); }}
           onApprove={activeSelected.lifecycleStatus === "DRAFT" ? () => setDecision({ version: activeSelected, status: "APPROVED" }) : undefined}
@@ -276,8 +256,6 @@ export function VersionsTab() {
     );
   }
 
-  const coveredCount = spotlightGaps.filter(g => g.covered).length;
-
   return (
     <div className={s.page}>
       {/* Page Header */}
@@ -287,6 +265,24 @@ export function VersionsTab() {
           <p className={s.sub}>Đối tượng, đại lượng và định luật của từng chủ đề. Bản đã duyệt không sửa được, hãy tạo phiên bản mới.</p>
         </div>
         <div className={s.headingRight}>
+          <div className={s.seg} role="group" aria-label="Chế độ xem chủ đề vật lý">
+            <button
+              type="button"
+              className={s.segItem}
+              aria-pressed={viewMode === "topics"}
+              onClick={() => setViewMode("topics")}
+            >
+              Danh sách chủ đề
+            </button>
+            <button
+              type="button"
+              className={s.segItem}
+              aria-pressed={viewMode === "history"}
+              onClick={() => setViewMode("history")}
+            >
+              Lịch sử thay đổi
+            </button>
+          </div>
           <button type="button" className={s.primaryBtn} onClick={() => setEditor({ clone: false })}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14" />
@@ -296,6 +292,18 @@ export function VersionsTab() {
           <TopicsArt />
         </div>
       </header>
+
+      {viewMode === "history" ? (
+        <VersionHistoryDesk
+          embedded
+          onOpenVersion={(versionId, schemaId) => {
+            const target = all.find(v => v.id === versionId)
+              ?? all.find(v => v.schemaId.toLowerCase() === schemaId.toLowerCase());
+            if (target) setSelected(target);
+          }}
+        />
+      ) : (
+        <>
 
       {/* 4 Tinted KPI Cards */}
       <section className={s.stats} aria-label="Chỉ số chủ đề vật lý">
@@ -350,7 +358,7 @@ export function VersionsTab() {
               <path d="M15.7 15.7c4.5-4.5 6.5-9.9 4.5-11.9s-7.4 0-11.9 4.5-6.5 9.9-4.5 11.9 7.4 0 11.9-4.5z" />
             </svg>
           </span>
-          <span className={s.statLabel}>Đại lượng & vai trò</span>
+          <span className={s.statLabel}>Đại lượng vật lý</span>
           <strong className={s.statVal}>{number(structure.roles)}</strong>
           <span className={s.statHint}>{number(structure.objects)} đối tượng vật lý</span>
         </article>
@@ -508,90 +516,42 @@ export function VersionsTab() {
               </>
             )}
           </section>
-
-          {/* Bottom Sub-Split: Draft Test & Version History */}
-          {spotlight && (
-            <div className={s.subSplit}>
-              <section className={s.card}>
-                <div className={s.cardHead}>
-                  <h2 className={s.cardTitle}>Kiểm thử bản nháp</h2>
-                  <LifecyclePill status={spotlight.lifecycleStatus === "DRAFT" ? "APPROVED" : spotlight.lifecycleStatus} />
-                </div>
-                <div className={s.cardBody}>
-                  <p className={s.draftIntro}>
-                    <b>{spotlight.name || spotlight.schemaId} v{spotlight.version}</b>{" "}
-                    {spotlight.lifecycleStatus === "DRAFT"
-                      ? "chưa phát hành. Đối chiếu với các mục định luật đang mở:"
-                      : "đang áp dụng. Tình trạng các mục định luật đang mở:"}
-                  </p>
-                  {spotlightGaps.length > 0 ? (
-                    <>
-                      <ul className={s.shareList}>
-                        {spotlightGaps.map(item => (
-                          <li key={item.key}>
-                            <span className={`${s.sq} ${item.covered ? s.sqOk : s.sqMuted}`} />
-                            <span>
-                              <b>{item.label}</b>
-                              <small>Gặp {number(item.occurrences)} lần</small>
-                            </span>
-                            <span className={item.covered ? s.pctOk : s.pctMuted}>
-                              {item.covered ? "Đã phủ" : "Chưa phủ"}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className={s.cardHint}>
-                        Phủ {coveredCount}/{spotlightGaps.length} mục đang mở.
-                        {spotlight.lifecycleStatus === "DRAFT" ? " Phê duyệt bản nháp sẽ tự động ngừng dùng bản cũ." : ""}
-                      </p>
-                    </>
-                  ) : (
-                    <p className={s.cardHint}>
-                      Hiện không có mục định luật nào đang mở cho chủ đề này ({statsOfVersion(spotlight).laws} định luật, {statsOfVersion(spotlight).roles} đại lượng).
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              <section className={s.card}>
-                <div className={s.cardHead}>
-                  <h2 className={s.cardTitle}>Lịch sử phiên bản</h2>
-                  <span className={s.cardMuted}>{spotlight.name || spotlight.schemaId}</span>
-                </div>
-                <div className={s.cardBody}>
-                  <ul className={s.timeline}>
-                    {spotlightFamily.slice(0, 4).map(ver => {
-                      const dotColor = ver.lifecycleStatus === "DRAFT"
-                        ? "#1D4ED8"
-                        : ver.lifecycleStatus === "APPROVED"
-                          ? "#15803D"
-                          : "#6B6B73";
-                      const verb = ver.lifecycleStatus === "DRAFT"
-                        ? `Tạo bản nháp v${ver.version}`
-                        : ver.lifecycleStatus === "APPROVED"
-                          ? `Phê duyệt v${ver.version}`
-                          : `v${ver.version} ngừng dùng`;
-                      return (
-                        <li key={ver.id} style={{ ["--dot" as string]: dotColor }}>
-                          <b>{verb}</b>
-                          <small>{ver.createdAt ? formatDate(ver.createdAt) : "Đã lưu trong hệ thống"}</small>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </section>
-            </div>
-          )}
         </div>
 
         {/* Right Insight Column */}
         <aside className={s.asideCol}>
-          <section className={s.card}>
-            <div className={s.cardHead}>
+          {topTopics.length > 0 && (
+            <section className={s.card}>
+              <div className={s.cardHead}>
+                <h2 className={s.cardTitle}>Độ phủ định luật theo chủ đề</h2>
+                <span className={s.cardMuted}>Định luật + đại lượng</span>
+              </div>
+              <div className={s.cardBody}>
+                <div className={s.hbars}>
+                  {topTopics.map((item, idx) => (
+                    <div key={item.id} className={s.hrow}>
+                      <div className={s.hrowTop}>
+                        <span title={item.name}>{item.name}</span>
+                        <b>{number(item.score)}</b>
+                      </div>
+                      <div className={s.barTrack}>
+                        <i
+                          className={`${s.barFill} ${idx === 0 ? s.barFillFirst : ""}`}
+                          style={{ width: `${Math.max(8, item.pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          <details className={`${s.card} ${s.structureDisclosure}`} open>
+            <summary className={s.cardHead}>
               <h2 className={s.cardTitle}>Cấu trúc một chủ đề</h2>
-              <span className={s.cardMuted}>Bản đang dùng</span>
-            </div>
+              <span className={s.cardMuted}>Bản đang dùng ▾</span>
+            </summary>
             <div className={s.cardBody}>
               <div className={s.flow}>
                 <div className={`${s.fnode} ${s.fnodeOn}`}>
@@ -634,7 +594,7 @@ export function VersionsTab() {
                     </svg>
                   </span>
                   <span className={s.fnodeText}>
-                    <b>Đại lượng (vai trò)</b>
+                    <b>Đại lượng vật lý</b>
                     <small>vận tốc, độ cao, khối lượng…</small>
                   </span>
                   <span className={s.fnodeNum}>{number(structure.roles)}</span>
@@ -671,36 +631,11 @@ export function VersionsTab() {
                 </div>
               </div>
             </div>
-          </section>
-
-          {topTopics.length > 0 && (
-            <section className={s.card}>
-              <div className={s.cardHead}>
-                <h2 className={s.cardTitle}>Độ phủ định luật theo chủ đề</h2>
-                <span className={s.cardMuted}>Định luật + vai trò</span>
-              </div>
-              <div className={s.cardBody}>
-                <div className={s.hbars}>
-                  {topTopics.map((item, idx) => (
-                    <div key={item.id} className={s.hrow}>
-                      <div className={s.hrowTop}>
-                        <span>{item.name}</span>
-                        <b>{number(item.score)}</b>
-                      </div>
-                      <div className={s.barTrack}>
-                        <i
-                          className={`${s.barFill} ${idx === 0 ? s.barFillFirst : ""}`}
-                          style={{ width: `${Math.max(8, item.pct)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          )}
+          </details>
         </aside>
       </div>
+        </>
+      )}
 
       {decision && (
         <DecisionDialog
@@ -747,7 +682,7 @@ function VersionDiffBox({ previous, next }: Readonly<{ previous: Version; next: 
   const nextCat = asRecord(nextDef.lawCatalogue);
   const rows: { label: string; added: number; changed: number; removed: number }[] = [
     { label: "Định luật", ...summarizeArrayDiff(prevCat.laws, nextCat.laws, r => String(r.id ?? r.title ?? "")) },
-    { label: "Vai trò đại lượng", ...summarizeRecordDiff(asRecord(prevCat.roles), asRecord(nextCat.roles)) },
+    { label: "Danh mục đại lượng", ...summarizeRecordDiff(asRecord(prevCat.roles), asRecord(nextCat.roles)) },
     { label: "Vật thể gợi ý", ...summarizeArrayDiff(prevDef.objectTypes, nextDef.objectTypes, r => String(r.type ?? r.label ?? "")) },
     { label: "Đại lượng gợi ý", ...summarizeArrayDiff(prevDef.quantityDefinitions, nextDef.quantityDefinitions, r => String(r.key ?? r.label ?? "")) },
   ].map(item => ({ label: item.label, added: item.added.length, changed: item.changed.length, removed: item.removed.length }))
@@ -852,14 +787,18 @@ const SCHEMA_AUDIT_ACTION: Record<string, string> = {
 
 function VersionDetail({
   version,
+  familyVersions,
   sharedCatalogue,
+  onSelectVersion,
   onClose,
   onEdit,
   onApprove,
   onDelete,
 }: Readonly<{
   version: Version;
+  familyVersions: Version[];
   sharedCatalogue?: Record<string, unknown>;
+  onSelectVersion: (ver: Version) => void;
   onClose: () => void;
   onEdit: () => void;
   onApprove?: () => void;
@@ -886,6 +825,10 @@ function VersionDetail({
       <div className="reviewer-detail-meta">
         <ReviewStatus status={version.lifecycleStatus} />
         <Text size="2" color="gray">Tạo ngày {formatDate(version.createdAt)}</Text>
+        <Text size="2" color="gray">· Người tạo: <strong>{version.createdByName || "Hệ thống"}</strong></Text>
+        {version.approvedByName && (
+          <Text size="2" color="gray">· Người duyệt: <strong>{version.approvedByName}</strong></Text>
+        )}
       </div>
       <div className="reviewer-summary">
         {typeof definition.description === "string" && <Text as="p" size="2" className="reviewer-context-text">{definition.description}</Text>}
@@ -911,23 +854,48 @@ function VersionDetail({
           </>
         )}
       </div>
-      {history.length > 0 && (
-        <details className="reviewer-disclosure">
-          <summary>Lịch sử phiên bản ({history.length})</summary>
-          <table className="reviewer-mini-table">
-            <thead><tr><th>Thời điểm</th><th>Người thực hiện</th><th>Hành động</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
-            <tbody>
-              {history.map(entry => (
-                <tr key={entry.id}>
-                  <td title={formatDate(entry.createdAt)}>{timeAgo(entry.createdAt) || formatDate(entry.createdAt)}</td>
-                  <td>{entry.actorName || entry.actorEmail || "—"}</td>
-                  <td>{SCHEMA_AUDIT_ACTION[entry.action] ?? entry.action}</td>
-                  <td>{entry.fromStatus ? `${reviewerStatusLabel(entry.fromStatus)} → ` : ""}{entry.toStatus ? reviewerStatusLabel(entry.toStatus) : "—"}</td>
-                  <td>{entry.note || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {(history.length > 0 || familyVersions.length > 1) && (
+        <details className="reviewer-disclosure" open>
+          <summary>Lịch sử phiên bản ({familyVersions.length} phiên bản · {history.length} thao tác)</summary>
+          {familyVersions.length > 1 && (
+            <table className="reviewer-mini-table" style={{ marginBottom: history.length > 0 ? 12 : 0 }}>
+              <thead><tr><th>Phiên bản</th><th>Trạng thái</th><th>Người tạo</th><th>Người duyệt</th><th>Ngày tạo</th><th /></tr></thead>
+              <tbody>
+                {familyVersions.map(ver => (
+                  <tr key={ver.id}>
+                    <td><strong>v{ver.version}</strong>{ver.id === version.id ? " (đang xem)" : ""}</td>
+                    <td>{reviewerStatusLabel(ver.lifecycleStatus)}</td>
+                    <td>{ver.createdByName || "Hệ thống"}</td>
+                    <td>{ver.approvedByName || "—"}</td>
+                    <td>{formatDate(ver.createdAt)}</td>
+                    <td>
+                      {ver.id !== version.id && (
+                        <button type="button" className={s.inlineTopicLink} onClick={() => onSelectVersion(ver)}>
+                          Mở v{ver.version} →
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {history.length > 0 && (
+            <table className="reviewer-mini-table">
+              <thead><tr><th>Thời điểm</th><th>Người thực hiện</th><th>Hành động</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+              <tbody>
+                {history.map(entry => (
+                  <tr key={entry.id}>
+                    <td title={formatDate(entry.createdAt)}>{timeAgo(entry.createdAt) || formatDate(entry.createdAt)}</td>
+                    <td>{entry.actorName || entry.actorEmail || "Hệ thống"}</td>
+                    <td>{SCHEMA_AUDIT_ACTION[entry.action] ?? entry.action}</td>
+                    <td>{entry.fromStatus ? `${reviewerStatusLabel(entry.fromStatus)} → ` : ""}{entry.toStatus ? reviewerStatusLabel(entry.toStatus) : "—"}</td>
+                    <td>{entry.note || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </details>
       )}
       <details className="reviewer-disclosure">

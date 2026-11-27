@@ -10,7 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface LawGapRepository extends JpaRepository<LawGap, UUID> {
     Optional<LawGap> findByGapKey(String gapKey);
 
-    @EntityGraph(attributePaths = {"decidedBy"})
+    @EntityGraph(attributePaths = { "decidedBy" })
     List<LawGap> findTop300ByStatusOrderByOccurrencesDescUpdatedAtDesc(String status);
+
     long countByStatus(String status);
 }

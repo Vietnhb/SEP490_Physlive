@@ -69,6 +69,12 @@ public class LawGap extends AuditedEntity {
     @Column(name = "decided_at")
     private Instant decidedAt;
 
+    @Column(name = "assigned_to_id")
+    private Long assignedToId;
+
+    @Column(name = "assigned_at")
+    private Instant assignedAt;
+
     @Column(name = "source_complaint_id")
     private java.util.UUID sourceComplaintId;
 }

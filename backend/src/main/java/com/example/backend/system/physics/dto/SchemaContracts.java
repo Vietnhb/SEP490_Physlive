@@ -21,11 +21,17 @@ public final class SchemaContracts {
     }
     public record Response(UUID id, String schemaId, String name, String topic, String version,
                            JsonNode definition, String definitionChecksum, LifecycleStatus lifecycleStatus,
-                           long recordVersion, Instant createdAt, Instant updatedAt) {
+                           long recordVersion, Instant createdAt, Instant updatedAt,
+                           String createdByName, String approvedByName, Instant approvedAt) {
         public static Response from(SchemaVersion schema) {
+            return from(schema, null, null, null);
+        }
+
+        public static Response from(SchemaVersion schema, String createdByName, String approvedByName, Instant approvedAt) {
             return new Response(schema.getId(), schema.getSchemaId(), schema.getName(), schema.getTopic(),
                     schema.getVersion(), schema.getDefinition(), schema.getDefinitionChecksum(),
-                    schema.getLifecycleStatus(), schema.getRecordVersion(), schema.getCreatedAt(), schema.getUpdatedAt());
+                    schema.getLifecycleStatus(), schema.getRecordVersion(), schema.getCreatedAt(), schema.getUpdatedAt(),
+                    createdByName, approvedByName, approvedAt);
         }
     }
     public record TopicName(String topic, String name, LifecycleStatus lifecycleStatus) {}
@@ -33,6 +39,9 @@ public final class SchemaContracts {
                           LifecycleStatus lifecycleStatus, Instant createdAt) {}
     public record Audit(UUID id, UUID schemaVersionId, String actorName, String actorEmail, String action,
                         LifecycleStatus fromStatus, LifecycleStatus toStatus, String note, Instant createdAt) {}
+    public record FamilyAudit(UUID id, UUID schemaVersionId, String schemaId, String topicName, String version,
+                              String actorName, String actorEmail, String action,
+                              LifecycleStatus fromStatus, LifecycleStatus toStatus, String note, Instant createdAt) {}
     public record ModuleRelease(UUID id, String topic, String moduleName, String schemaId,
                                 String schemaVersion, LifecycleStatus lifecycleStatus) {
         public static ModuleRelease from(SchemaVersion schema) {

@@ -213,9 +213,6 @@ public class SupportService {
     @Transactional
     public SupportView escalateComplaintToLawGap(UUID id, SupportContracts.EscalateLawGapRequest request) {
         User reviewer = requireReviewer();
-        if (accountAccess.canEditContext(reviewer)) {
-            throw ApiException.forbidden("Tài khoản đã có quyền biên soạn dữ liệu chuẩn, hãy chỉnh sửa trực tiếp chủ đề vật lý thay vì chuyển tiếp.");
-        }
         if (lawGapService == null) {
             throw ApiException.badRequest("Chức năng chuyển sang rà soát định luật chưa sẵn sàng.");
         }

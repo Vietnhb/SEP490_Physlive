@@ -26,12 +26,22 @@ public class ReviewerVersionsController {
 
     @GetMapping("/schemas")
     public List<SchemaContracts.Response> schemas() {
-        return service.schemas().stream().map(SchemaContracts.Response::from).toList();
+        return service.schemaResponses();
     }
 
     @GetMapping("/schemas/summary")
     public List<SchemaContracts.Summary> schemaSummaries() {
         return service.schemaSummaries();
+    }
+
+    @GetMapping("/schemas/history")
+    public List<SchemaContracts.FamilyAudit> allHistory() {
+        return service.allHistory();
+    }
+
+    @GetMapping("/schemas/{schemaId}/history")
+    public List<SchemaContracts.FamilyAudit> familyHistory(@PathVariable String schemaId) {
+        return service.familyHistory(schemaId);
     }
 
     @GetMapping("/schema-versions/{id}/history")

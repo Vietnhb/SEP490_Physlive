@@ -145,7 +145,24 @@ button.tab[aria-selected="true"]:hover {
 }
 
 /* Filter strip */
+.filterCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--gray-4);
+  background: var(--color-panel-solid);
+}
+
 .filterRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.35fr) minmax(170px, 1fr) minmax(150px, 0.85fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.filterSubRow {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -154,8 +171,7 @@ button.tab[aria-selected="true"]:hover {
 
 .searchWrap {
   position: relative;
-  flex: 1 1 220px;
-  min-width: 180px;
+  min-width: 0;
 }
 
 .searchIcon {
@@ -186,6 +202,8 @@ button.tab[aria-selected="true"]:hover {
 }
 
 .filterSelect {
+  width: 100%;
+  min-width: 0;
   height: 36px;
   padding: 0 28px 0 10px;
   border: 1px solid var(--gray-5);
@@ -197,6 +215,12 @@ button.tab[aria-selected="true"]:hover {
   cursor: pointer;
 }
 
+@media (max-width: 820px) {
+  .filterRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* Cards */
 .card {
   border-radius: 16px;
@@ -205,6 +229,12 @@ button.tab[aria-selected="true"]:hover {
   box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
   overflow: hidden;
   min-width: 0;
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.cardHighlight {
+  border-color: #147B84;
+  box-shadow: 0 0 0 3px rgba(20, 123, 132, 0.22);
 }
 
 .cardHead {
@@ -257,6 +287,52 @@ button.tab[aria-selected="true"]:hover {
   color: #34446F;
   font-size: 11.5px;
   font-weight: 500;
+}
+
+.tagMe {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #E4F3F4;
+  color: #0E6A73;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.tagOther {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #FBEEF3;
+  color: #952F59;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.tagNone {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--gray-3);
+  color: var(--gray-11);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+:global(.dark) .tagMe {
+  background: rgba(63, 179, 188, 0.16);
+  color: #7FD0D6;
+}
+
+:global(.dark) .tagOther {
+  background: rgba(224, 122, 162, 0.16);
+  color: #EFA3C1;
 }
 
 :global(.dark) .tagLaw {
@@ -493,6 +569,59 @@ button.ghostBtn:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.hrowBtn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.hrowBtn:hover:not(:disabled) {
+  background: var(--gray-2);
+  transform: none;
+}
+
+.hrowBtn:disabled {
+  cursor: default;
+}
+
+.hrowBtnActive {
+  background: #E6F4F1;
+  border-color: #99D5D9;
+}
+
+:global(.dark) .hrowBtnActive {
+  background: rgba(63, 179, 188, 0.14);
+  border-color: rgba(63, 179, 188, 0.35);
+}
+
+.reopenNote {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid #FDE68A;
+  background: #FFFBEB;
+  color: #92400E;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+:global(.dark) .reopenNote {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #FCD34D;
 }
 
 .hrow {

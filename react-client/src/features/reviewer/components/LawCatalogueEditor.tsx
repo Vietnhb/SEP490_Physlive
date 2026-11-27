@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button, Text } from "@radix-ui/themes";
 import { AdvancedJson } from "./JsonEditor";
 import { ReviewerDialog } from "./ReviewerDialog";
 import type { JsonObject } from "../model/jsonRows";
 import { codeFrom, parseRelation, plainName, pretty, relationOf, relationText, sameAs, summedSymbols, symbols, print, type Ast } from "../model/lawText";
-import { matches } from "../model/reviewerUtils";
+import { foldSearchText, matches } from "../model/reviewerUtils";
 import "../styles/lawbook.css";
 
 type Catalogue = JsonObject;
@@ -48,6 +48,20 @@ const without = (source: Names, ...keys: string[]) => Object.fromEntries(Object.
 const bindOf = (law: Law) => record(law.bind) as Bind;
 const UNSORTED = "Chưa xếp vào phần nào";
 const partOf = (law: Law) => String(law.curriculum ?? "").split(" – ")[0].trim() || UNSORTED;
+
+/** Vietnamese-aware curriculum filter: preserves diacritics when the user types them (e.g. "điện"), falls back to accent-insensitive matching when unsigned. */
+function matchesCurriculum(query: string, candidate: string): boolean {
+  const qNfc = query.trim().normalize("NFC").toLowerCase();
+  if (!qNfc) return true;
+  const cNfc = candidate.normalize("NFC").toLowerCase();
+  const hasDiacritics = qNfc !== foldSearchText(qNfc);
+  if (hasDiacritics) {
+    if (cNfc.includes(qNfc)) return true;
+    const words = qNfc.split(/\s+/).filter(Boolean);
+    return words.length > 1 && words.every(word => cNfc.includes(word));
+  }
+  return matches(qNfc, cNfc);
+}
 
 /** Splits "vận tốc của vật (of, axis)" into editable Vietnamese label + technical AI suffix "(of, axis)". */
 function splitRoleDescription(raw: unknown, fallback = ""): { label: string; suffix: string } {
@@ -214,6 +228,8 @@ function LawForm({ law, ownRoles, roles, kinds, constants, curricula, takenIds, 
   const [autoRoles, setAutoRoles] = useState<Record<string, string>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showCurriculaMenu, setShowCurriculaMenu] = useState(false);
+  const [activeCurriculumIdx, setActiveCurriculumIdx] = useState(-1);
+  const formulaInputRef = useRef<HTMLInputElement | null>(null);
   const typed = draft && draft.base === current ? draft : null;
   const bind = bindOf(law);
   const scope = Array.isArray(law.scope) ? law.scope.map(String) : [];
@@ -286,6 +302,45 @@ function LawForm({ law, ownRoles, roles, kinds, constants, curricula, takenIds, 
   const autoIds = new Set(Object.values(autoRoles));
   const roleSuggestions = [...new Set(Object.entries(roles).filter(([id]) => !autoIds.has(id)).map(([id, description]) => plainName(description, id)).filter(Boolean))];
   const curriculumValue = String(law.curriculum ?? "");
+  const filteredCurricula = useMemo(
+    () => curricula.filter(item => matchesCurriculum(curriculumValue, item)),
+    [curricula, curriculumValue],
+  );
+  const formulaValue = typed ? typed.text : current;
+
+  const handleFormulaChange = (rawText: string, caret: number | null) => {
+    if (rawText.includes("..")) {
+      const beforeCaret = caret !== null ? rawText.slice(0, caret) : rawText;
+      const converted = rawText.replaceAll("..", "·");
+      const nextCaret = beforeCaret.replaceAll("..", "·").length;
+      write(converted);
+      window.requestAnimationFrame(() => {
+        const input = formulaInputRef.current;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(nextCaret, nextCaret);
+        }
+      });
+      return;
+    }
+    write(rawText);
+  };
+
+  const insertFormulaSymbol = (symbol: string) => {
+    const input = formulaInputRef.current;
+    const start = input?.selectionStart ?? formulaValue.length;
+    const end = input?.selectionEnd ?? formulaValue.length;
+    const nextText = formulaValue.slice(0, start) + symbol + formulaValue.slice(end);
+    write(nextText);
+    const nextPos = start + symbol.length;
+    window.requestAnimationFrame(() => {
+      const el = formulaInputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(nextPos, nextPos);
+      }
+    });
+  };
 
   return <article className="law is-editing">
     <div className="lawform">
@@ -298,11 +353,50 @@ function LawForm({ law, ownRoles, roles, kinds, constants, curricula, takenIds, 
             id="lawform-curriculum-input"
             className="lawbook-input"
             value={curriculumValue}
-            placeholder="Nhập phần mới hoặc chọn phần đã lưu bên dưới…"
-            onFocus={() => setShowCurriculaMenu(true)}
+            placeholder="Tìm nhanh (có dấu, vd: điện) hoặc nhập phần mới…"
+            role="combobox"
+            aria-expanded={showCurriculaMenu}
+            aria-autocomplete="list"
+            onFocus={() => { setShowCurriculaMenu(true); setActiveCurriculumIdx(-1); }}
             onBlur={() => window.setTimeout(() => setShowCurriculaMenu(false), 160)}
-            onChange={event => { onChange({ ...law, curriculum: event.target.value }); setShowCurriculaMenu(true); }}
+            onChange={event => {
+              onChange({ ...law, curriculum: event.target.value });
+              setShowCurriculaMenu(true);
+              setActiveCurriculumIdx(-1);
+            }}
+            onKeyDown={event => {
+              if (!showCurriculaMenu || filteredCurricula.length === 0) return;
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setActiveCurriculumIdx(idx => (idx + 1) % filteredCurricula.length);
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveCurriculumIdx(idx => (idx <= 0 ? filteredCurricula.length - 1 : idx - 1));
+              } else if (event.key === "Enter" && activeCurriculumIdx >= 0 && activeCurriculumIdx < filteredCurricula.length) {
+                event.preventDefault();
+                onChange({ ...law, curriculum: filteredCurricula[activeCurriculumIdx] });
+                setShowCurriculaMenu(false);
+                setActiveCurriculumIdx(-1);
+              } else if (event.key === "Escape") {
+                setShowCurriculaMenu(false);
+              }
+            }}
           />
+          {curriculumValue && (
+            <button
+              type="button"
+              className="lawform-combobox-clear"
+              aria-label="Xoá nội dung đang nhập"
+              onMouseDown={event => {
+                event.preventDefault();
+                onChange({ ...law, curriculum: "" });
+                setShowCurriculaMenu(true);
+                setActiveCurriculumIdx(-1);
+              }}
+            >
+              ×
+            </button>
+          )}
           {curricula.length > 0 && (
             <button
               type="button"
@@ -315,47 +409,59 @@ function LawForm({ law, ownRoles, roles, kinds, constants, curricula, takenIds, 
           )}
           {showCurriculaMenu && curricula.length > 0 && (
             <div className="lawform-combobox-menu" role="listbox" aria-label="Các phần chương trình đã lưu">
-              <div className="lawform-combobox-head">Phần chương trình đã có trong chủ đề (nhấn để chọn):</div>
-              {curricula.map(item => (
-                <button
-                  key={item}
-                  type="button"
-                  role="option"
-                  aria-selected={curriculumValue.trim() === item}
-                  className={`lawform-combobox-option${curriculumValue.trim() === item ? " is-selected" : ""}`}
-                  onMouseDown={event => {
-                    event.preventDefault();
-                    onChange({ ...law, curriculum: item });
-                    setShowCurriculaMenu(false);
-                  }}
-                >
-                  {item}
-                </button>
-              ))}
+              <div className="lawform-combobox-head">
+                {curriculumValue.trim()
+                  ? `Chọn nhanh (${filteredCurricula.length} phần khớp):`
+                  : `Chọn nhanh phần chương trình (${filteredCurricula.length}):`}
+              </div>
+              {filteredCurricula.length > 0 ? (
+                filteredCurricula.map((item, idx) => (
+                  <button
+                    key={item}
+                    type="button"
+                    role="option"
+                    aria-selected={curriculumValue.trim() === item}
+                    className={`lawform-combobox-option${curriculumValue.trim() === item ? " is-selected" : ""}${activeCurriculumIdx === idx ? " is-highlighted" : ""}`}
+                    onMouseDown={event => {
+                      event.preventDefault();
+                      onChange({ ...law, curriculum: item });
+                      setShowCurriculaMenu(false);
+                      setActiveCurriculumIdx(-1);
+                    }}
+                  >
+                    {item}
+                  </button>
+                ))
+              ) : (
+                <div className="lawform-combobox-empty">
+                  Không có phần sẵn khớp với “{curriculumValue.trim()}” — giữ nguyên để tạo phần mới.
+                </div>
+              )}
             </div>
           )}
         </div>
-        {curricula.length > 0 && (
-          <div className="lawform-curriculum-chips">
-            <small>Chọn nhanh:</small>
-            {curricula.map(item => (
-              <button
-                key={item}
-                type="button"
-                className={`lawform-chip${curriculumValue.trim() === item ? " is-active" : ""}`}
-                onClick={() => onChange({ ...law, curriculum: item })}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       <label className="lawform-field is-wide"><span>Công thức</span>
-        <input className="lawbook-input lawform-formula" spellCheck={false} value={typed ? typed.text : current} placeholder="m·d(v)/dt = ΣF" aria-invalid={Boolean(typed?.problem)} onChange={event => write(event.target.value)} />
+        <input
+          ref={formulaInputRef}
+          className="lawbook-input lawform-formula"
+          spellCheck={false}
+          value={formulaValue}
+          placeholder="m·d(v)/dt = ΣF"
+          aria-invalid={Boolean(typed?.problem)}
+          onChange={event => handleFormulaChange(event.target.value, event.target.selectionStart)}
+        />
         {typed?.problem ? <em className="lawform-problem">{typed.problem}</em>
-          : <small>Nhân: <kbd>·</kbd> hoặc <kbd>*</kbd> · luỹ thừa: <kbd>v^2</kbd> · tổng: <kbd>ΣF</kbd> hoặc <kbd>sum(F)</kbd> · đạo hàm theo thời gian: <kbd>d(v)/dt</kbd> · căn: <kbd>sqrt(x)</kbd> · trị tuyệt đối: <kbd>|x|</kbd> · bất đẳng thức: <kbd>≤</kbd> hoặc <kbd>&lt;=</kbd></small>}</label>
+          : <small>
+            Nhân: gõ <kbd>..</kbd> → <button type="button" className="lawform-kbd-btn" title="Nhấn để chèn dấu nhân ·" onClick={() => insertFormulaSymbol("·")}>·</button> hoặc <kbd>*</kbd>
+            {" · "}luỹ thừa: <kbd>v^2</kbd>
+            {" · "}tổng: <button type="button" className="lawform-kbd-btn" title="Nhấn để chèn ký hiệu tổng Σ" onClick={() => insertFormulaSymbol("Σ")}>Σ</button> hoặc <kbd>sum(F)</kbd>
+            {" · "}đạo hàm theo thời gian: <kbd>d(v)/dt</kbd>
+            {" · "}căn: <kbd>sqrt(x)</kbd>
+            {" · "}trị tuyệt đối: <kbd>|x|</kbd>
+            {" · "}bất đẳng thức: <button type="button" className="lawform-kbd-btn" title="Nhấn để chèn dấu ≤" onClick={() => insertFormulaSymbol("≤")}>≤</button> hoặc <kbd>&lt;=</kbd>
+          </small>}</label>
 
       <div className="lawform-field is-wide"><span>Mỗi kí hiệu là đại lượng nào</span>
         {roleSuggestions.length > 0 && <datalist id="lawbook-roles-datalist">{roleSuggestions.map(item => <option key={item} value={item} />)}</datalist>}

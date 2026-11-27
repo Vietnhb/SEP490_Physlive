@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import api from "../../../shared/api/client";
 import { apiKey, queryClient } from "../../../shared/api/queryClient";
 import { useSessionStore } from "../../../shared/auth/sessionStore";
@@ -159,15 +159,6 @@ export function ContentModeration() {
 
   const hasActiveFilters = Boolean(debouncedQuery || topicFilter !== "ALL" || (filter === "PENDING" && quickFilter !== "ALL"));
 
-  const onHorizontalWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
-    const el = event.currentTarget;
-    if (el.scrollWidth <= el.clientWidth) return;
-    if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-      el.scrollLeft += event.deltaY;
-      event.preventDefault();
-    }
-  }, []);
-
   return (
     <div className={s.page}>
       <header className={s.heading}>
@@ -180,82 +171,62 @@ export function ContentModeration() {
         </div>
       </header>
 
+      <div className={s.statusBar}>
+        <div className={s.statusTabs} role="tablist" aria-label="Lọc theo trạng thái">
+          {FILTERS.map(item => {
+            const count = countsResource.data?.[item.value];
+            const active = filter === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={s.statusTab}
+                onClick={() => {
+                  setFilter(item.value);
+                  setPage(0);
+                  setSelectedId("");
+                }}
+              >
+                <span>{item.label}</span>
+                {count !== undefined && <span className={s.statusCount}>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className={s.iconBtn}
+          onClick={() => void refreshAll()}
+          disabled={refreshing}
+          aria-label="Làm mới danh sách"
+          title="Làm mới"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? s.spin : undefined} aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
+        </button>
+      </div>
+
       <div className={s.splitPane}>
         {/* Left pane: Filters + Queue List */}
         <aside className={s.listPane} aria-label="Danh sách mô phỏng">
           <div className={s.listControls}>
-            <div className={s.seg} role="tablist" aria-label="Lọc theo trạng thái" onWheel={onHorizontalWheel}>
-              {FILTERS.map(item => {
-                const count = countsResource.data?.[item.value];
-                const active = filter === item.value;
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    className={s.segItem}
-                    onClick={() => {
-                      setFilter(item.value);
-                      setPage(0);
-                      setSelectedId("");
-                    }}
-                  >
-                    {item.label}
-                    {count !== undefined ? ` · ${count}` : ""}
-                  </button>
-                );
-              })}
-            </div>
-
-            {filter === "PENDING" && (
-              <div className={s.seg} role="group" aria-label="Lọc nhanh mô phỏng chờ duyệt" onWheel={onHorizontalWheel}>
-                {QUICK_FILTERS.map(item => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    aria-pressed={quickFilter === item.value}
-                    className={s.segItem}
-                    onClick={() => {
-                      setQuickFilter(item.value);
-                      setPage(0);
-                      setSelectedId("");
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className={s.searchRow}>
-              <div className={s.searchWrap}>
-                <svg className={s.searchIcon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-                <input
-                  type="search"
-                  className={s.searchInput}
-                  aria-label="Tìm mô phỏng"
-                  placeholder="Tìm tiêu đề, chủ đề, giáo viên, trường"
-                  value={query}
-                  onChange={event => setQuery(event.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className={s.iconBtn}
-                onClick={() => void refreshAll()}
-                disabled={refreshing}
-                aria-label="Làm mới danh sách"
-                title="Làm mới"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={refreshing ? s.spin : undefined} aria-hidden="true">
-                  <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                  <polyline points="21 3 21 9 15 9" />
-                </svg>
-              </button>
+            <div className={s.searchWrap}>
+              <svg className={s.searchIcon} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="search"
+                className={s.searchInput}
+                aria-label="Tìm mô phỏng"
+                placeholder="Tìm tiêu đề, chủ đề, giáo viên, trường"
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+              />
             </div>
 
             {topics.length > 0 && (
@@ -274,6 +245,26 @@ export function ContentModeration() {
                   <option key={topic} value={topic}>{catalog.topicName(topic)}</option>
                 ))}
               </select>
+            )}
+
+            {filter === "PENDING" && (
+              <div className={s.quickChips} role="group" aria-label="Lọc nhanh mô phỏng chờ duyệt">
+                {QUICK_FILTERS.map(item => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-pressed={quickFilter === item.value}
+                    className={s.quickChip}
+                    onClick={() => {
+                      setQuickFilter(item.value);
+                      setPage(0);
+                      setSelectedId("");
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
@@ -311,9 +302,9 @@ export function ContentModeration() {
                       <SimulationTopicThumb topic={topicLabel} title={item.title} />
                     </span>
                     <span className={s.itemBody}>
-                      <strong className={s.itemTitle}>{item.title}</strong>
-                      <span className={s.itemMeta}>{topicLabel}</span>
-                      <span className={s.itemMeta}>
+                      <strong className={s.itemTitle} title={item.title}>{item.title}</strong>
+                      <span className={s.itemMeta} title={topicLabel}>{topicLabel}</span>
+                      <span className={s.itemMeta} title={`${item.sharedByName || "Không rõ người gửi"}${item.schoolName ? ` · ${item.schoolName}` : ""}`}>
                         {item.sharedByName || "Không rõ người gửi"}
                         {item.schoolName ? ` · ${item.schoolName}` : ""}
                       </span>

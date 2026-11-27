@@ -39,6 +39,11 @@ public class ReviewerVersionService {
     }
 
     @Transactional(readOnly = true)
+    public List<SchemaContracts.Response> schemaResponses() {
+        return schemaService.listResponsesWithActors(false);
+    }
+
+    @Transactional(readOnly = true)
     public List<SchemaContracts.Summary> schemaSummaries() {
         return schemaService.listSummaries();
     }
@@ -46,6 +51,16 @@ public class ReviewerVersionService {
     @Transactional(readOnly = true)
     public List<SchemaContracts.Audit> schemaHistory(UUID id) {
         return schemaService.history(id);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.FamilyAudit> allHistory() {
+        return schemaService.allHistory();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.FamilyAudit> familyHistory(String schemaId) {
+        return schemaService.familyHistory(schemaId);
     }
 
     public SchemaVersion updateSchema(UUID id, SchemaContracts.Request request) {

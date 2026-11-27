@@ -9,6 +9,9 @@ export type Version = {
   definitionChecksum?: string;
   recordVersion?: number;
   createdAt: string;
+  createdByName?: string | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
 };
 
 export type ModuleRelease = {

@@ -300,6 +300,26 @@
   border-radius: 5px;
 }
 
+.lawform-kbd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  font: 600 13px var(--font-mono);
+  color: var(--accent-strong, var(--accent));
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line, var(--line-strong));
+  border-radius: 5px;
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: background .15s, border-color .15s;
+}
+
+.lawform-kbd-btn:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
 .lawform-formula {
   min-height: 48px;
   font: 500 19px "Cambria Math", "STIX Two Math", Cambria, Georgia, serif;
@@ -401,7 +421,29 @@
 }
 
 .lawform-combobox>.lawbook-input {
-  padding-right: 34px;
+  padding-right: 58px;
+}
+
+.lawform-combobox-clear {
+  position: absolute;
+  right: 32px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lawform-combobox-clear:hover {
+  background: var(--surface-3);
+  color: var(--ink);
 }
 
 .lawform-combobox-toggle {
@@ -466,10 +508,17 @@
 }
 
 .lawform-combobox-option:hover,
-.lawform-combobox-option.is-selected {
+.lawform-combobox-option.is-selected,
+.lawform-combobox-option.is-highlighted {
   background: var(--accent-soft);
   color: var(--accent-strong, var(--accent));
   font-weight: 500;
+}
+
+.lawform-combobox-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 .lawform-curriculum-chips {

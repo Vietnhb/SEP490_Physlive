@@ -173,6 +173,87 @@ public class SchemaService {
     }
 
     @Transactional(readOnly = true)
+    public List<SchemaContracts.Response> listResponsesWithActors(boolean enabledOnly) {
+        List<SchemaVersion> versions = list(enabledOnly);
+        if (versions.isEmpty() || auditRepository == null) {
+            return versions.stream().map(SchemaContracts.Response::from).toList();
+        }
+        List<UUID> ids = versions.stream().map(SchemaVersion::getId).toList();
+        java.util.Map<UUID, String> creators = new java.util.HashMap<>();
+        java.util.Map<UUID, String> approvers = new java.util.HashMap<>();
+        java.util.Map<UUID, java.time.Instant> approvedDates = new java.util.HashMap<>();
+        for (SchemaVersionAudit audit : auditRepository.findAllBySchemaVersionIdInOrderByCreatedAtDesc(ids)) {
+            UUID versionId = audit.getSchemaVersion().getId();
+            String actorLabel = actorDisplayName(audit);
+            if ("CREATE_DRAFT".equals(audit.getAction()) && actorLabel != null) {
+                creators.putIfAbsent(versionId, actorLabel);
+            } else if ("APPROVE".equals(audit.getAction())) {
+                if (actorLabel != null) approvers.putIfAbsent(versionId, actorLabel);
+                approvedDates.putIfAbsent(versionId, audit.getCreatedAt());
+            }
+        }
+        return versions.stream()
+                .map(v -> SchemaContracts.Response.from(
+                        v,
+                        creators.get(v.getId()),
+                        approvers.get(v.getId()),
+                        approvedDates.get(v.getId())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.FamilyAudit> allHistory() {
+        if (auditRepository == null) {
+            return List.of();
+        }
+        return auditRepository.findTop200ByOrderByCreatedAtDesc().stream()
+                .map(row -> new SchemaContracts.FamilyAudit(
+                        row.getId(),
+                        row.getSchemaVersion().getId(),
+                        row.getSchemaVersion().getSchemaId(),
+                        row.getSchemaVersion().getName(),
+                        row.getSchemaVersion().getVersion(),
+                        row.getActor() == null ? null : row.getActor().getFullName(),
+                        row.getActor() == null ? null : row.getActor().getEmail(),
+                        row.getAction(),
+                        row.getFromStatus(),
+                        row.getToStatus(),
+                        row.getNote(),
+                        row.getCreatedAt()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SchemaContracts.FamilyAudit> familyHistory(String schemaId) {
+        if (auditRepository == null || schemaId == null || schemaId.isBlank()) {
+            return List.of();
+        }
+        return auditRepository.findTop100BySchemaVersionSchemaIdIgnoreCaseOrderByCreatedAtDesc(schemaId.trim()).stream()
+                .map(row -> new SchemaContracts.FamilyAudit(
+                        row.getId(),
+                        row.getSchemaVersion().getId(),
+                        row.getSchemaVersion().getSchemaId(),
+                        row.getSchemaVersion().getName(),
+                        row.getSchemaVersion().getVersion(),
+                        row.getActor() == null ? null : row.getActor().getFullName(),
+                        row.getActor() == null ? null : row.getActor().getEmail(),
+                        row.getAction(),
+                        row.getFromStatus(),
+                        row.getToStatus(),
+                        row.getNote(),
+                        row.getCreatedAt()))
+                .toList();
+    }
+
+    private static String actorDisplayName(SchemaVersionAudit audit) {
+        if (audit.getActor() == null) return null;
+        String name = audit.getActor().getFullName();
+        if (name != null && !name.isBlank()) return name.trim();
+        String email = audit.getActor().getEmail();
+        return (email != null && !email.isBlank()) ? email.trim() : null;
+    }
+
+    @Transactional(readOnly = true)
     public List<SchemaContracts.Audit> history(UUID id) {
         if (!schemaRepository.existsById(id)) {
             throw ApiException.notFound("Không tìm thấy phiên bản mô hình");
