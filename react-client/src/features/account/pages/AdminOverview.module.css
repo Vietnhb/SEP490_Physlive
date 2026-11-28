@@ -41,9 +41,10 @@
 .metricsSection { display: grid; gap: 16px; min-width: 0; }
 .periodBar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .periodBar > span { font-size: 13px; color: var(--m3-muted); font-weight: 500; }
-.dashboard .periodBar :global(.rt-SegmentedControlRoot) { min-height: 40px; border-radius: 999px; background: var(--m3-surface-container); border: 1px solid var(--m3-outline); box-shadow: none; padding: 3px; }
+.dashboard .periodBar :global(.rt-SegmentedControlRoot) { min-height: 38px; border-radius: 999px; background: var(--m3-surface-container); border: 1px solid var(--m3-outline); box-shadow: none; overflow: hidden; }
 .dashboard .periodBar :global(.rt-SegmentedControlItem) { border-radius: 999px; color: var(--m3-muted); font-size: 13px; }
-.dashboard .periodBar :global(.rt-SegmentedControlIndicator) { border-radius: 999px; box-shadow: none; background: var(--m3-primary-container); }
+.dashboard .periodBar :global(.rt-SegmentedControlIndicator),
+.dashboard .periodBar :global(.rt-SegmentedControlIndicator::before) { border-radius: 999px; box-shadow: none; background: var(--m3-primary-container); }
 .dashboard .periodBar :global(.rt-SegmentedControlItem[data-state="on"]) { color: var(--m3-on-primary-container); }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .metric { min-width: 0; border-radius: 20px; padding: 20px; }
