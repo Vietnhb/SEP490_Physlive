@@ -49,11 +49,10 @@ class _StudentAssignmentsScreenState extends State<StudentAssignmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = SessionScope.of(context).user!;
     return Scaffold(
-      appBar: HeroBar(
-        title: 'Chào ${user.fullName.split(' ').last}',
-        subtitle: 'Bài tập được giao',
+      appBar: const HeroBar(
+        title: 'Bài tập được giao',
+        subtitle: 'Tập trung vào bài cần làm hôm nay.',
         art: Art.notebook,
       ),
       body: Loader<List<Assignment>>(
