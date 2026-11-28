@@ -52,7 +52,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final teacher = SessionScope.of(context).user!.isTeacher;
+    final user = SessionScope.of(context).user;
+    if (user == null) return const Scaffold();
+    final teacher = user.isTeacher;
     final shelves = <_Shelf>[
       if (teacher)
         (

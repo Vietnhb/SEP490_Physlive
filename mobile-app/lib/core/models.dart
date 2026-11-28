@@ -23,23 +23,33 @@ class User {
   String? get schoolName => asString(json['schoolName']);
   String? get schoolId => asString(json['schoolId']);
   String? get avatarUrl => asString(json['avatarUrl']);
+  String? get dateOfBirth => asString(json['dateOfBirth']);
   List<String> get permissions => (json['permissions'] is List) ? (json['permissions'] as List).map((e) => '$e').toList() : const [];
   bool get mustChangePassword => asBool(json['mustChangePassword']);
+  bool get billingRequired => asBool(json['billingRequired']);
   bool get suspended => json['active'] == false || json['accountStatus'] == 'SUSPENDED_READ_ONLY';
 
   bool get isStudent => role == 'STUDENT';
   bool get isTeacher => role == 'STAFF' && permissions.contains('TEACH');
+  bool get isDepartmentHead =>
+      role == 'STAFF' &&
+      permissions.any((p) =>
+          p == 'MANAGE_CLASS' ||
+          p == 'MODERATE_SCHOOL_LIBRARY' ||
+          p == 'VIEW_SCHOOL_REPORTS' ||
+          p == 'MANAGE_DEPARTMENT');
+  bool get isDepartmentHeadOnly => isDepartmentHead && !isTeacher;
   bool get isManager => role == 'MANAGER';
   bool get isSchool => role == 'SCHOOL';
   bool get isAdmin => role == 'ADMIN';
   bool get isReviewer => role == 'REVIEWER';
 
-  /// The accounts the app is made for; staff who only run a department work from the web.
-  bool get usesApp => isStudent || isTeacher || isManager || isSchool || isAdmin || isReviewer;
+  /// Every signed-in role is supported on mobile, including department-head-only staff.
+  bool get usesApp => isStudent || isTeacher || isDepartmentHead || isManager || isSchool || isAdmin || isReviewer;
 
   String get roleLabel => switch (role) {
         'STUDENT' => 'Học sinh',
-        'STAFF' => isTeacher ? 'Giáo viên' : 'Cán bộ trường',
+        'STAFF' => isTeacher ? 'Giáo viên' : (isDepartmentHead ? 'Tổ trưởng bộ môn' : 'Cán bộ trường'),
         'SCHOOL' => 'Quản trị trường',
         'MANAGER' => 'Vận hành',
         'REVIEWER' => 'Kiểm duyệt',

@@ -30,10 +30,11 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
   static const _speeds = [0.25, 0.5, 1.0, 2.0];
 
   late final WebViewController _web;
+  final ValueNotifier<({double time, Map<String, double>? exact})> _tick = ValueNotifier((time: 0, exact: null));
+  int _lastTickMs = 0;
   bool _hostReady = false, _ready = false, _playing = true, _loop = false, _dragging = false, _computing = false;
-  double _time = 0, _speed = 1;
+  double _speed = 1;
   String? _error, _computeError;
-  Map<String, double>? _exact;
   late Map<String, double> _draft;
   Timer? _debounce;
   int _run = 0;
@@ -65,6 +66,7 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _debounce?.cancel();
+    _tick.dispose();
     super.dispose();
   }
 
@@ -92,17 +94,13 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
         _hostReady = true;
         _start();
       case 'ready':
-        setState(() {
-          _ready = true;
-          _readTick(data);
-        });
+        _readTick(data, force: true);
+        setState(() => _ready = true);
       case 'tick':
-        if (!_dragging) setState(() => _readTick(data));
+        if (!_dragging) _readTick(data);
       case 'ended':
-        setState(() {
-          _readTick(data);
-          _playing = false;
-        });
+        _readTick(data, force: true);
+        setState(() => _playing = false);
       case 'error':
         setState(() {
           _error = sentenceCase('${data['message'] ?? 'Không dựng được cảnh.'}');
@@ -111,11 +109,15 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
     }
   }
 
-  void _readTick(Json data) {
+  void _readTick(Json data, {bool force = false}) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (!force && now - _lastTickMs < 66) return;
+    _lastTickMs = now;
     final t = asDouble(data['t']);
-    if (t != null) _time = t.clamp(0, _scene.duration).toDouble();
+    final nextTime = t != null ? t.clamp(0, _scene.duration).toDouble() : _tick.value.time;
     final sample = data['sample'];
-    _exact = sample is Map ? {for (final e in sample.entries) '${e.key}': asDouble(e.value) ?? double.nan} : null;
+    final nextExact = sample is Map ? {for (final e in sample.entries) '${e.key}': asDouble(e.value) ?? double.nan} : null;
+    _tick.value = (time: nextTime, exact: nextExact);
   }
 
   void _start() {
@@ -123,10 +125,10 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
       setState(() => _error = 'Mô phỏng này chưa có hình minh hoạ để phát.');
       return;
     }
+    _tick.value = (time: 0, exact: null);
     setState(() {
       _error = null;
       _ready = false;
-      _time = 0;
     });
     final payload = jsonEncode(_scene.stagePayload(_theme));
     final controls = jsonEncode({'speed': _speed * _scene.playbackRate, 'loop': _loop, 'playing': _playing});
@@ -141,12 +143,12 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
   }
 
   void _togglePlay() {
-    if (!_playing && _time >= _scene.duration - 1e-9 && !_loop) _seek(0);
+    if (!_playing && _tick.value.time >= _scene.duration - 1e-9 && !_loop) _seek(0);
     _setPlaying(!_playing);
   }
 
   void _seek(double t) {
-    setState(() => _time = t);
+    _tick.value = (time: t, exact: _tick.value.exact);
     _send({'type': 'seek', 't': t});
   }
 
@@ -175,9 +177,8 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
       if (!mounted || run != _run) return;
       _scene.replaceRun(computed, values);
       _send({'type': 'replace', ..._scene.runPayload()});
+      _tick.value = (time: 0, exact: null);
       setState(() {
-        _time = 0;
-        _exact = null;
         _playing = true;
       });
       _send({'type': 'play', 'playing': true});
@@ -245,7 +246,7 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
             borderRadius: BorderRadius.circular(14),
           ),
           child: Stack(fit: StackFit.expand, children: [
-            if (_error == null) WebViewWidget(controller: _web),
+            if (_error == null) RepaintBoundary(child: WebViewWidget(controller: _web)),
             if (_error == null && !_ready)
               ColoredBox(
                 color: p.surface,
@@ -293,30 +294,33 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
         icon: const Icon(Icons.replay_rounded),
       ),
       Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+        child: ValueListenableBuilder<({double time, Map<String, double>? exact})>(
+          valueListenable: _tick,
+          builder: (context, tick, _) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              ),
+              child: Slider(
+                value: duration > 0 ? tick.time.clamp(0, duration).toDouble() : 0,
+                max: duration > 0 ? duration : 1,
+                onChangeStart: disabled ? null : (_) => _dragging = true,
+                onChanged: disabled ? null : _seek,
+                onChangeEnd: disabled ? null : (_) => _dragging = false,
+              ),
             ),
-            child: Slider(
-              value: duration > 0 ? _time.clamp(0, duration).toDouble() : 0,
-              max: duration > 0 ? duration : 1,
-              onChangeStart: disabled ? null : (_) => _dragging = true,
-              onChanged: disabled ? null : _seek,
-              onChangeEnd: disabled ? null : (_) => _dragging = false,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(children: [
+                Text(formatTime(tick.time, duration),
+                    style: TextStyle(fontSize: 12, color: p.ink, fontFeatures: const [FontFeature.tabularFigures()])),
+                Text(' / ${formatTime(duration, duration)}', style: TextStyle(fontSize: 12, color: p.muted)),
+              ]),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(children: [
-              Text(formatTime(_time, duration),
-                  style: TextStyle(fontSize: 12, color: p.ink, fontFeatures: const [FontFeature.tabularFigures()])),
-              Text(' / ${formatTime(duration, duration)}', style: TextStyle(fontSize: 12, color: p.muted)),
-            ]),
-          ),
-        ]),
+          ]),
+        ),
       ),
       PopupMenuButton<Object>(
         tooltip: 'Tốc độ và lặp lại',
@@ -358,12 +362,15 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
   }
 
   Widget _readouts(Palette p) {
-    final exact = _exact != null && _scene.presentation != null;
-    final values = exact ? _exact! : _scene.sample(_time);
     final keys = _scene.watched.isNotEmpty ? _scene.watched : _scene.fields.keys.take(4).toList();
     if (keys.isEmpty) return const SizedBox.shrink();
     final others = _scene.fields.keys.where((k) => !keys.contains(k)).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return ValueListenableBuilder<({double time, Map<String, double>? exact})>(
+      valueListenable: _tick,
+      builder: (context, tick, _) {
+        final exact = tick.exact != null && _scene.presentation != null;
+        final values = exact ? tick.exact! : _scene.sample(tick.time);
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       LayoutBuilder(builder: (context, box) {
         final width = (box.maxWidth - 8) / 2;
         return Wrap(spacing: 8, runSpacing: 8, children: [
@@ -413,6 +420,8 @@ class _SimulationPlayerState extends State<SimulationPlayer> with WidgetsBinding
           ),
         ),
     ]);
+      },
+    );
   }
 
   Widget _parameters(Palette p) {

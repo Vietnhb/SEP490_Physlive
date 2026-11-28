@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -202,6 +204,7 @@ class HeroBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final canPop = Navigator.of(context).canPop();
     return Material(
       color: p.surface,
       child: SafeArea(
@@ -219,10 +222,20 @@ class HeroBar extends StatelessWidget implements PreferredSizeWidget {
                 bottom: 6,
                 child: ArtImage(art, width: 136),
               ),
+              if (canPop)
+                Positioned(
+                  left: 4,
+                  top: 2,
+                  child: IconButton(
+                    tooltip: 'Quay lại',
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: Icon(Icons.arrow_back_rounded, color: p.ink),
+                  ),
+                ),
               Positioned(
                 left: 20,
                 right: 128,
-                bottom: 16,
+                bottom: 14,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -554,21 +567,42 @@ class Avatar extends StatelessWidget {
         height: 1,
       ),
     );
+    Widget child = initials;
+    final src = url?.trim();
+    if (src != null && src.isNotEmpty) {
+      if (src.startsWith('data:image/')) {
+        final comma = src.indexOf(',');
+        if (comma > 0) {
+          try {
+            final Uint8List bytes = base64Decode(src.substring(comma + 1));
+            child = Image.memory(
+              bytes,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => initials,
+            );
+          } catch (_) {
+            child = initials;
+          }
+        }
+      } else {
+        child = Image.network(
+          src,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => initials,
+        );
+      }
+    }
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(color: t.bg, shape: BoxShape.circle),
       clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,
-      child: url == null || url!.isEmpty
-          ? initials
-          : Image.network(
-              url!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => initials,
-            ),
+      child: child,
     );
   }
 }

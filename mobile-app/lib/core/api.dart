@@ -50,6 +50,9 @@ class ApiClient {
       _send(() => _http.put(_uri(path), headers: _headers, body: body == null ? null : jsonEncode(body)),
           const Duration(seconds: 30));
 
+  Future<dynamic> delete(String path) =>
+      _send(() => _http.delete(_uri(path), headers: _headers), const Duration(seconds: 20));
+
   Future<dynamic> _send(Future<http.Response> Function() request, Duration timeout) async {
     final sentWith = token;
     http.Response response;

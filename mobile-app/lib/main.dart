@@ -4,9 +4,10 @@ import 'package:flutter/services.dart';
 import 'core/config.dart';
 import 'core/session.dart';
 import 'features/account/account_screens.dart';
-import 'features/auth/login_screen.dart';
 import 'features/auth/server_screen.dart';
 import 'features/home/home_shell.dart';
+import 'features/public/public_screens.dart';
+import 'features/school/school_billing_and_reports_screen.dart';
 import 'ui/theme.dart';
 
 Future<void> main() async {
@@ -78,9 +79,13 @@ class _Gate extends StatelessWidget {
     if (session.restoring) {
       screen = const Scaffold(key: ValueKey('splash'), body: Center(child: CircularProgressIndicator()));
     } else if (user == null) {
-      screen = const LoginScreen(key: ValueKey('login'));
+      screen = const PublicShell(key: ValueKey('public'));
+    } else if (user.suspended) {
+      screen = const MySupportScreen(key: ValueKey('suspended-support'));
     } else if (user.mustChangePassword) {
       screen = const ChangePasswordScreen(key: ValueKey('password'), forced: true);
+    } else if (user.isSchool && user.billingRequired) {
+      screen = const SchoolBillingScreen(key: ValueKey('school-billing-required'));
     } else if (!user.usesApp) {
       screen = const WebOnlyScreen(key: ValueKey('web-only'));
     } else {

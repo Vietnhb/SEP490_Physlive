@@ -76,6 +76,16 @@ class Session extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateProfile({required String fullName, String? dateOfBirth, String? avatarUrl}) async {
+    final payload = <String, dynamic>{
+      'fullName': fullName.trim(),
+      if (dateOfBirth != null && dateOfBirth.trim().isNotEmpty) 'dateOfBirth': dateOfBirth.trim(),
+      if (avatarUrl != null && avatarUrl.trim().isNotEmpty) 'avatarUrl': avatarUrl.trim(),
+    };
+    _user = User(asJson(await api.put('/user/me/profile', payload)));
+    notifyListeners();
+  }
+
   Future<void> refreshUser() async {
     _user = User(asJson(await api.get('/user/me')));
     notifyListeners();
@@ -106,6 +116,9 @@ class SessionScope extends InheritedNotifier<Session> {
 
   static Session of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<SessionScope>()!.notifier!;
+
+  static Session read(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SessionScope>()!.notifier!;
 
   static ApiClient api(BuildContext context) =>
       context.getInheritedWidgetOfExactType<SessionScope>()!.notifier!.api;
