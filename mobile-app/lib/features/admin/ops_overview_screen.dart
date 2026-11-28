@@ -4,6 +4,8 @@ import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
+import '../account/account_screens.dart';
+import '../manager/manager_modules_screen.dart';
 import 'payments_screen.dart';
 
 class _Overview {
@@ -20,7 +22,7 @@ class OpsOverviewScreen extends StatelessWidget {
 
   Future<_Overview> _load(BuildContext context) async {
     final api = SessionScope.api(context);
-    final manager = SessionScope.of(context).user!.isManager;
+    final manager = SessionScope.read(context).user?.isManager ?? false;
     final results = await Future.wait([
       api.get('/admin/overview-counts'),
       // the inbox and the revenue are extras: the overview still shows without them
@@ -35,13 +37,10 @@ class OpsOverviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = SessionScope.of(context).user!;
+    final user = SessionScope.of(context).user;
+    if (user == null) return const Scaffold();
     return Scaffold(
-      appBar: HeroBar(
-        title: 'Tổng quan',
-        subtitle: 'Xin chào, ${user.fullName.split(' ').last}',
-        art: Art.ops,
-      ),
+      appBar: RoleTopBar(subtitle: user.isManager ? 'Vận hành' : 'Quản trị'),
       body: Loader<_Overview>(
         load: () => _load(context),
         skeleton: const SkeletonList(withStats: true, count: 3),
@@ -100,6 +99,9 @@ class OpsOverviewScreen extends StatelessWidget {
                   icon: Icons.verified_rounded,
                   tint: p.green,
                   detail: 'mô phỏng đã chạy',
+                  onTap: user.isManager
+                      ? () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManagerValidationScreen()))
+                      : null,
                 ),
                 StatTile(
                   label: 'Không đạt',
@@ -107,11 +109,41 @@ class OpsOverviewScreen extends StatelessWidget {
                   icon: Icons.report_gmailerrorred_rounded,
                   tint: p.rose,
                   detail: '${failureRate.toStringAsFixed(1)}% tổng số',
+                  onTap: user.isManager
+                      ? () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManagerValidationScreen()))
+                      : null,
                 ),
               ),
-              const SizedBox(height: 18),
-              Text('Gói dịch vụ, chương trình học và kiểm định chi tiết dùng trên bản web.',
-                  textAlign: TextAlign.center, style: TextStyle(color: p.muted, fontSize: 12)),
+              if (user.isManager) ...[
+                const SizedBox(height: 12),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                        child: Text('Cần theo dõi', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.bar_chart_rounded, color: p.teal.fg),
+                        title: const Text('Sử dụng khách hàng', style: TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text('Theo dõi lượt dùng AI & sắp hết hạn', style: TextStyle(color: p.muted, fontSize: 12)),
+                        trailing: Icon(Icons.chevron_right_rounded, color: p.muted),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManagerUsageScreen())),
+                      ),
+                      Divider(height: 1, indent: 56, color: p.line),
+                      ListTile(
+                        leading: Icon(Icons.mail_outline_rounded, color: p.blue.fg),
+                        title: const Text('Nhật ký email tự động', style: TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text('Xem trạng thái gửi và phản hồi', style: TextStyle(color: p.muted, fontSize: 12)),
+                        trailing: Icon(Icons.chevron_right_rounded, color: p.muted),
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ManagerEmailsScreen())),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ]),
           );
         },

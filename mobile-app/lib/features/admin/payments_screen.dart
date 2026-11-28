@@ -22,6 +22,10 @@ class PaymentsScreen extends StatefulWidget {
 class _PaymentsScreenState extends State<PaymentsScreen> {
   _Status _status = _Status.all;
   String _query = '';
+  int? _year;
+  int? _month;
+  String? _planCode;
+  int _limit = 15;
 
   Future<List<Payment>> _load() async {
     final items = asJsonList(await SessionScope.api(context).get('/admin/payments')).map(Payment.new).toList();
@@ -39,13 +43,32 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
       body: Loader<List<Payment>>(
         load: _load,
         skeleton: const SkeletonList(withStats: true),
-        builder: (context, items, reload) {
-          final paid = items.where((x) => x.paid).toList();
-          final failed = items.where((x) => x.failed).toList();
-          final pending = items.where((x) => !x.paid && !x.failed).toList();
+        builder: (context, allItems, reload) {
+          final years = <int>{
+            for (final x in allItems)
+              if (x.createdAt != null) x.createdAt!.year,
+          }.toList()
+            ..sort((a, b) => b.compareTo(a));
+          final plans = <String>{
+            for (final x in allItems)
+              if (x.planCode.isNotEmpty) x.planCode,
+          }.toList()
+            ..sort();
+
+          // Apply year / month / plan filter first so KPIs & status counts match the selected period
+          final scoped = allItems.where((x) {
+            if (_year != null && x.createdAt?.year != _year) return false;
+            if (_month != null && x.createdAt?.month != _month) return false;
+            if (_planCode != null && x.planCode != _planCode) return false;
+            return true;
+          }).toList();
+
+          final paid = scoped.where((x) => x.paid).toList();
+          final failed = scoped.where((x) => x.failed).toList();
+          final pending = scoped.where((x) => !x.paid && !x.failed).toList();
           final query = _query.toLowerCase();
-          final shown = switch (_status) {
-            _Status.all => items,
+          final filtered = switch (_status) {
+            _Status.all => scoped,
             _Status.paid => paid,
             _Status.failed => failed,
             _Status.pending => pending,
@@ -53,6 +76,11 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               .where((x) => query.isEmpty ||
                   '${x.schoolName} ${x.managerEmail ?? ''} ${x.planCode}'.toLowerCase().contains(query))
               .toList();
+
+          final shown = filtered.take(_limit).toList();
+          final remaining = (filtered.length - shown.length).clamp(0, filtered.length);
+          final hasExtraFilters = _year != null || _month != null || _planCode != null;
+
           // one heading per month, newest first
           final groups = <String, List<Payment>>{};
           for (final x in shown) {
@@ -78,14 +106,98 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   tint: p.rose,
                 ),
               ),
-              const SizedBox(height: 14),
-              SearchBox(hint: 'Tìm theo trường, email, gói', onChanged: (v) => setState(() => _query = v)),
+              const SizedBox(height: 12),
+              SearchBox(
+                hint: 'Tìm theo trường, email, gói',
+                onChanged: (v) => setState(() {
+                  _query = v;
+                  _limit = 15;
+                }),
+              ),
               const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int?>(
+                      initialValue: years.contains(_year) ? _year : null,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(14),
+                      dropdownColor: p.surface,
+                      elevation: 4,
+                      decoration: const InputDecoration(labelText: 'Năm', isDense: true),
+                      items: [
+                        const DropdownMenuItem<int?>(value: null, child: Text('Tất cả năm', overflow: TextOverflow.ellipsis)),
+                        for (final y in years) DropdownMenuItem<int?>(value: y, child: Text('$y')),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _year = v;
+                        _limit = 15;
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<int?>(
+                      initialValue: _month,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(14),
+                      dropdownColor: p.surface,
+                      elevation: 4,
+                      menuMaxHeight: 300,
+                      decoration: const InputDecoration(labelText: 'Tháng', isDense: true),
+                      items: [
+                        const DropdownMenuItem<int?>(value: null, child: Text('Tất cả tháng', overflow: TextOverflow.ellipsis)),
+                        for (var m = 1; m <= 12; m++) DropdownMenuItem<int?>(value: m, child: Text('Tháng $m')),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _month = v;
+                        _limit = 15;
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: plans.contains(_planCode) ? _planCode : null,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(14),
+                      dropdownColor: p.surface,
+                      elevation: 4,
+                      decoration: const InputDecoration(labelText: 'Gói', isDense: true),
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('Tất cả gói', overflow: TextOverflow.ellipsis)),
+                        for (final c in plans) DropdownMenuItem<String?>(value: c, child: Text(_plan(c), overflow: TextOverflow.ellipsis)),
+                      ],
+                      onChanged: (v) => setState(() {
+                        _planCode = v;
+                        _limit = 15;
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+              if (hasExtraFilters)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => setState(() {
+                      _year = null;
+                      _month = null;
+                      _planCode = null;
+                      _limit = 15;
+                    }),
+                    child: const Text('Xóa bộ lọc'),
+                  ),
+                ),
+              const SizedBox(height: 8),
               ChoiceRow<_Status>(
                 selected: _status,
-                onSelected: (s) => setState(() => _status = s),
+                onSelected: (s) => setState(() {
+                  _status = s;
+                  _limit = 15;
+                }),
                 options: [
-                  (_Status.all, 'Tất cả', items.length),
+                  (_Status.all, 'Tất cả', scoped.length),
                   (_Status.paid, 'Đã thanh toán', paid.length),
                   (_Status.failed, 'Thất bại', failed.length),
                   (_Status.pending, 'Đang chờ', pending.length),
@@ -94,7 +206,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
               const SizedBox(height: 6),
               if (shown.isEmpty)
                 const EmptyState(art: Art.billing, title: 'Không có giao dịch phù hợp')
-              else
+              else ...[
                 for (final entry in groups.entries) ...[
                   GroupLabel(entry.key,
                       trailing: Text(
@@ -112,6 +224,25 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                   ),
                   const SizedBox(height: 6),
                 ],
+                if (remaining > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() => _limit += 20),
+                      icon: const Icon(Icons.expand_more_rounded, size: 18),
+                      label: Text('Xem thêm (còn $remaining giao dịch)'),
+                    ),
+                  )
+                else if (filtered.length > 15)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _limit = 15),
+                      icon: const Icon(Icons.expand_less_rounded, size: 18),
+                      label: const Text('Thu gọn danh sách'),
+                    ),
+                  ),
+              ],
             ]),
           );
         },
