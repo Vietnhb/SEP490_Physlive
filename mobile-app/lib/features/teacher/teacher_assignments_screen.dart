@@ -6,6 +6,7 @@ import '../../core/session.dart';
 import '../../ui/theme.dart';
 import '../../ui/widgets.dart';
 import 'teacher_assignment_screen.dart';
+import 'teacher_composer_and_lab_screen.dart';
 
 enum _Filter { open, toGrade, late, closed }
 
@@ -63,6 +64,16 @@ class _TeacherAssignmentsScreenState extends State<TeacherAssignmentsScreen> {
     final p = context.palette;
     return Scaffold(
       appBar: const HeroBar(title: 'Bài đã giao', subtitle: 'Giảng dạy', art: Art.assign),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final created = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(builder: (_) => const TeacherComposerScreen()),
+          );
+          if (created == true && mounted) setState(() => _reload++);
+        },
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Giao bài mới'),
+      ),
       body: Loader<_Data>(
         load: _load,
         reloadKey: _reload,
