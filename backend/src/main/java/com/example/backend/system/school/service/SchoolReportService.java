@@ -45,15 +45,42 @@ public class SchoolReportService {
     private final TokenUsageAuditRepository tokenAudits;
 
     public Summary summary(UUID schoolId) {
+        return summary(schoolId, null, null);
+    }
+
+    public Summary summary(UUID schoolId, String month, Integer year) {
         requireAccess(schoolId); School school = school(schoolId);
         long teachers = users.countReportAccounts(schoolId, RoleName.STAFF.name());
         long students = users.countActiveStudents(schoolId);
         long managers = users.countReportAccounts(schoolId, RoleName.SCHOOL.name());
         long enrolled = enrollments.countActiveStudentsBySchoolId(schoolId);
+        LocalDate currentMonth = aiQuota.currentMonth();
+        LocalDate usageMonth = currentMonth;
+        long usedTokens;
+        if (month != null && !month.isBlank()) {
+            usageMonth = parseMonth(month);
+            if (usageMonth.equals(currentMonth)) {
+                usedTokens = aiQuota.usedThisMonth(school);
+            } else {
+                usedTokens = tokenAudits.monthlyTokens(schoolId, usageMonth, usageMonth).stream()
+                        .mapToLong(r -> r.getTokens() == null ? 0L : r.getTokens()).sum();
+            }
+        } else if (year != null) {
+            validateYear(year);
+            LocalDate start = LocalDate.of(year, 1, 1);
+            LocalDate end = LocalDate.of(year, 12, 1);
+            usageMonth = start;
+            var totals = tokenAudits.monthlyTokens(schoolId, start, end).stream().collect(java.util.stream.Collectors.toMap(
+                    TokenUsageAuditRepository.MonthlyTokens::getMonth, r -> r.getTokens() == null ? 0L : r.getTokens()));
+            if (currentMonth.getYear() == year) totals.put(currentMonth, aiQuota.usedThisMonth(school));
+            usedTokens = totals.values().stream().mapToLong(Long::longValue).sum();
+        } else {
+            usedTokens = aiQuota.usedThisMonth(school);
+        }
         return new Summary(schoolId, school.getName(), students, teachers, managers,
                 classes.countBySchoolIdAndIsActiveTrue(schoolId), enrolled,
-                aiQuota.usedThisMonth(school), school.getMonthlyTokenQuota(), school.getLicenseEnd(),
-                aiQuota.currentMonth(), school.getStudentQuota(), school.getPlanCode(), school.getLicenseStart(),
+                usedTokens, school.getMonthlyTokenQuota(), school.getLicenseEnd(),
+                usageMonth, school.getStudentQuota(), school.getPlanCode(), school.getLicenseStart(),
                 SchoolContracts.Response.from(school).subscriptionStatus());
     }
 
@@ -71,17 +98,34 @@ public class SchoolReportService {
     }
 
     public List<com.example.backend.system.school.dto.SchoolReportContracts.MonthlyTokenRow> monthlyTokens(UUID schoolId) {
+        return monthlyTokens(schoolId, null, null);
+    }
+
+    public List<com.example.backend.system.school.dto.SchoolReportContracts.MonthlyTokenRow> monthlyTokens(UUID schoolId, String month, Integer year) {
         requireAccess(schoolId);
         School school = school(schoolId);
-        LocalDate end = aiQuota.currentMonth();
-        LocalDate start = end.minusMonths(5);
+        LocalDate currentMonth = aiQuota.currentMonth();
+        LocalDate start;
+        LocalDate end;
+        int count;
+        if (year != null && (month == null || month.isBlank())) {
+            validateYear(year);
+            start = LocalDate.of(year, 1, 1);
+            end = LocalDate.of(year, 12, 1);
+            count = 12;
+        } else {
+            end = (month != null && !month.isBlank()) ? parseMonth(month) : currentMonth;
+            start = end.minusMonths(5);
+            count = 6;
+        }
         var totals = tokenAudits.monthlyTokens(schoolId, start, end).stream().collect(java.util.stream.Collectors.toMap(
                 TokenUsageAuditRepository.MonthlyTokens::getMonth, row -> row.getTokens() == null ? 0L : row.getTokens()));
-        // The current month uses the same quota counter as the dashboard summary.
-        totals.put(end, aiQuota.usedThisMonth(school));
-        return java.util.stream.IntStream.range(0, 6).mapToObj(offset -> {
-            LocalDate month = start.plusMonths(offset);
-            return new com.example.backend.system.school.dto.SchoolReportContracts.MonthlyTokenRow(month, totals.getOrDefault(month, 0L));
+        if (!currentMonth.isBefore(start) && !currentMonth.isAfter(end)) {
+            totals.put(currentMonth, aiQuota.usedThisMonth(school));
+        }
+        return java.util.stream.IntStream.range(0, count).mapToObj(offset -> {
+            LocalDate m = start.plusMonths(offset);
+            return new com.example.backend.system.school.dto.SchoolReportContracts.MonthlyTokenRow(m, totals.getOrDefault(m, 0L));
         }).toList();
     }
 
@@ -104,18 +148,25 @@ public class SchoolReportService {
     }
 
     public TokenPage tokenPage(UUID schoolId, int page, int size, String query, String operation, String month) {
+        return tokenPage(schoolId, page, size, query, operation, month, null);
+    }
+
+    public TokenPage tokenPage(UUID schoolId, int page, int size, String query, String operation, String month, Integer year) {
         requireAccess(schoolId);
         if (page < 0 || size < 1 || size > 100) throw ApiException.badRequest("Phân trang không hợp lệ (1–100 dòng/trang).");
         if ((query != null && query.length() > 200) || (operation != null && operation.length() > 64))
             throw ApiException.badRequest("Bộ lọc quá dài.");
-        LocalDate usageMonth;
-        try { usageMonth = month == null || month.isBlank() ? null : YearMonth.parse(month).atDay(1); }
-        catch (java.time.format.DateTimeParseException invalid) { throw ApiException.badRequest("Tháng cần có dạng yyyy-MM."); }
+        LocalDate usageMonth = (month == null || month.isBlank()) ? null : parseMonth(month);
+        if (usageMonth == null && year != null) validateYear(year);
         String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         Specification<TokenUsageAudit> filter = (root, criteria, cb) -> {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
             predicates.add(cb.equal(root.get("school").get("id"), schoolId));
             if (usageMonth != null) predicates.add(cb.equal(root.get("usageMonth"), usageMonth));
+            else if (year != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("usageMonth"), LocalDate.of(year, 1, 1)));
+                predicates.add(cb.lessThanOrEqualTo(root.get("usageMonth"), LocalDate.of(year, 12, 31)));
+            }
             if (operation != null && !operation.isBlank()) predicates.add(cb.equal(root.get("operation"), operation));
             if (!needle.isEmpty()) {
                 String escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
@@ -130,6 +181,15 @@ public class SchoolReportService {
         var items = result.getContent().stream().map(row -> new TokenRow(row.getUser().getEmail(), row.getOperation(),
                 row.getTokens(), row.getUsageMonth(), row.getRecordedAt())).toList();
         return new TokenPage(items, result.getTotalElements(), result.getTotalPages(), result.getNumber(), result.getSize());
+    }
+
+    private static LocalDate parseMonth(String month) {
+        try { return YearMonth.parse(month.trim()).atDay(1); }
+        catch (java.time.format.DateTimeParseException invalid) { throw ApiException.badRequest("Tháng cần có dạng yyyy-MM."); }
+    }
+
+    private static void validateYear(int year) {
+        if (year < 2000 || year > 2100) throw ApiException.badRequest("Năm không hợp lệ.");
     }
 
     private School school(UUID schoolId) { return schools.findById(schoolId).orElseThrow(() -> ApiException.notFound("Không tìm thấy trường")); }

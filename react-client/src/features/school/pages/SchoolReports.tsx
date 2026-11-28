@@ -38,9 +38,16 @@ export default function SchoolReports() {
   const [tokenMonth, setTokenMonth] = useState("ALL");
   const [tokenPage, setTokenPage] = useState(0);
   const [tokenSize, setTokenSize] = useState(10);
+  const now = new Date();
+  const [periodMode, setPeriodMode] = useState<"MONTH" | "YEAR">("MONTH");
+  const [reportYear, setReportYear] = useState(now.getFullYear());
+  const [reportMonth, setReportMonth] = useState(now.getMonth() + 1);
+
+  const selectedMonthIso = `${reportYear}-${String(reportMonth).padStart(2, "0")}`;
+  const summaryQuery = periodMode === "YEAR" ? `?year=${reportYear}` : `?month=${selectedMonthIso}`;
 
   const base = "/schools/" + schoolId + "/reports";
-  const summaryResource = useResource<SchoolReportSummary>(base + "/summary", Boolean(schoolId));
+  const summaryResource = useResource<SchoolReportSummary>(base + "/summary" + summaryQuery, Boolean(schoolId));
   const classesResource = useResource<SchoolReportClass[]>(base + "/classes", Boolean(schoolId));
   const optionsResource = useResource<SchoolTokenOptions>(base + "/token-audit/options", Boolean(schoolId));
   const search = useDebouncedValue(tokenQuery.trim());
@@ -48,6 +55,7 @@ export default function SchoolReports() {
   if (search) params.set("query", search);
   if (tokenOperation !== "ALL") params.set("operation", tokenOperation);
   if (tokenMonth !== "ALL") params.set("month", tokenMonth);
+  else if (periodMode === "YEAR") params.set("year", String(reportYear));
   const tokensResource = useResource<SchoolTokenPage>(base + "/token-audit/page?" + params, Boolean(schoolId));
   const summary = summaryResource.data;
   const classes = useMemo(() => classesResource.data ?? [], [classesResource.data]);
@@ -59,6 +67,16 @@ export default function SchoolReports() {
   const tokenError = tokensResource.error;
   const refreshing = summaryResource.refreshing || classesResource.refreshing || optionsResource.refreshing || tokensResource.refreshing;
   const load = () => { setError(""); return Promise.all([summaryResource.refresh(), classesResource.refresh(), optionsResource.refresh()]); };
+
+  const reportYears = useMemo(() => {
+    const set = new Set<number>([now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]);
+    for (const m of options.months) {
+      const y = Number(m.slice(0, 4));
+      if (Number.isFinite(y)) set.add(y);
+    }
+    return [...set].sort((a, b) => b - a);
+  }, [options.months, now]);
+  const periodLabel = periodMode === "YEAR" ? `Năm ${reportYear}` : `Tháng ${reportMonth}/${reportYear}`;
 
   const years = useMemo(() => [...new Set(classes.map(item => item.schoolYear))].sort(compareCodeUnits).reverse(), [classes]);
   const filteredClasses = useMemo(() => classes.filter(item => item.name.toLocaleLowerCase("vi").includes(classQuery.trim().toLocaleLowerCase("vi"))
@@ -79,8 +97,31 @@ export default function SchoolReports() {
 
   if (!schoolId) return null;
   return <div className={`admin-content ${s.reports}`} data-analytics="report" data-report-design="school">
-    {summary && <section data-kpis aria-label="Tổng hợp báo cáo trường">{[{label:"Học sinh đang hoạt động",value:summary.students,note:"Tài khoản thuộc trường"},{label:"Giáo viên",value:summary.teachers,note:"Tài khoản giảng dạy"},{label:"Lớp đang hoạt động",value:summary.activeClasses,note:"Toàn bộ năm học"},{label:"Token AI tháng này",value:summary.usedTokens,note:monthLabel(summary.usageMonth)}].map(item=><article data-kpi key={item.label}><span>{item.label}</span><strong>{number(item.value)}</strong><small>{item.note}</small></article>)}</section>}
-    <PageActions><RefreshButton onClick={() => { void load(); void tokensResource.refresh(); }} disabled={refreshing} /></PageActions>
+    {summary && <section data-kpis aria-label="Tổng hợp báo cáo trường">{[{label:"Học sinh đang hoạt động",value:summary.students,note:"Tài khoản thuộc trường"},{label:"Giáo viên",value:summary.teachers,note:"Tài khoản giảng dạy"},{label:"Lớp đang hoạt động",value:summary.activeClasses,note:"Toàn bộ năm học"},{label:periodMode === "YEAR" ? `Token AI năm ${reportYear}` : "Token AI trong tháng",value:summary.usedTokens,note:periodLabel}].map(item=><article data-kpi key={item.label}><span>{item.label}</span><strong>{number(item.value)}</strong><small>{item.note}</small></article>)}</section>}
+    <PageActions>
+      <Select.Root size="2" value={periodMode} onValueChange={v => { setPeriodMode(v as "MONTH" | "YEAR"); setTokenPage(0); }}>
+        <Select.Trigger aria-label="Chế độ lọc thời gian" />
+        <Select.Content position="popper">
+          <Select.Item value="MONTH">Theo tháng</Select.Item>
+          <Select.Item value="YEAR">Theo năm</Select.Item>
+        </Select.Content>
+      </Select.Root>
+      {periodMode === "MONTH" && (
+        <Select.Root size="2" value={String(reportMonth)} onValueChange={v => { setReportMonth(Number(v)); setTokenPage(0); }}>
+          <Select.Trigger aria-label="Chọn tháng báo cáo" />
+          <Select.Content position="popper">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <Select.Item key={m} value={String(m)}>Tháng {m}</Select.Item>)}
+          </Select.Content>
+        </Select.Root>
+      )}
+      <Select.Root size="2" value={String(reportYear)} onValueChange={v => { setReportYear(Number(v)); setTokenPage(0); }}>
+        <Select.Trigger aria-label="Chọn năm báo cáo" />
+        <Select.Content position="popper">
+          {reportYears.map(y => <Select.Item key={y} value={String(y)}>Năm {y}</Select.Item>)}
+        </Select.Content>
+      </Select.Root>
+      <RefreshButton onClick={() => { void load(); void tokensResource.refresh(); }} disabled={refreshing} />
+    </PageActions>
     {error && <Callout.Root color="red" role="alert"><Callout.Text>{error}</Callout.Text><Button variant="soft" onClick={() => void load()}>Thử lại</Button></Callout.Root>}
     {notice && <Callout.Root color="green" role="status"><Callout.Text>{notice}</Callout.Text></Callout.Root>}
     {loading && !summary ? <DashboardLoadingSkeleton cards={4} label="Đang tải báo cáo…" /> : summary && <>

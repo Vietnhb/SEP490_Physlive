@@ -17,8 +17,10 @@ public class SchoolReportController {
     private final SchoolReportService service;
 
     @GetMapping("/summary")
-    public SchoolReportContracts.Summary summary(@PathVariable UUID schoolId) {
-        return service.summary(schoolId);
+    public SchoolReportContracts.Summary summary(@PathVariable UUID schoolId,
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) Integer year) {
+        return service.summary(schoolId, month, year);
     }
 
     @GetMapping("/classes")
@@ -27,8 +29,10 @@ public class SchoolReportController {
     }
 
     @GetMapping("/tokens/monthly")
-    public List<SchoolReportContracts.MonthlyTokenRow> monthlyTokens(@PathVariable UUID schoolId) {
-        return service.monthlyTokens(schoolId);
+    public List<SchoolReportContracts.MonthlyTokenRow> monthlyTokens(@PathVariable UUID schoolId,
+            @RequestParam(required = false) String month,
+            @RequestParam(required = false) Integer year) {
+        return service.monthlyTokens(schoolId, month, year);
     }
 
     @GetMapping("/token-audit")
@@ -40,8 +44,8 @@ public class SchoolReportController {
     public SchoolReportContracts.TokenPage tokenPage(@PathVariable UUID schoolId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String query, @RequestParam(required = false) String operation,
-            @RequestParam(required = false) String month) {
-        return service.tokenPage(schoolId, page, size, query, operation, month);
+            @RequestParam(required = false) String month, @RequestParam(required = false) Integer year) {
+        return service.tokenPage(schoolId, page, size, query, operation, month, year);
     }
 
     @GetMapping("/token-audit/options")
